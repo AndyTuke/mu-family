@@ -6,6 +6,7 @@
 // shared layout is caught here. Like the rest of the family it does NOT construct the
 // full PluginProcessor (its createEditor() drags the editor/UI tree in - see the backlog).
 
+#include "Plugin/MuOnLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams
 #include "Persistence/TrackParams.h"   // the Track type's per-slot table
@@ -44,7 +45,7 @@ public:
     {
         StubProcessor proc;
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_mixfx::addGlobalFxParams (layout);
+        mu_mixfx::addGlobalFxParams (layout, 0, mu_on::kLimits);
         juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
 
         beginTest ("Core global-FX / return / master params exist");
@@ -80,7 +81,7 @@ public:
         beginTest ("addLayerParams adds exactly eng, src, swing, accent and every engine's parameters of one slot, under its prefix");
         StubProcessor proc;
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        mu_on::addLayerParams (layout, 3);
+        mu_on::addLayerParams (layout, 3, mu_on::kLimits.layers);
         juce::AudioProcessorValueTreeState apvts (proc, nullptr, "PARAMS", std::move (layout));
 
         int expected = 4 + 1 + 1 + 6 + 1 + 1 + 2;   // eng, src, swing, accent, prob, level, and the insert (algorithm + four knobs + Sync), the ghost level, the Fill target, and the Speed and Play Mode

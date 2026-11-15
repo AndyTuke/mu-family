@@ -8,6 +8,7 @@
 // from this console target, so the numRhythms clamp itself is covered by the
 // listening / smoke plan.
 
+#include "Plugin/MuClidLimits.h"
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include "MuLimits.h"
@@ -53,8 +54,7 @@ public:
     {
         beginTest ("limits: eight layers and 64 steps are the family maximums");
         {
-            expectEquals (mu_limits::kMaxLayers, 8);
-            expectEquals ((int) RhythmSequencer::MaxRhythms, 8);
+            expectEquals (mu_clid::kLimits.layers, 8);
             expectEquals ((int) HitGenerator::kMaxSteps, 64);
         }
 
@@ -94,10 +94,10 @@ public:
         {
             const auto* def = findDef ("stepsA");
             juce::ValueTree preset ("MuClidPreset");
-            preset.setProperty ("numRhythms", mu_limits::kMaxLayers, nullptr);
+            preset.setProperty ("numRhythms", mu_clid::kLimits.layers, nullptr);
 
             // One child per rhythm, each with a distinct step count up to 64.
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_clid::kLimits.layers; ++i)
             {
                 Rhythm r;
                 setSteps (r, (float) (64 - i * 3));

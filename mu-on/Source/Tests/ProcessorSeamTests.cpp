@@ -2,6 +2,7 @@
 // construction under a temp storage root, layer ownership after construction, and the structural
 // edits (add / delete / reorder) on a processor whose layers are tracks with an engine.
 
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
@@ -61,7 +62,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
         expectEquals(p.unsavedLayerCount, 5, "an older state without a layer count held five lanes");
         expect(p.getLayer(1) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
         std::set<const void*> seen;
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_on::kLimits.layers; ++i)
         {
             expect(p.layers[(size_t) i] != nullptr, "slot " + juce::String(i) + " is allocated");
             expect(&p.getTrack(i) == p.layers[(size_t) i].get(), "getTrack(" + juce::String(i) + ") is layer " + juce::String(i));
@@ -69,7 +70,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             expectEquals(p.getTrack(i).slot, i, "the track knows its slot");
         }
         expect(p.getLayer(0) == &p.getTrack(0), "getLayer(0) is getTrack(0)");
-        expectEquals((int) seen.size(), mu_limits::kMaxLayers, "distinct tracks");
+        expectEquals((int) seen.size(), mu_on::kLimits.layers, "distinct tracks");
         expect(p.getTrackEngine(0) == EngineType::Kick, "the fresh track is a Kick");
         expectEquals(p.getLayerName(0), juce::String("Kick"), "a track is named after its engine");
         for (int s = 0; s < 16; ++s)
@@ -77,7 +78,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
         expect(p.pattern().isAccent(0, 0), "the downbeat is accented");
 
         beginTest("Each track writes its own step row; the Rumble envelope is written only once it is drawn");
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_on::kLimits.layers; ++i)
         {
             juce::ValueTree node("Slot");
             p.getTrack(i).writeExtras(node);
@@ -125,7 +126,7 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             TempStorage storage;
             ExposedPluginProcessor p;
             const int expectedEngines[] = { 0, 1, 2, 3, 4, 0, 0, 0 };   // Kick, Bass, Hat, Snare, Rumble, then Kick again
-            for (int i = 1; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 1; i < mu_on::kLimits.layers; ++i)
             {
                 expectEquals(p.addLayer(), i, "addLayer appends");
                 expectEquals(engineIndex(p, i), expectedEngines[i], "track " + juce::String(i) + " engine");
@@ -259,9 +260,9 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             [&](const juce::String& where)
             {
                 const int n = stress.numLayers.load();
-                expect(n >= 1 && n <= mu_limits::kMaxLayers, where + ": count in range");
+                expect(n >= 1 && n <= mu_on::kLimits.layers, where + ": count in range");
                 std::set<const void*> distinct;
-                for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+                for (int i = 0; i < mu_on::kLimits.layers; ++i)
                 {
                     expect(stress.layers[(size_t) i] != nullptr, where + ": slot " + juce::String(i) + " is filled");
                     distinct.insert(stress.layers[(size_t) i].get());
@@ -275,9 +276,9 @@ struct MuOnProcessorSeamTests : juce::UnitTest
                     row.setOn(15, before);
 
                     const int src = rumbleSource(stress, i);
-                    expect(src >= 0 && src < mu_limits::kMaxLayers, where + ": the Rumble source is a layer index");
+                    expect(src >= 0 && src < mu_on::kLimits.layers, where + ": the Rumble source is a layer index");
                 }
-                expectEquals((int) distinct.size(), mu_limits::kMaxLayers, where + ": no layer appears twice");
+                expectEquals((int) distinct.size(), mu_on::kLimits.layers, where + ": no layer appears twice");
             });
     }
 };
@@ -319,14 +320,14 @@ struct MuOnRowGrooveTests : juce::UnitTest
             b.processBlock(buf, midi);
         };
         block();
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_on::kLimits.layers; ++i)
         {
             expectEquals(b.getTrack(i).row.swingAmount(), 0.0f, "a fresh row has the default swing");
             expectEquals(b.getTrack(i).row.accentVelocity(), 1.0f, "and the default accent");
         }
         b.setStateInformation(saved.getData(), (int) saved.getSize());
         block();
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_on::kLimits.layers; ++i)
         {
             const bool three = i == 3;
             expectWithinAbsoluteError(b.getTrack(i).row.swingAmount(), three ? 0.35f : 0.0f, 1.0e-6f, "track " + juce::String(i) + " swing");

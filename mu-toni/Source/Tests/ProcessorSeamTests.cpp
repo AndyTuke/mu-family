@@ -1,6 +1,7 @@
 // Tests on the REAL mu-Toni PluginProcessor, built headless (no editor, host or audio device):
 // construction under a temp storage root and layer ownership after construction.
 
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
@@ -184,14 +185,14 @@ struct MuToniProcessorSeamTests : juce::UnitTest
         expectEquals(p.getNumLayers(), 1);
         expect(p.getLayer(1) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
         std::set<const void*> seen;
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_toni::kLimits.layers; ++i)
         {
             expect(p.layers[(size_t) i] != nullptr, "slot " + juce::String(i) + " is allocated");
             expect(&p.getArp(i) == p.layers[(size_t) i].get(), "getArp(" + juce::String(i) + ") is layer " + juce::String(i));
             seen.insert(&p.getArp(i));
         }
         expect(p.getLayer(0) == &p.getArp(0), "getLayer(0) is getArp(0)");
-        expectEquals((int) seen.size(), mu_limits::kMaxLayers, "distinct arps");
+        expectEquals((int) seen.size(), mu_toni::kLimits.layers, "distinct arps");
 
         beginTest("prepareToPlay and a processBlock run under the temp root");
         p.prepareToPlay(48000.0, 256);
@@ -227,14 +228,14 @@ struct MuToniProcessorSeamTests : juce::UnitTest
             [&](const juce::String& where)
             {
                 const int n = stress.numLayers.load();
-                expect(n >= 1 && n <= mu_limits::kMaxLayers, where + ": count in range");
+                expect(n >= 1 && n <= mu_toni::kLimits.layers, where + ": count in range");
                 std::set<const void*> distinct;
-                for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+                for (int i = 0; i < mu_toni::kLimits.layers; ++i)
                 {
                     expect(stress.layers[(size_t) i] != nullptr, where + ": slot " + juce::String(i) + " is filled");
                     distinct.insert(stress.layers[(size_t) i].get());
                 }
-                expectEquals((int) distinct.size(), mu_limits::kMaxLayers, where + ": no layer appears twice");
+                expectEquals((int) distinct.size(), mu_toni::kLimits.layers, where + ": no layer appears twice");
             });
     }
 };

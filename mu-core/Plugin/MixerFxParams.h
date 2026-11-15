@@ -6,7 +6,7 @@
 #include "Audio/AlgorithmNames.h"   // mu_audio::kInsertAlgorithmCount
 #include "Audio/VoiceParams.h"      // VoiceParams::kInsertSlotCount
 #include "Persistence/InsertParams.h"   // mu_mixfx::addInsertParams (layer-safe: no Plugin/ include)
-#include "MuLimits.h"             // mu_limits::kMaxLayers / kMaxBuses: the sidechain source range
+#include "MuLimits.h"             // ProcessorLimits: the sidechain source range
 
 // Shared global FX + return + master APVTS parameter layout for the family
 // mixer. The shared MixerOverlay / FXRow / DelayRow bind to these exact IDs, so
@@ -18,13 +18,14 @@
 // The matching engine sync is ProcessorBase::syncGlobalFxParam().
 namespace mu_mixfx {
 
-// The largest sidechain source parameter value: 0 = off, 1..kMaxLayers = channels, kMaxLayers + 1 = the
-// external input, then one per group bus (equal to kMaxLayers + 1 where a product has no buses).
-inline constexpr int kScSrcMax = mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses;
+// The largest sidechain source parameter value: 0 = off, 1..layers = channels, layers + 1 = the
+// external input, then one per group bus.
+inline constexpr int scSrcMax(const mu_limits::ProcessorLimits& limits) noexcept { return limits.layers + 1 + limits.buses; }
 
 // `swapTimingDefault` is the product's hot-swap timing (mu_hotswap::SwapTiming as an int): OnMasterLoop (0)
 // for the looping products, OnBar (2) for those with no loop of their own.
-inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int swapTimingDefault = 0)
+inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int swapTimingDefault,
+                              const mu_limits::ProcessorLimits& limits)
 {
     auto addF = [&](const juce::String& id, const juce::String& name, float mn, float mx, float def)
     { layout.add(std::make_unique<juce::AudioParameterFloat>(id, name, juce::NormalisableRange<float>(mn, mx), def)); };
@@ -108,7 +109,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
         addF3(q+"pan",  nm+"Pan",     -1.0f,    1.0f,    0.0f);
         addB(q+"mute",  nm+"Mute",    false);
         addB(q+"solo",  nm+"Solo",    false);
-        addI(q+"scSrc", nm+"SC Src",  0,        kScSrcMax, 0);  // 0=off, 1..kMaxLayers=channels, kMaxLayers+1=external, then the buses
+        addI(q+"scSrc", nm+"SC Src",  0,        scSrcMax(limits), 0);  // 0=off, 1..layers=channels, layers+1=external, then the buses
         addF(q+"scAmt", nm+"SC Amt",  0.0f,     1.0f,    0.0f);
         addF(q+"scAtk", nm+"SC Atk",  0.0f,   500.0f,    0.0f);
         addF(q+"scRel", nm+"SC Rel",  0.0f, 2000.0f,    0.0f);
@@ -152,7 +153,7 @@ struct ChannelStripOptions
 {
     int   versionHint = 1;        // parameter version hint (mu-Clid's strips predate hints: 0)
     bool  continuous  = false;    // ranges without a snapping interval (mu-Clid's reference layout)
-    int   scSrc       = 0;        // sidechain source default: 0 = off, 1..kMaxLayers = channels, kMaxLayers + 1 = external
+    int   scSrc       = 0;        // sidechain source default: 0 = off, 1..layers = channels, layers + 1 = external
     float scAmt       = 0.0f;     // sidechain amount default
     float scRel       = 0.0f;     // sidechain release default (ms): none, as the attack
     bool  outBus      = true;     // declare "outBus" (DAW direct out); a group bus goes to the master, so it has none
@@ -162,11 +163,12 @@ struct ChannelStripOptions
 
 // One mixer channel strip's parameters — level / pan / mute / solo, the three FX sends,
 // sidechain and output bus — under `prefix` (e.g. "ch3_"), named "<namePrefix>Level" etc. Where the
-// product has group buses (mu_limits::kMaxBuses > 0) a channel strip also gets "bus" (0 = master, 1..kMaxBuses).
+// product has group buses (limits.buses > 0) a channel strip also gets "bus" (0 = master, 1..limits.buses).
 // The shared MixerChannel binds to these ids; ProcessorBase::syncGlobalFxParam syncs them.
 inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
                                   const juce::String& prefix, const juce::String& namePrefix,
-                                  const ChannelStripOptions& o = {})
+                                  const ChannelStripOptions& o,
+                                  const mu_limits::ProcessorLimits& limits)
 {
     auto range = [&o](float lo, float hi, float step)
     { return juce::NormalisableRange<float>(lo, hi, o.continuous ? 0.0f : step); };
@@ -192,32 +194,32 @@ inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterL
     addF("sendEff", "Send Eff",   0.0f,    1.0f, 0.001f, 0.0f);
     addF("sendDly", "Send Dly",   0.0f,    1.0f, 0.001f, 0.0f);
     addF("sendRev", "Send Rev",   0.0f,    1.0f, 0.001f, 0.0f);
-    addI("scSrc",   "SC Src",     0, kScSrcMax, o.scSrc);   // 0 off, 1..kMaxLayers channels, the external input, then the buses
+    addI("scSrc",   "SC Src",     0, scSrcMax(limits), o.scSrc);   // 0 off, 1..layers channels, the external input, then the buses
     addF("scAmt",   "SC Amount",  0.0f,    1.0f, 0.001f, o.scAmt);
     addF("scAtk",   "SC Attack",  0.0f,  500.0f, 0.1f,   0.0f);
     addF("scRel",   "SC Release", 0.0f, 2000.0f, 1.0f,  o.scRel);
     if (o.outBus)
         addI("outBus",  "Output Bus", 0, 8, 0);                 // 0 = master mix, 1..8 = direct out
-    if constexpr (mu_limits::kMaxBuses > 0)
-        if (o.busAssign)
-            addI("bus", "Bus", 0, mu_limits::kMaxBuses, 0);         // 0 = master, 1..kMaxBuses = group bus
+    if (limits.buses > 0 && o.busAssign)
+        addI("bus", "Bus", 0, limits.buses, 0);                     // 0 = master, 1..buses = group bus
     if (o.midiIn)
         addI("midiIn", "MIDI In", 0, 16, 0);                        // 0 = Omni, 1..16 = that channel only
 }
 
 // The group buses' parameters: bus{B}_ with the channel strip's suffixes (a bus has the same fader, pan,
 // mute / solo, sends and sidechain; no "outBus": a bus goes to the master), and bus{B}_i{I}_ per insert. Nothing is
-// declared where mu_limits::kMaxBuses is 0. Buses have no modulators.
-inline void addBusParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, ChannelStripOptions o = {})
+// declared where limits.buses is 0. Buses have no modulators.
+inline void addBusParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, ChannelStripOptions o,
+                         const mu_limits::ProcessorLimits& limits)
 {
     o.busAssign = false;
     o.outBus    = false;
-    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+    for (int b = 0; b < limits.buses; ++b)
     {
         const juce::String prefix = "bus" + juce::String(b) + "_";
         const juce::String name   = "Bus " + juce::String(b + 1) + " ";
-        addChannelStripParams(layout, prefix, name, o);
-        for (int i = 0; i < mu_limits::kBusInserts; ++i)
+        addChannelStripParams(layout, prefix, name, o, limits);
+        for (int i = 0; i < limits.busInserts; ++i)
             addInsertParams(layout, prefix + "i" + juce::String(i) + "_", name + "I" + juce::String(i + 1) + " ", o.versionHint);
     }
 }

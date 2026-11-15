@@ -1,3 +1,4 @@
+#include "Plugin/MuTilateLimits.h"
 #include "Plugin/PluginProcessor.h"
 
 #include "License/LicenseKey.h"
@@ -17,15 +18,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     // Mixer channel strips, one per layer slot: the shared ch{N}_ rows the MixerChannel / MixerOverlay bind to.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Layer " + juce::String(i + 1) + " Ch ");
+    for (int i = 0; i < mu_tilate::kLimits.layers; ++i)
+        mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Layer " + juce::String(i + 1) + " Ch ", {}, kLimits);
 
     // The Phrase type's rows for every layer slot (p{N}_*).
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        addLayerParams(layout, i);
+    for (int i = 0; i < mu_tilate::kLimits.layers; ++i)
+        addLayerParams(layout, i, kLimits.layers);
 
     // Shared global FX rack + returns + master. A Phrase has a loop of its own, so a staged swap lands on the master loop (0).
-    mu_mixfx::addGlobalFxParams(layout, 0);
+    mu_mixfx::addGlobalFxParams(layout, 0, kLimits);
     return layout;
 }
 
@@ -34,13 +35,14 @@ PluginProcessor::PluginProcessor()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
-                    juce::Identifier("MuTilateState")),
+                    juce::Identifier("MuTilateState"),
+                    kLimits),
       mu_core::ProcessorLayerHostView(static_cast<ProcessorBase&>(*this)),
       PhraseSlotHost(static_cast<mu_core::ProcessorLayerHostView&>(*this))
 {
     // All eight Phrases exist for the processor's lifetime (capacity is fixed, only the count is runtime).
     keepSpareLayers = true;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_tilate::kLimits.layers; ++i)
     {
         layers[(size_t) i] = createLayer(i);
         layers[(size_t) i]->colourIndex = i;   // each layer starts on its own palette colour
@@ -53,7 +55,7 @@ PluginProcessor::PluginProcessor()
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ mu_tilate::kLicenseProductId, mu_tilate::kLicenseFilename, mu_tilate::kLicensePublicKey, "mutilate.activation", mu_tilate::kCheckoutUrl, mu_tilate::kSuggestedPrice });
 
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i]->bindParams(apvts, i);
+    for (int i = 0; i < mu_tilate::kLimits.layers; ++i) layers[(size_t) i]->bindParams(apvts, i);
     setupLayerState();
     layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                              [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
@@ -111,7 +113,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
     jassert(getLayerAccess() == mu_core::LayerAccess::TryLock);
-    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_tilate::kLimits.layers - 1); ++d)
     {
         auto& ph = getPhrase(d);
         ph.playback->hardReset();

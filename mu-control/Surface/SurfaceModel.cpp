@@ -245,7 +245,7 @@ uint32_t SurfaceModel::layerRgb(int layer) const
 void SurfaceModel::trackPlayingClips(double nowMs) const
 {
     // A layer whose playing clip changed to a real clip starts a burst; the first sighting does not.
-    for (int layer = 0; layer < mu_limits::kMaxLayers; ++layer)
+    for (int layer = 0; layer < mu_limits::kAbsoluteMaxLayers; ++layer)   // every slot, as before: a removed layer reads -1
     {
         const int playing = view.getPlayingClip(layer);
         auto& last = lastPlaying[(size_t) layer];

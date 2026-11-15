@@ -35,6 +35,8 @@ public:
     int  getNumCards() const noexcept { return (int) cards.size(); }
 
     std::function<void(mu_core::LayerTypeId)> onChoose;
+    // When set, only the types it accepts get a card (mu-Host offers just the engines the user has a licence for). Re-read by rebuild().
+    std::function<bool(mu_core::LayerTypeId)> isOffered;
 
     void paint(juce::Graphics&) override;
     void resized() override;

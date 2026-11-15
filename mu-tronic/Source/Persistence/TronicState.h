@@ -44,10 +44,10 @@ inline juce::String slotPrefix(char letter, int slot)
     return juce::String::charToString((juce::juce_wchar) letter) + juce::String(slot) + "_";
 }
 
-inline std::vector<juce::StringArray> slotPrefixSets()
+inline std::vector<juce::StringArray> slotPrefixSets(int numSlots)
 {
     std::vector<juce::StringArray> out;
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < numSlots; ++s)
     {
         juce::StringArray set;
         for (const char* l = kPrefixLetters; *l != 0; ++l) set.add(slotPrefix(*l, s));

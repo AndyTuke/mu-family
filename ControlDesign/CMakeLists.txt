@@ -38,3 +38,6 @@ target_compile_definitions(ControlDesign PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_STANDALONE_APPLICATION=1
 )
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

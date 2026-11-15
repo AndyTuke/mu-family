@@ -54,23 +54,35 @@ SliceParams PhrasePlayback::paramsFor(const PhraseLoop& loop, const PhraseSettin
                                       SliceRange& range) const noexcept
 {
     // The hit's own settings are offsets on top of the layer's values: level, fades, pitch, pan and both envelopes add (each sum
-    // is held to its control's range). They belong to this block, not to the slice it plays, so two hits of one slice can sound different.
+    // is held to its control's range). A knob set Absolute replaces the layer's value instead: its offset is the distance from the layer's
+    // value, so the same sums land on the absolute value. They belong to this block, not to the slice it plays, so two hits of one slice
+    // can sound different.
     const SliceSettings& own = b.own;
+    auto off = [&own](OverrideField f, float layerValue) { return resolvedOffset(own, f, layerValue); };
     SliceParams p;
     p.own       = own;
     // The filter is the layer's, run over the layer's output (renderPiece); a slice voice itself does not filter.
     p.own.filterType = 0;
-    p.own.pitchSemi = juce::jlimit(-24.0f, 24.0f, s.pitchSemi + own.pitchSemi);
-    p.own.fineCents = juce::jlimit(-100.0f, 100.0f, s.fineCents + own.fineCents);
-    p.own.pan       = juce::jlimit(-1.0f, 1.0f, s.pan + own.pan);
-    p.own.ampA = juce::jmax(0.0f, s.ampA + own.ampA);   p.own.ampD = juce::jmax(0.0f, s.ampD + own.ampD);
-    p.own.ampS = juce::jlimit(0.0f, 1.0f, s.ampS + own.ampS);   p.own.ampR = juce::jmax(0.0f, s.ampR + own.ampR);
-    p.own.fltA = juce::jmax(0.0f, s.fltA + own.fltA);   p.own.fltD = juce::jmax(0.0f, s.fltD + own.fltD);
-    p.own.fltS = juce::jlimit(0.0f, 1.0f, s.fltS + own.fltS);   p.own.fltR = juce::jmax(0.0f, s.fltR + own.fltR);
-    p.own.filterEnvAmt = juce::jlimit(-1.0f, 1.0f, s.filterEnvAmt + own.filterEnvAmt);
-    p.gain      = s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-12.0f, 12.0f, own.levelDb)) * juce::jlimit(0.0f, 1.0f, own.volume);
-    p.fadeInMs  = juce::jmax(0.0f, s.fadeInMs + own.fadeInMs);
-    p.fadeOutMs = juce::jmax(0.0f, s.fadeOutMs + own.fadeOutMs);
+    p.own.pitchSemi = juce::jlimit(-24.0f, 24.0f, s.pitchSemi + off(OverrideField::PitchSemi, s.pitchSemi));
+    p.own.fineCents = juce::jlimit(-100.0f, 100.0f, s.fineCents + off(OverrideField::FineCents, s.fineCents));
+    p.own.pan       = juce::jlimit(-1.0f, 1.0f, s.pan + off(OverrideField::Pan, s.pan));
+    p.own.ampA = juce::jmax(0.0f, s.ampA + off(OverrideField::AmpA, s.ampA));   p.own.ampD = juce::jmax(0.0f, s.ampD + off(OverrideField::AmpD, s.ampD));
+    p.own.ampS = juce::jlimit(0.0f, 1.0f, s.ampS + off(OverrideField::AmpS, s.ampS));   p.own.ampR = juce::jmax(0.0f, s.ampR + off(OverrideField::AmpR, s.ampR));
+    p.own.fltA = juce::jmax(0.0f, s.fltA + off(OverrideField::FltA, s.fltA));   p.own.fltD = juce::jmax(0.0f, s.fltD + off(OverrideField::FltD, s.fltD));
+    p.own.fltS = juce::jlimit(0.0f, 1.0f, s.fltS + off(OverrideField::FltS, s.fltS));   p.own.fltR = juce::jmax(0.0f, s.fltR + off(OverrideField::FltR, s.fltR));
+    p.own.filterEnvAmt = juce::jlimit(-1.0f, 1.0f, s.filterEnvAmt + off(OverrideField::FilterEnvAmt, s.filterEnvAmt));
+    // The filter's cutoff is moved in octaves from the layer's Hz and its resonance added to the layer's: an Absolute cutoff is the
+    // octaves from the layer's to the chosen Hz, an Absolute resonance the distance from the layer's.
+    if (const auto& co = own.ov[(int) OverrideField::CutoffOct]; co.absolute)
+        p.own.cutoffOct = juce::jlimit(-8.0f, 8.0f, std::log2(juce::jlimit(20.0f, 20000.0f, co.absValue) / std::max(1.0f, s.cutoffHz)));
+    p.own.resOffset = off(OverrideField::ResOffset, s.resonance);
+    // Level: an Absolute level (dB) is the hit's whole level and replaces the layer's gain.
+    const float levelGain = own.ov[(int) OverrideField::LevelDb].absolute
+                              ? juce::Decibels::decibelsToGain(juce::jlimit(-60.0f, 6.0f, own.ov[(int) OverrideField::LevelDb].absValue))
+                              : s.gain * juce::Decibels::decibelsToGain(juce::jlimit(-12.0f, 12.0f, own.levelDb));
+    p.gain      = levelGain * juce::jlimit(0.0f, 1.0f, own.volume);
+    p.fadeInMs  = juce::jmax(0.0f, s.fadeInMs + off(OverrideField::FadeIn, s.fadeInMs));
+    p.fadeOutMs = juce::jmax(0.0f, s.fadeOutMs + off(OverrideField::FadeOut, s.fadeOutMs));
     p.reverse   = own.reverse;
     p.holdMs    = s.holdMs;
     p.strength  = s.strength;

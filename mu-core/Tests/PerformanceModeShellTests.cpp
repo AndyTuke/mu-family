@@ -10,6 +10,7 @@
 #include "UI/PerformanceChooser.h"
 #include "UI/PerformanceIndication.h"
 #include "UI/ShellChrome.h"
+#include "TestLimits.h"
 
 namespace
 {
@@ -49,7 +50,7 @@ ControlAction act(ControlActionType t, int layer = 0, int index = -1)
 // a stopped transport applies a staged item at once.
 struct Rig
 {
-    LiveState live;
+    LiveState live { mu_test::kLimits.layers };
     bool stopped = true;
     bool pending = false;
     uint32_t serial = 0;

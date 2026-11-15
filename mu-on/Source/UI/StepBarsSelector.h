@@ -63,6 +63,11 @@ public:
         }
         const auto bars = barsArea();
         const int bar = juce::jlimit(0, length - 1, (int) ((e.position.x - bars.getX()) / (bars.getWidth() / (float) length)));
+        if (length <= 1)   // a one-loop step plays every pass: there is nothing to switch off
+        {
+            mu_ui::reportStatus(*this, "Step Loops", describe());
+            return;
+        }
         const bool on = (bits >> bar & 1) == 0;
         bits = on ? (bits | (1 << bar)) : (bits & ~(1 << bar));
         repaint();

@@ -8,6 +8,7 @@
 #include "InsertProcessor.h"
 #include "VoiceParams.h"
 #include "MuLimits.h"
+#include "Audio/FlatArray.h"
 #include "SidechainRemap.h"
 
 class VoiceEngine;
@@ -32,8 +33,8 @@ struct RetiredVoices
 class MixerEngine
 {
 public:
-    // One mixer channel per layer — must equal mu_limits::kMaxLayers.
-    static constexpr int MaxChannels = mu_limits::kMaxLayers;
+    // The direct-out buffer table a block is given: one slot per channel up to the 32-layer ceiling; the first numChannels are read.
+    using DirectOuts = std::array<juce::AudioBuffer<float>*, mu_limits::kAbsoluteMaxLayers>;
 
     // Optional per-channel render hook. When supplied, Phase 1 invokes it to fill
     // channel r's buffer (channel index, target buffer, sample count) INSTEAD of
@@ -63,18 +64,9 @@ public:
     // around −14 dBFS at the master output (≈ +4 dB on the calibrated VU).
     static constexpr float kHeadroomTrim = 0.5f;
 
-    // Group buses (mu_limits::kMaxBuses, 0 in a product without them) and the inserts on each.
-    static constexpr int kNumBuses   = mu_limits::kMaxBuses;
-    static constexpr int kBusInserts = mu_limits::kBusInserts;
-    // Bus and insert indices are one digit in the parameter ids (bus{B}_i{I}_), which ProcessorBase parses.
-    static_assert(kNumBuses <= 9 && kBusInserts <= 9, "bus parameter ids carry one-digit bus and insert indices");
-    static_assert(kNumBuses >= 0 && kBusInserts >= 1, "MU_MAX_BUSES must be >= 0 and MU_BUS_INSERTS >= 1");
-
-    // Sidechain source encoding (a plain int): -1 = off, 0..MaxChannels-1 = a channel, kExtSidechainSrc =
+    // Sidechain source encoding (a plain int): -1 = off, 0..numChannels-1 = a channel, extSidechainSrc() =
     // the DAW sidechain input (bus pointers supplied via setExternalSidechain() before each processBlock
-    // call), kExtSidechainSrc + 1 + b = group bus b. See SidechainRemap.h for which strip may take which.
-    static constexpr int kExtSidechainSrc = MaxChannels;
-    static constexpr int busSidechainSource(int bus) noexcept { return mu_mix::busSource(bus, MaxChannels); }
+    // call), extSidechainSrc() + 1 + b = group bus b. See SidechainRemap.h for which strip may take which.
 
     // Per-channel and per-return state.  All fields are atomics so they can be
     // written by the message thread (via syncChannelStripParam / parameterChanged)
@@ -106,16 +98,16 @@ public:
         std::atomic<bool>  mute       { false };
         std::atomic<bool>  solo       { false };
         // Sidechain ducking
-        std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0-7=channel index, kExtSidechainSrc=DAW bus
+        std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0..numChannels-1=channel index, extSidechainSrc()=DAW bus
         std::atomic<float> sidechainAmount   { 0.0f };   // 0-1 ducking depth
         std::atomic<float> sidechainAttackMs  { 0.0f };
         std::atomic<float> sidechainReleaseMs { 0.0f };
         // Multi-bus output routing (DAW only): 0 = Master mix (default, applies master fader + FX),
         // 1..8 = direct out to Bus 1..8 (post-channel-fader, no master fader, no FX sends).
         std::atomic<int>   outputBus { 0 };
-        // Group bus this channel's dry signal feeds: 0 = master, 1..kNumBuses = bus 1.... A non-zero
+        // Group bus this channel's dry signal feeds: 0 = master, 1..numBuses = bus 1.... A non-zero
         // outputBus (a DAW direct out) wins: that channel feeds neither a bus nor the master. Never used
-        // where kNumBuses is 0. Part of the strip, so it moves with it; not in a layer preset or clip.
+        // where numBuses is 0. Part of the strip, so it moves with it; not in a layer preset or clip.
         std::atomic<int>   busAssign { 0 };
 
         // Copy all fields from another ChannelState. Use instead of `= other`
@@ -188,7 +180,7 @@ public:
     // busAssign unused: a bus goes to the master) plus its insert chain, insert 0 then 1.
     struct BusState : ChannelState
     {
-        BusInsert insert[kBusInserts];
+        mu_core::FlatArray<BusInsert> insert;   // sized to the mixer's bus-insert count at construction
     };
 
     struct ReturnState
@@ -197,16 +189,16 @@ public:
         std::atomic<float> pan   { 0.0f };
         std::atomic<bool>  mute  { false };
         std::atomic<bool>  solo  { false };
-        // Sidechain ducking (source = channel index, -1=off, kExtSidechainSrc=DAW bus)
+        // Sidechain ducking (source = channel index, -1=off, extSidechainSrc()=DAW bus)
         std::atomic<int>   sidechainSource   { -1 };
         std::atomic<float> sidechainAmount   { 0.0f };
         std::atomic<float> sidechainAttackMs  { 0.0f };
         std::atomic<float> sidechainReleaseMs { 0.0f };
     };
 
-    std::array<ChannelState, MaxChannels> channels;
+    mu_core::FlatArray<ChannelState> channels;
     std::array<ReturnState,  3>           returns;   // 0=effect, 1=delay, 2=reverb
-    std::array<BusState, (size_t) kNumBuses> buses;   // empty where kNumBuses is 0
+    mu_core::FlatArray<BusState> buses;   // empty where numBuses is 0
     std::atomic<float> masterLevel { 1.0f };   // 0 dB default
     std::atomic<float> masterPan   { 0.0f };
 
@@ -227,36 +219,44 @@ public:
     // ramps across the next block instead of stepping (audio thread only). `primed` is false until the strip's
     // first block, which starts at its target.
     struct GainRamp { float l = 1.0f, r = 1.0f; bool primed = false; };
-    GainRamp channelRamp[MaxChannels];
-    GainRamp busRamp[kNumBuses > 0 ? kNumBuses : 1];
+    mu_core::FlatArray<GainRamp> channelRamp, busRamp;
     GainRamp returnRamp[3];   // effect, delay, reverb returns
     GainRamp masterRamp;
     // The bus (-1 = master) each channel's dry signal went to last block; kBusUnset until its first block.
     // A change crossfades old to new across the block.
     static constexpr int kBusUnset = -2;
-    int channelLastBus[MaxChannels];
+    mu_core::FlatArray<int> channelLastBus;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
     // The combined peak (larger of left and right) plus the left / right peaks behind the stereo VU
     // meters, all post-fader and post-pan.
-    std::atomic<float> channelPeaks[MaxChannels];
+    mu_core::FlatArray<std::atomic<float>> channelPeaks;
     std::atomic<float> returnPeaks[3];
     std::atomic<float> masterPeak;
-    std::atomic<float> channelPeaksL[MaxChannels], channelPeaksR[MaxChannels];
+    mu_core::FlatArray<std::atomic<float>> channelPeaksL, channelPeaksR;
     std::atomic<float> returnPeaksL[3], returnPeaksR[3];
     std::atomic<float> masterPeakL, masterPeakR;
     // Per-channel peak gain-reduction (0 = no duck, 1 = full duck), written each block.
-    std::atomic<float> sidechainGR[MaxChannels];
+    mu_core::FlatArray<std::atomic<float>> sidechainGR;
     // Per-return peak gain-reduction for sidechain ducking.
     std::atomic<float> returnSidechainGR[3];
     // Bus peaks (post-fader, post-pan; combined, left, right) and the bus sidechain gain-reduction. A bus
     // insert's own Compressor / Limiter gain reduction is on buses[b].insert[i].processor.grReduction.
-    std::array<std::atomic<float>, (size_t) kNumBuses> busPeaks, busPeaksL, busPeaksR, busSidechainGR;
+    mu_core::FlatArray<std::atomic<float>> busPeaks, busPeaksL, busPeaksR, busSidechainGR;
     // How many blocks were silenced because the master output held a NaN or infinity (the FX tails and master
     // inserts were reset with them). Written by the audio thread; read by tests and diagnostics.
     std::atomic<int> nonFiniteBlocks { 0 };
 
-    MixerEngine();
+    // The counts this mixer is built with, fixed for its lifetime (docs/design-runtime-counts.md). Every loop runs to these.
+    const int  numChannels;
+    const int  numBuses;
+    const int  numBusInserts;
+    const bool externalSidechainOffered;
+    mu_limits::ProcessorLimits limits() const noexcept { return { numChannels, numBuses, numBusInserts, externalSidechainOffered }; }
+    int extSidechainSrc() const noexcept { return numChannels; }   // the source value that means the DAW sidechain input
+    int busSidechainSource(int bus) const noexcept { return mu_mix::busSource(bus, numChannels); }   // the source value that means group bus `bus`
+
+    explicit MixerEngine(const mu_limits::ProcessorLimits& limits);
 
     void prepare(double sampleRate, int blockSize);
     // The block size prepare() sized the channel and send buffers for: the longest block processBlock may get.
@@ -296,7 +296,7 @@ public:
                       std::unique_ptr<VoiceEngine>* voices,
                       FXChain&                    fxChain,
                       int                         numSamples,
-                      std::array<juce::AudioBuffer<float>*, MaxChannels>* directOuts = nullptr,
+                      DirectOuts* directOuts = nullptr,
                       juce::AudioBuffer<float>*    fxReturnsOut = nullptr,
                       const RetiredVoices*        retired      = nullptr,
                       const RenderChannelFn*      renderChannel = nullptr);
@@ -308,8 +308,8 @@ public:
     void swapChannelState(int i, int j) noexcept
     {
         if (i == j) return;
-        auto& a = channels[(size_t)i];
-        auto& b = channels[(size_t)j];
+        auto& a = channels[i];
+        auto& b = channels[j];
         auto swapF = [](std::atomic<float>& x, std::atomic<float>& y) noexcept {
             const float t = x.load(std::memory_order_relaxed);
             x.store(y.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -360,11 +360,11 @@ public:
     void renumberSidechainsAfterRemove(int removed) noexcept
     {
         for (auto& c : channels)
-            c.sidechainSource.store(mu_mix::sidechainAfterRemove(c.sidechainSource.load(std::memory_order_relaxed), removed, MaxChannels), std::memory_order_relaxed);
+            c.sidechainSource.store(mu_mix::sidechainAfterRemove(c.sidechainSource.load(std::memory_order_relaxed), removed, numChannels), std::memory_order_relaxed);
         for (auto& r : returns)
-            r.sidechainSource.store(mu_mix::sidechainAfterRemove(r.sidechainSource.load(std::memory_order_relaxed), removed, MaxChannels), std::memory_order_relaxed);
+            r.sidechainSource.store(mu_mix::sidechainAfterRemove(r.sidechainSource.load(std::memory_order_relaxed), removed, numChannels), std::memory_order_relaxed);
         for (auto& b : buses)
-            b.sidechainSource.store(mu_mix::sidechainAfterRemove(b.sidechainSource.load(std::memory_order_relaxed), removed, MaxChannels), std::memory_order_relaxed);
+            b.sidechainSource.store(mu_mix::sidechainAfterRemove(b.sidechainSource.load(std::memory_order_relaxed), removed, numChannels), std::memory_order_relaxed);
     }
 
     // Layers `a` and `b` are about to swap strips: re-point every sidechain source that named either.
@@ -372,23 +372,23 @@ public:
     void renumberSidechainsAfterSwap(int a, int b) noexcept
     {
         for (auto& c : channels)
-            c.sidechainSource.store(mu_mix::sidechainAfterSwap(c.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
+            c.sidechainSource.store(mu_mix::sidechainAfterSwap(c.sidechainSource.load(std::memory_order_relaxed), a, b, numChannels), std::memory_order_relaxed);
         for (auto& r : returns)
-            r.sidechainSource.store(mu_mix::sidechainAfterSwap(r.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
+            r.sidechainSource.store(mu_mix::sidechainAfterSwap(r.sidechainSource.load(std::memory_order_relaxed), a, b, numChannels), std::memory_order_relaxed);
         for (auto& bus : buses)
-            bus.sidechainSource.store(mu_mix::sidechainAfterSwap(bus.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
+            bus.sidechainSource.store(mu_mix::sidechainAfterSwap(bus.sidechainSource.load(std::memory_order_relaxed), a, b, numChannels), std::memory_order_relaxed);
     }
 
     // Read / seed one strip's follower (state inspection for the layer-edit tests only: never call
     // these while audio is running, the follower is plain audio-thread state).
     float getSidechainEnv(int channelIndex) const noexcept
     {
-        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        jassert(channelIndex >= 0 && channelIndex < numChannels);
         return scEnv[channelIndex];
     }
     void setSidechainEnv(int channelIndex, float v) noexcept
     {
-        jassert(channelIndex >= 0 && channelIndex < MaxChannels);
+        jassert(channelIndex >= 0 && channelIndex < numChannels);
         scEnv[channelIndex] = v;
     }
 
@@ -407,7 +407,7 @@ public:
     // target gain and bus, as a strip's first block does.
     void resetStripRamp(int channelIndex) noexcept
     {
-        if (channelIndex >= 0 && channelIndex < MaxChannels)
+        if (channelIndex >= 0 && channelIndex < numChannels)
         {
             channelRamp[channelIndex]    = GainRamp {};
             channelLastBus[channelIndex] = kBusUnset;
@@ -418,7 +418,7 @@ public:
     // (add, reset, the vacated top slot after a remove), so no old ducking envelope carries over.
     void resetSidechainEnv(int channelIndex) noexcept
     {
-        if (channelIndex >= 0 && channelIndex < MaxChannels)
+        if (channelIndex >= 0 && channelIndex < numChannels)
             scEnv[channelIndex] = 0.0f;
     }
 
@@ -427,7 +427,7 @@ public:
     // while a block runs. Used when a slot's layer type changes under a running host.
     void requestSidechainEnvReset(int channelIndex) noexcept
     {
-        if (channelIndex >= 0 && channelIndex < MaxChannels)
+        if (channelIndex >= 0 && channelIndex < numChannels)
             scEnvResetRequest[channelIndex].store(true, std::memory_order_release);
     }
 
@@ -459,10 +459,10 @@ public:
 
 private:
     double sampleRate = 44100.0;
-    float  scEnv[MaxChannels] {};     // per-channel sidechain envelope state
-    std::atomic<bool> scEnvResetRequest[MaxChannels] {};   // set by requestSidechainEnvReset, cleared by the next block
+    mu_core::FlatArray<float> scEnv;     // per-channel sidechain envelope state
+    mu_core::FlatArray<std::atomic<bool>> scEnvResetRequest;   // set by requestSidechainEnvReset, cleared by the next block
     float  scRetEnv[3] {};            // per-return sidechain envelope state
-    float  scBusEnv[(size_t) (kNumBuses > 0 ? kNumBuses : 1)] {};   // per-bus sidechain envelope state
+    mu_core::FlatArray<float> scBusEnv;   // per-bus sidechain envelope state
 
     // External DAW sidechain bus — set by setExternalSidechain() before processBlock,
     // or copied into extScCapture by copyExternalSidechain() when the host channels
@@ -471,7 +471,7 @@ private:
     const float* extScR = nullptr;
     juce::AudioBuffer<float> extScCapture;   // private copy that survives buffer.clear()
 
-    juce::AudioBuffer<float> channelBufs[MaxChannels];
+    mu_core::FlatArray<juce::AudioBuffer<float>> channelBufs;
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;
     // The channel each return's sidechain listens to, copied before the strip's fader and pan are applied (as
     // the channel-to-channel ducking reads it), so the fader does not change how hard a return ducks.
@@ -479,7 +479,7 @@ private:
     // Group buses (sized in prepare, empty where there are none). busBufs sums the dry signal of each bus's
     // channels; busTap keeps a bus's signal after its inserts and before its fader for the strips that duck
     // from it; busScSource holds the channel copy a bus ducks from (taken before the faders, as for returns).
-    std::array<juce::AudioBuffer<float>, (size_t) kNumBuses> busBufs, busTap, busScSource;
+    mu_core::FlatArray<juce::AudioBuffer<float>> busBufs, busTap, busScSource;
 
     static float peakOf(const juce::AudioBuffer<float>& buf, int numSamples);
     // Publish a buffer's combined, left and right peaks / silence them. A mono buffer reports its one

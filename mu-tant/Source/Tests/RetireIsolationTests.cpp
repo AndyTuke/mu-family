@@ -4,6 +4,7 @@
 // voice's modulators and envelopes are replaced. The dropped voice's fade, read on its own channel before the
 // strip (the approved channel tap, N6), must be bit-identical in both for its whole life.
 
+#include "Plugin/MuTantLimits.h"
 #include "GoldenTestRig.h"
 #include "Tests/RetireIsolation.h"     // mu-core: the generic twin test
 #include "Audio/SpinLock.h"            // mu-core: the modLock helpers
@@ -38,7 +39,7 @@ namespace
     void scramble(ProcessorBase& pb)
     {
         auto& p = static_cast<mu_tant::PluginProcessor&>(pb);
-        for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+        for (int v = 0; v < mu_tant::kLimits.layers; ++v)
         {
             auto& pat = p.getPattern(v);
             mu_core::spinLock(pat.modLock);

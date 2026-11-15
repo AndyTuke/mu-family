@@ -5,6 +5,8 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
+#include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -15,10 +17,38 @@
 
 ProcessorBase::ProcessorBase(const BusesProperties& props,
                              juce::AudioProcessorValueTreeState::ParameterLayout layout,
-                             const juce::Identifier& stateTreeType)
-    : ProcessorCore(props),
-      apvts(*this, nullptr, stateTreeType, std::move(layout))
+                             const juce::Identifier& stateTreeType,
+                             mu_limits::ProcessorLimits limits)
+    : ProcessorCore(props, limits.layers),
+      apvts(*this, nullptr, stateTreeType, std::move(layout)),
+      mixerEngine(limits),
+      liveState(limits.layers),
+      retireBinStorage(std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout, limits.layers)),
+      retireBin(*retireBinStorage),
+      limits_(limits)
 {
+    if (! limits_.valid())
+    {
+        // A product's counts are a compile-time constant it owns, so this is a programming error: fail loudly in every build.
+        const juce::String msg = "ProcessorLimits outside the ceilings: layers " + juce::String(limits_.layers) + ", buses " + juce::String(limits_.buses)
+                               + ", inserts " + juce::String(limits_.busInserts);
+        juce::Logger::writeToLog(msg);
+        std::fprintf(stderr, "%s\n", msg.toRawUTF8());
+        std::_Exit(70);   // not abort(): a Debug CRT abort opens a dialog that hangs a headless run
+    }
+    // Every per-slot array is sized once, here (never on the audio thread).
+    layerSwapper.setCount(limits_.layers);
+    pendingPresetTree.reset(limits_.layers);
+    clipWatch.reset(limits_.layers);
+    presetLabels.reset(limits_.layers);
+    muteParams.reset(limits_.layers);
+    midiInRaw.reset(limits_.layers);
+    renderState.scratch.reset(limits_.layers);
+    renderState.view.reset(limits_.layers);
+    renderState.directViews.reset(limits_.layers);
+    renderState.peers.reset(limits_.layers);
+    renderState.live.reset(limits_.layers);
+    renderState.loopBeats.reset(limits_.layers);
     // The block driver's mixer hook: channel r is slot r's scratch, copied exactly (raw pointers, so a
     // buffer's "cleared" flag can never turn the copy into a clear). A slot that nothing wrote this call (its
     // view still carries the cleared flag) is not copied: the mixer's channel stays cleared, as a voice that
@@ -26,7 +56,7 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
     // later channel's -0 into +0). Built once here: no allocation per block.
     renderState.copyToMixer = [this](int r, juce::AudioBuffer<float>& buf, int n)
     {
-        if (r < 0 || r >= mu_limits::kMaxLayers) return;
+        if (r < 0 || r >= limits_.layers) return;
         if (renderState.view[(size_t) r].hasBeenCleared()) return;
         const auto& src = renderState.scratch[(size_t) r];
         const int nCh = juce::jmin(buf.getNumChannels(), src.getNumChannels());
@@ -81,13 +111,13 @@ ProcessorBase::ProcessorBase(const BusesProperties& props,
         mute.layer = layer;
         return perform(mute);
     };
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits_.layers; ++i)
         midiInRaw[(size_t) i] = apvts.getRawParameterValue("ch" + juce::String(i) + "_midiIn");
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits_.layers; ++i)
         muteParams[(size_t) i] = apvts.getParameter("ch" + juce::String(i) + "_mute");   // cached: the lamps ask per pad per frame
     cb.layerMuted   = [this](int layer)
     {
-        const auto* p = layer >= 0 && layer < mu_limits::kMaxLayers ? muteParams[(size_t) layer] : nullptr;
+        const auto* p = layer >= 0 && layer < limits_.layers ? muteParams[(size_t) layer] : nullptr;
         return p != nullptr && p->getValue() > 0.5f;
     };
     cb.savedClip    = [this](int layer)
@@ -233,7 +263,7 @@ void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                ma
                                      int                                      numVoices,
                                      int                                      numSamples,
                                      double                                   effectiveBpm,
-                                     std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts,
+                                     MixerEngine::DirectOuts* directOuts,
                                      juce::AudioBuffer<float>*                fxReturnsOut,
                                      const RetiredVoices*                     retired,
                                      const MixerEngine::RenderChannelFn*      renderChannel)
@@ -255,3 +285,4 @@ bool ProcessorBase::isBusesLayoutSupported(const BusesLayout& layouts) const
     // Main output: stereo.
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
+

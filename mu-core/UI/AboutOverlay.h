@@ -16,9 +16,11 @@ public:
 
     void setProductInfo(const juce::String& displayName,
                         const juce::StringArray& credits);
+    // The product's full version ("1.2.0.1487"), from its ShellBackend::getVersionString().
+    void setVersion(const juce::String& fullVersion) { versionText = fullVersion; repaint(); }
 
-    // Support entry points. An unlicensed copy shows "Support" (opens the pay-what-you-want
-    // prompt) and "Enter a key"; a supporter sees a thank-you line and a "Want to give more?" tip link instead; a product with no
+    // Support entry points. An unlicensed copy shows "Support" (opens the licence
+    // prompt) and "Enter a key"; a supporter sees a thank-you line instead; a product with no
     // licensing shows neither. Set each time the panel opens.
     enum class SupportState { None, Unlicensed, Supporter };
     void setSupportState(SupportState state);
@@ -39,10 +41,10 @@ private:
     juce::TextButton supportBtn { "Support" };
     juce::TextButton keyBtn     { "Enter a key" };
     juce::ToggleButton updateToggle { "Check for updates" };
-    mu_core::ExternalLinkButton tipLink;   // supporters only: opens the shared tip page
     SupportState     supportState = SupportState::None;
 
     juce::String      productName;
+    juce::String      versionText;
     juce::StringArray productCredits;
 
     static constexpr int kCardW = 400;

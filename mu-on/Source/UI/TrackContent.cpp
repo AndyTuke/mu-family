@@ -534,7 +534,7 @@ void TrackContent::rebuildGrid()
 
 void TrackContent::setLayer(int idx)
 {
-    currentLayer = juce::jlimit(0, mu_limits::kMaxLayers - 1, idx);
+    currentLayer = juce::jlimit(0, mu_limits::kAbsoluteMaxLayers - 1, idx);
     rebuild();
 }
 

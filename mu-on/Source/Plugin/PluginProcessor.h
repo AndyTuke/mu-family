@@ -1,5 +1,8 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
@@ -65,16 +68,16 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
-    // `numLayers`, 1..kMaxLayers).
+    // `numLayers`, 1..kLimits.layers).
     // A track is named after the engine it runs; the name is not saved, it follows the engine.
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String(engineName(getTrackEngine(idx))) : juce::String();
+        return (idx >= 0 && idx < mu_on::kLimits.layers) ? juce::String(engineName(getTrackEngine(idx))) : juce::String();
     }
     // The palette colour is allocated per track and follows it through delete / reorder.
     int          getLayerColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
+        return (idx >= 0 && idx < mu_on::kLimits.layers) ? layers[(size_t) idx]->colourIndex : 0;
     }
 
     // Add / delete / reorder are ProcessorBase::addLayer / removeLayer / swapLayers; this product
@@ -90,13 +93,13 @@ public:
     // ── The tracks ───────────────────────────────────────────────────────────
     // Layer `i` as its mu-On Track (colour, modulation, step row, Rumble envelope). The layers live in
     // ProcessorCore; the editor's ModulatorPanel binds to the shown one through this.
-    Track&       getTrack(int i) noexcept override { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
-    const Track& getTrack(int i) const noexcept { return layerAs<Track>(juce::jlimit(0, mu_limits::kMaxLayers - 1, i)); }
+    Track&       getTrack(int i) noexcept override { return layerAs<Track>(juce::jlimit(0, mu_on::kLimits.layers - 1, i)); }
+    const Track& getTrack(int i) const noexcept { return layerAs<Track>(juce::jlimit(0, mu_on::kLimits.layers - 1, i)); }
 
     // The engine track `i` runs (its `t{N}_eng` parameter).
     EngineType getTrackEngine(int i) const noexcept override
     {
-        const auto* p = (i >= 0 && i < mu_limits::kMaxLayers) ? engineParam[(size_t) i] : nullptr;
+        const auto* p = (i >= 0 && i < mu_on::kLimits.layers) ? engineParam[(size_t) i] : nullptr;
         return engineFromIndex(p != nullptr ? juce::roundToInt(p->load(std::memory_order_relaxed)) : 0);
     }
 
@@ -130,7 +133,7 @@ public:
     // the editor polls it to pulse the sidebar item. Read-only for the editor.
     int triggerCount(int i) const noexcept
     {
-        return (i >= 0 && i < mu_limits::kMaxLayers) ? getTrack(i).triggers.load(std::memory_order_relaxed) : 0;
+        return (i >= 0 && i < mu_on::kLimits.layers) ? getTrack(i).triggers.load(std::memory_order_relaxed) : 0;
     }
 
     // ── Preset directories / extensions (per family file-format rule) ─────────
@@ -194,7 +197,7 @@ private:
     StepPattern     stepPattern;
 
     // Cached APVTS pointers for each track's engine choice.
-    std::array<std::atomic<float>*, mu_limits::kMaxLayers> engineParam {};
+    std::array<std::atomic<float>*, mu_on::kLimits.layers> engineParam {};
 
     // Written by prepareToPlay (the host's thread), read by createLayer (the message thread).
     std::atomic<double> currentSampleRate { 44100.0 };
@@ -224,7 +227,7 @@ private:
     };
     void engineParamChanged(int slot);
     void commitDeferredWork() override;
-    std::array<std::unique_ptr<EngineParamListener>, mu_limits::kMaxLayers> engineListeners;
+    std::array<std::unique_ptr<EngineParamListener>, mu_on::kLimits.layers> engineListeners;
     std::atomic<unsigned> enginesPending { 0 };   // slots whose engine waits for the message thread
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

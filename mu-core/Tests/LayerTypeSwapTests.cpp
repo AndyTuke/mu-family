@@ -14,6 +14,7 @@
 #include <atomic>
 #include <functional>
 #include <thread>
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
@@ -92,14 +93,14 @@ namespace
             if (prefixLetters)
             {
                 std::vector<juce::StringArray> sets;
-                for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+                for (int s = 0; s < mu_test::kLimits.layers; ++s)
                     sets.push_back(juce::StringArray { "v" + juce::String(s) + "_", "x" + juce::String(s) + "_" });
                 initLayerStatePrefixSets(sets);
             }
             offer(LayerTypeId::Arp,  "Arp",  &makeT<ArpT>);
             offer(LayerTypeId::Kick, "Kick", &makeT<KickT>);
             offer(LayerTypeId::Hat,  "Hat",  &makeT<FadingT>);
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layers[(size_t) i] = std::make_unique<ArpT>();
                 layers[(size_t) i]->colourIndex = i;
@@ -322,7 +323,7 @@ struct LayerTypeSwapTests : juce::UnitTest
         }
         auto box = std::make_unique<TypedHost>(); auto& p = *box;
         expect(! p.setLayerType(-1, LayerTypeId::Kick));
-        expect(! p.setLayerType(mu_limits::kMaxLayers, LayerTypeId::Kick));
+        expect(! p.setLayerType(mu_test::kLimits.layers, LayerTypeId::Kick));
         expect(! p.setLayerType(0, LayerTypeId::Rumble), "not offered");
         const auto* before = p.getLayer(0);
         expect(p.setLayerType(0, LayerTypeId::Arp), "the type it has");
@@ -355,7 +356,7 @@ struct LayerTypeSwapTests : juce::UnitTest
         expectEquals((int) view->numLive, 4);
         expectEquals(p.layoutWordCountForTest(), 4);
         expectEquals(p.layerCountMirrorForTest(), 4);
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s) expect(view->layer[(size_t) s] == p.getLayer(s) || p.getLayer(s) == nullptr);
+        for (int s = 0; s < mu_test::kLimits.layers; ++s) expect(view->layer[(size_t) s] == p.getLayer(s) || p.getLayer(s) == nullptr);
     }
 
     // The other strips are bit-identical to a run with no change, and slot 1 changes type between two blocks with

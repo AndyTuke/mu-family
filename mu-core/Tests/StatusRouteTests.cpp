@@ -16,7 +16,7 @@ struct StatusRouteTests : juce::UnitTest
         KnobContent()
         {
             knob.setRange(0.0, 100.0, 1.0);
-            knob.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
+            knob.onStatusUpdate = [this](const juce::String& knobName, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(knobName, value); };
             addAndMakeVisible(knob);
         }
         void resized() override { knob.setBounds(getLocalBounds()); }

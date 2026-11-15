@@ -17,6 +17,8 @@ function(mu_add_ui_audit product dir)
     endif()
     get_target_property(defs ${product} COMPILE_DEFINITIONS)
     if(defs)
+        # juce_add_console_app sets JUCE_STANDALONE_APPLICATION itself; copying the product's value too redefines it (RC4005).
+        list(FILTER defs EXCLUDE REGEX "^JUCE_STANDALONE_APPLICATION")
         target_compile_definitions(${audit} PRIVATE ${defs})
     endif()
     get_target_property(libs ${product} LINK_LIBRARIES)

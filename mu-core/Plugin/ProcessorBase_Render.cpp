@@ -267,7 +267,7 @@ void ProcessorBase::applyLayerChannelMask(mu_core::RenderContext& ctx, Layer& la
 }
 
 void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
-                                 std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts,
+                                 MixerEngine::DirectOuts* directOuts,
                                  juce::AudioBuffer<float>* fxReturnsOut) noexcept
 {
     const int n = buffer.getNumSamples();
@@ -304,14 +304,14 @@ void ProcessorBase::renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
         renderLayers(block, t, off, len, off == 0, off + len >= n);
 
-        std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> directViews;
-        std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> directPtrs {};
+        auto& directViews = renderState.directViews;   // views into the host's direct-out buffers, one per slot (no storage)
+        MixerEngine::DirectOuts directPtrs {};
         if (directOuts != nullptr)
-            for (size_t i = 0; i < directPtrs.size(); ++i)
-                if (auto* d = (*directOuts)[i]; d != nullptr && d->getNumSamples() >= off + len && d->getNumChannels() < 32)
+            for (int i = 0; i < limits_.layers; ++i)
+                if (auto* d = (*directOuts)[(size_t) i]; d != nullptr && d->getNumSamples() >= off + len && d->getNumChannels() < 32)
                 {
                     directViews[i].setDataToReferTo(d->getArrayOfWritePointers(), d->getNumChannels(), off, len);
-                    directPtrs[i] = &directViews[i];
+                    directPtrs[(size_t) i] = &directViews[i];
                 }
         juce::AudioBuffer<float> fxView;
         if (fxReturnsOut != nullptr && fxReturnsOut->getNumSamples() >= off + len && fxReturnsOut->getNumChannels() < 32)
@@ -381,7 +381,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
                                  int offset, int numSamples, bool firstChunk, bool lastChunk) noexcept
 {
     const auto& v = block.view();
-    constexpr int K = mu_limits::kMaxLayers;
+    const int K = limits_.layers;
     const int reserveStart = mu_limits::kMaxBlockMidiEvents - mu_limits::kMidiNoteOffReserve;
 
     // The call's context template (design 2.1.5). A chunk starts where the previous one ended in beats; the
@@ -476,7 +476,7 @@ void ProcessorBase::renderLayers(const mu_core::LayerBlock& block, const mu_core
     // priority is read once per call (`priority1`) and phase 3 uses that reading: a type whose priority follows a
     // parameter (mu-On's engine) is rendered exactly once even when the parameter moves between the two passes.
     for (auto& p : renderState.peers) p = {};
-    std::array<bool, (size_t) K> priority1 {};
+    std::array<bool, mu_limits::kAbsoluteMaxLayers> priority1 {};   // slots 0..K-1 used
     for (int s = 0; s < K; ++s)
     {
         if (! renderState.live[(size_t) s])

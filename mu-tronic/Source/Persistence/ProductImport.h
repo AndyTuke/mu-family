@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MuLimits.h"   // mu-core: mu_limits::ProcessorLimits
 #include "Sequencer/LayerTypeRegistry.h"
 
 #include <juce_core/juce_core.h>
@@ -65,7 +66,7 @@ struct ProductImport
     bool ok() const noexcept { return error.isEmpty() && ! entries.empty(); }
 };
 
-// How many layers the products hold at most (their MU_MAX_LAYERS); a product's sidechain parameter is
+// How many layers the products hold at most (their kLimits.layers); a product's sidechain parameter is
 // 0 off, 1..kProductLayers channels, kProductLayers + 1 the external input.
 inline constexpr int kProductLayers = 8;
 
@@ -82,7 +83,7 @@ ProductImport readProductPresetTree(const juce::ValueTree& root, ProductKind kin
 // channel becomes the slot its layer was laid into (`slotOfSource[productIndex]`, -1 when that layer was not imported),
 // the product's external input becomes this binary's external input. A source that is not legal for the strip (its own
 // slot, an unimported layer) becomes off. The mu_mix renumbering rules decide legality.
-int remapImportedSidechain(int productParam, int ownSlot, const std::vector<int>& slotOfSource);
+int remapImportedSidechain(int productParam, int ownSlot, const std::vector<int>& slotOfSource, const mu_limits::ProcessorLimits& limits);
 
 // Rewrites a Rumble node's source row to `slot` (a slot number in this host).
 void setRumbleSourceRow(juce::ValueTree& node, int slot);

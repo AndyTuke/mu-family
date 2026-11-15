@@ -2,6 +2,7 @@
 // and how the result is installed (the stager, the slot engines, the locks). The rhythm's own saved form is
 // Persistence/RhythmPresetTree; the host-state path is PluginProcessor_HostState.cpp. Partial-class TU split from
 // PluginProcessor.cpp, as mu-Tant, mu-Toni and mu-On keep theirs.
+#include "Plugin/MuClidLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName + replaceFileAtomically
@@ -389,7 +390,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, const RhythmPresetContext& 
     int n = 0;
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
         if (root.getChild(ci).getType() == juce::Identifier("Rhythm")) ++n;
-    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) mu_limits::kMaxLayers), n);
+    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) mu_clid::kLimits.layers), n);
     out.numRhythms = n;
 
     // Prepare each <Rhythm> child into its slot.
@@ -419,7 +420,7 @@ buildPreparedFullPreset(const juce::ValueTree& root, const RhythmPresetContext& 
 
 HotSwapStager::PreparedFullPreset PluginProcessor::prepareFullPreset(const juce::ValueTree& root) const
 {
-    return buildPreparedFullPreset(root, presetContext(), (int) mu_limits::kMaxLayers);
+    return buildPreparedFullPreset(root, presetContext(), (int) mu_clid::kLimits.layers);
 }
 
 bool PluginProcessor::loadPresetFile(const juce::File& file)
@@ -507,7 +508,7 @@ void PluginProcessor::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& 
     // microseconds and the swap stays glitch-free. The lock is released before the
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
     // Engines that must not destruct under the lock (the shrunk slots') land here and free after it is released.
-    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> shrunkEngines;
+    std::array<std::unique_ptr<VoiceEngine>, mu_clid::kLimits.layers> shrunkEngines;
     suspendProcessing(true);
     {
         const juce::ScopedLock lw(layoutWriteLock);   // first: the count stores below advance the layout serial

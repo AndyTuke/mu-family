@@ -1,3 +1,4 @@
+#include "Plugin/MuClidLimits.h"
 #include "HotSwapStager.h"
 #include "PluginProcessor.h"
 #include "Persistence/ScopedApvtsLoading.h"
@@ -21,13 +22,13 @@ void HotSwapStager::stage(int rhythmIndex, Rhythm&& rhythm,
 
 void HotSwapStager::cancelStagedSwap(int rhythmIndex)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_clid::kLimits.layers) return;
     cancelPendingIfAny(rhythmIndex);
 }
 
 bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers) return false;
+    if (rhythmIndex < 0 || rhythmIndex >= mu_clid::kLimits.layers) return false;
     return stager.hasPending(rhythmIndex);
 }
 
@@ -56,7 +57,7 @@ bool HotSwapStager::takeStagedFullPreset(PreparedFullPreset& out)
 void HotSwapStager::cancelAllStaged()
 {
     // Drop every per-rhythm swap, then the full preset: a full preset applied at once overwrites every slot.
-    for (int r = 0; r < mu_limits::kMaxLayers; ++r) stager.cancel(r);
+    for (int r = 0; r < mu_clid::kLimits.layers; ++r) stager.cancel(r);
     stager.cancelFull();
 }
 
@@ -139,7 +140,7 @@ void HotSwapStager::processSwaps()
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
     const int n = proc.numLayers.load(std::memory_order_acquire);
-    std::array<int, mu_limits::kMaxLayers> readyRhythms {};
+    std::array<int, mu_clid::kLimits.layers> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
         if (stager.isFlagged(r))   // (a swap cancelled after it was flagged is skipped)
@@ -148,10 +149,10 @@ void HotSwapStager::processSwaps()
     if (readyCount > 0)
     {
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
-        std::array<bool, mu_limits::kMaxLayers> applied {};
+        std::array<bool, mu_clid::kLimits.layers> applied {};
         // Everything the commit empties lives out here, so its destructors run after the lock and the suspend
         // are released, not inside them (a retired engine goes to the RetireBin, which frees it later).
-        std::array<PendingRhythm, mu_limits::kMaxLayers>            spent;
+        std::array<PendingRhythm, mu_clid::kLimits.layers>            spent;
         proc.suspendProcessing(true);
         {
             // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it

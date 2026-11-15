@@ -93,7 +93,7 @@ struct Audit
         }
     }
 
-    bool verbose = std::getenv("UIAUDIT_VERBOSE") != nullptr;
+    bool verbose = juce::SystemStats::getEnvironmentVariable("UIAUDIT_VERBOSE", {}).isNotEmpty();
     bool silent()
     {
         if (verbose) std::printf("    bar: [%s] [%s]\n", bar->getShownName().toRawUTF8(), bar->getShownValue().toRawUTF8());
@@ -305,12 +305,12 @@ int auditOne(const juce::String& product, const juce::String& tag, const std::fu
     std::unique_ptr<juce::AudioProcessor> processor(createPluginFilter());
     pump(200);
     if (prepare) prepare(*processor);
-    std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());   // the way a host asks
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorAndMakeActive());   // the way a host asks
     if (editor == nullptr) { std::fprintf(stderr, "%s: createEditor returned null\n", product.toRawUTF8()); failure = 3; return 0; }
     pump(700);   // long enough for the shell's refresh timer to give every button its status reporter
 
     // UIAUDIT_SHOT=<folder>: a PNG of the real editor as it stands (a look at the layout without opening the app).
-    if (const char* shotDir = std::getenv("UIAUDIT_SHOT"))
+    if (const auto shotDir = juce::SystemStats::getEnvironmentVariable("UIAUDIT_SHOT", {}); shotDir.isNotEmpty())
     {
         juce::File dir(shotDir);
         dir.createDirectory();

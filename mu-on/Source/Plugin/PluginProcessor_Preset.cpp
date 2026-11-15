@@ -1,3 +1,4 @@
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"           // isValidEngineDest
 #include "Modulation/ModulatorSerialise.h"    // mu-core: modulator (de)serialise
@@ -55,7 +56,7 @@ namespace
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i) prefixes.add(layerParamPrefix(i));
+    for (int i = 0; i < mu_on::kLimits.layers; ++i) prefixes.add(layerParamPrefix(i));
     initLayerState(prefixes, legacyLaneParamPrefixes());   // older APVTS dumps used "k_ b_ h_ s_ r_"
 }
 
@@ -203,7 +204,7 @@ juce::Array<juce::File> PluginProcessor::slotPresetFiles(int) const
 // sound reset, so all four stay.
 void PluginProcessor::resetLayer(int track)
 {
-    if (track < 0 || track >= mu_limits::kMaxLayers) return;
+    if (track < 0 || track >= mu_on::kLimits.layers) return;
     cancelPendingSwap(track);   // a staged swap would re-fill what we're resetting
 
     // Rows for the two kept parameters make the apply write them back unchanged; every other

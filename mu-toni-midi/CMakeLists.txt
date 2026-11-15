@@ -71,9 +71,10 @@ target_compile_definitions(mu-toni-midi
         JUCE_USE_MP3AUDIOFORMAT=1
 )
 
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-toni-midi
     PRIVATE
-        mu-core
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -176,3 +177,6 @@ target_link_libraries(mu-toni-midi-shot
         juce::juce_recommended_warning_flags
 )
 set_target_properties(mu-toni-midi-shot PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

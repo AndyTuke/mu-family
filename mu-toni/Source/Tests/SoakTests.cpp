@@ -1,6 +1,7 @@
 // A random-parameter / MIDI / state-restore soak of the real mu-toni processor while the audio thread renders (set MU_SOAK_SECONDS to
 // run it longer; the default is a few seconds). See mu-core/Tests/ParamSoak.h.
 
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ParamSoak.h"
 
@@ -19,7 +20,7 @@ struct MuToniSoakTests : juce::UnitTest
             const int n = p.getNumLayers();
             switch (rng() % 3)
             {
-                case 0: if (n < mu_limits::kMaxLayers) p.addLayer(); break;
+                case 0: if (n < mu_toni::kLimits.layers) p.addLayer(); break;
                 case 1: if (n > 1) p.removeLayer((int) (rng() % (unsigned) n)); break;
                 default: if (n > 1) p.swapLayers((int) (rng() % (unsigned) n), (int) (rng() % (unsigned) n)); break;
             }

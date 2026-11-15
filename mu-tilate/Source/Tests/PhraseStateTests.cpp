@@ -162,6 +162,56 @@ struct PhraseStateTests : public juce::UnitTest
             expect(! out.slices.settings(0).reverse && out.slices.settings(0).levelDb == 0.0f && ! out.slices.settings(0).preFade);
         }
 
+        beginTest("a knob set Absolute round-trips with its value, the remembered offset stays, and old files read as Offset");
+        {
+            PhraseState in;
+            in.loopLength = 96000;
+            in.slices = SliceList(96000);
+            in.slices.applyDetected({ 24000, 48000 });
+            SliceSettings own;
+            own.pitchSemi = 3.0f;                                         // the offset kept while the knob is Absolute
+            own.ov[(int) OverrideField::PitchSemi] = { true, 7.0f };
+            own.ov[(int) OverrideField::CutoffOct] = { true, 800.0f };    // Hz
+            own.ov[(int) OverrideField::Send1]     = { true, 0.0f };      // Absolute at 0 still counts as Absolute
+            in.slices.setSettings(1, own);
+
+            juce::ValueTree node("Layer");
+            writePhraseState(node, in);
+            const auto out = readPhraseState(node);
+            const auto& g = out.slices.settings(1);
+            expect(g.ov[(int) OverrideField::PitchSemi].absolute);
+            expectEquals(g.ov[(int) OverrideField::PitchSemi].absValue, 7.0f);
+            expectEquals(g.pitchSemi, 3.0f);
+            expect(g.ov[(int) OverrideField::CutoffOct].absolute);
+            expectEquals(g.ov[(int) OverrideField::CutoffOct].absValue, 800.0f);
+            expect(g.ov[(int) OverrideField::Send1].absolute);
+            expect(! g.ov[(int) OverrideField::LevelDb].absolute);
+            expect(! out.slices.settings(0).ov[(int) OverrideField::PitchSemi].absolute);   // a slice with no override reads as Offset
+
+            // A damaged absolute value is brought to a finite number.
+            SliceSettings bad;
+            bad.ov[(int) OverrideField::LevelDb] = { true, std::numeric_limits<float>::quiet_NaN() };
+            expect(std::isfinite(sanitised(bad).ov[(int) OverrideField::LevelDb].absValue));
+        }
+
+        beginTest("an Absolute knob replaces the layer's value, an Offset knob adds to it");
+        {
+            LayerValues layer;
+            layer.pitchSemi = 5.0f; layer.cutoffHz = 1000.0f; layer.levelDb = -6.0f; layer.ins[1] = 0.5f;
+            SliceSettings s;
+            s.pitchSemi = 2.0f; s.cutoffOct = 1.0f; s.levelDb = 3.0f; s.insOff[1] = 0.25f;
+            expectEquals(effectiveValue(s, layer, OverrideField::PitchSemi), 7.0f);          // 5 + 2
+            expectEquals(effectiveValue(s, layer, OverrideField::CutoffOct), 2000.0f);       // one octave up from 1000 Hz
+            expectEquals(effectiveValue(s, layer, OverrideField::LevelDb), -3.0f);
+            expectEquals(effectiveValue(s, layer, OverrideField::Ins1), 0.75f);
+            expectEquals(resolvedOffset(s, OverrideField::PitchSemi, layer.pitchSemi), 2.0f);
+
+            s.ov[(int) OverrideField::PitchSemi] = { true, 12.0f };
+            expectEquals(effectiveValue(s, layer, OverrideField::PitchSemi), 12.0f);         // the layer's 5 and the offset 2 no longer matter
+            expectEquals(resolvedOffset(s, OverrideField::PitchSemi, layer.pitchSemi), 7.0f);   // 5 + 7 = 12
+            expectEquals(s.pitchSemi, 2.0f);                                                 // the offset is still there for switching back
+        }
+
         beginTest("slices, pins, blocks and the loop reference round-trip");
         {
             PhraseState in;

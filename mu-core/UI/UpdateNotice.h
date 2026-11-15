@@ -2,7 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-#include "BuildNumber.h"               // BUILD_NUMBER, MU_VERSION_STRING: the local version the check compares
+#include "BuildNumber.h"               // BUILD_NUMBER: the local build the check compares
 #include "Plugin/ShellBackend.h"
 #include "Plugin/UpdateChecker.h"
 #include "UI/Components/StatusBar.h"
@@ -84,14 +84,17 @@ public:
 private:
     JUCE_DECLARE_WEAK_REFERENCEABLE(UpdateNotice)
 
+    // "1.2.0.1487" -> "1.2": the major.minor the newer build would carry (the published list gives only its build number).
+    static juce::String versionBase(const juce::String& full) { return full.upToLastOccurrenceOf(".", false, false).upToLastOccurrenceOf(".", false, false); }
+
     void refresh()
     {
         namespace uc = mu_core::update_check;
         auto* settings = backend.getAppSettingsFile();
         const bool wanted = settings != nullptr
                             && uc::shouldShow(uc::isEnabled(settings), entry.build, uc::dismissedBuild(settings), BUILD_NUMBER);
-        const juce::String tip = juce::String(entry.version.isNotEmpty() ? entry.version : "v1.1." + juce::String(entry.build))
-                                 + " is out (you have v" + juce::String(MU_VERSION_STRING)
+        const juce::String tip = juce::String(entry.version.isNotEmpty() ? entry.version : "v" + versionBase(backend.getVersionString()) + "." + juce::String(entry.build))
+                                 + " is out (you have v" + backend.getVersionString()
                                  + "). Click to open the download page.";
         statusBar.setUpdateLinkVisible(wanted && ! isSuppressed, tip);
     }

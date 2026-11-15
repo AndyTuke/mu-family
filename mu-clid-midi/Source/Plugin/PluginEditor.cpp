@@ -36,6 +36,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
             juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
         });
+    aboutOverlay.setVersion(proc.getVersionString());
     aboutOverlay.onDismiss = [this] { aboutOverlay.setVisible(false); };
     addChildComponent(aboutOverlay);
 

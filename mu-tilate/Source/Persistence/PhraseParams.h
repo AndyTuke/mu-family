@@ -66,6 +66,6 @@ inline double gridBeats(int choice)
 }
 
 // The Phrase type's rows for one layer slot (p{slot}_*), in ppi order.
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/);
 
 } // namespace mu_tilate

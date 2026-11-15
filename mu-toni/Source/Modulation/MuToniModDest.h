@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider + wireTableModDestResolve
+#include "UI/TableModDestProvider.h"      // mu-core: the table-driven destination provider
 #include "UI/Components/DropdownSelect.h"
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
 #include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
@@ -96,27 +96,11 @@ enum ModDestIndex
 static_assert((int) (sizeof(kModDestTable) / sizeof(kModDestTable[0])) == kNumModDests,
               "kModDestTable size must equal kNumModDests");
 
-inline bool isValidModDest(const std::string& id)
-{
-    for (const auto& d : kModDestTable) if (id == d.id) return true;
-    return false;
-}
+inline bool isValidModDest(const std::string& id) { return mu_mod::isValidTarget(kModDestTable, id); }
 
 inline ModDestProvider makeModDestProvider()
 {
-    ModDestProvider p;
-    p.unitsPerDirection = [](const std::string&) { return 0; };   // no stepped-snap graphic for MVP
-
-    p.populate = [](DropdownSelect& dd, int driveChar, bool /*steppedMode*/)
-    {
-        mu_mod::populateDropdown(dd, kModDestTable, { driveChar });   // the shared builder; driveChar = active insert effect
-    };
-
-    wireTableModDestResolve(p,
-        [](int i) { return std::string(kModDestTable[i].id); },
-        kNumModDests);
-
-    return p;
+    return mu_mod::makeTableDestProvider(kModDestTable, kNumModDests);
 }
 
 } // namespace mu_toni

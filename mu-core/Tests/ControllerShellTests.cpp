@@ -11,6 +11,7 @@
 #include "UI/TransportBar.h"
 
 #include <memory>
+#include "TestLimits.h"
 
 namespace
 {
@@ -85,7 +86,7 @@ struct ControllerShellTests : juce::UnitTest
         {
             SlotGuard slot;
             controlAttachmentFactory() = nullptr;
-            LiveState view; NullSink sink;
+            LiveState view { mu_test::kLimits.layers }; NullSink sink;
             TestShellBackend b(true);
             b.live = &view; b.sink = &sink; b.performanceSupported = true;
             ControlHost host;
@@ -101,7 +102,7 @@ struct ControllerShellTests : juce::UnitTest
         {
             SlotGuard slot;
             juce::StringArray log;
-            LiveState view; NullSink sink;
+            LiveState view { mu_test::kLimits.layers }; NullSink sink;
             const ControlSink* gotSink = nullptr; const LiveView* gotView = nullptr;
             float gotDim = 0; juce::File gotFolder;
             controlAttachmentFactory() = [&](ControlSink& s, const LiveView& v, const SurfaceLook& look, const juce::File& f)
@@ -127,7 +128,7 @@ struct ControllerShellTests : juce::UnitTest
         {
             SlotGuard slot;
             juce::StringArray log;
-            LiveState view; NullSink sink;
+            LiveState view { mu_test::kLimits.layers }; NullSink sink;
             controlAttachmentFactory() = [&](ControlSink&, const LiveView&, const SurfaceLook&, const juce::File&)
             { return std::unique_ptr<ControlAttachment>(new FakeController(&log)); };
             TestShellBackend b(true);
@@ -149,7 +150,7 @@ struct ControllerShellTests : juce::UnitTest
             int built = 0;
             controlAttachmentFactory() = [&](ControlSink&, const LiveView&, const SurfaceLook&, const juce::File&)
             { ++built; return std::unique_ptr<ControlAttachment>(new FakeController()); };
-            LiveState view; NullSink sink;
+            LiveState view { mu_test::kLimits.layers }; NullSink sink;
             auto none = [](ControlAttachment*) {};
 
             TestShellBackend unsupported(true);
@@ -415,7 +416,7 @@ struct ControllerShellTests : juce::UnitTest
 
         beginTest("Status line: the Lost warning goes when Performance mode ends");
         {
-            LiveState live;
+            LiveState live { mu_test::kLimits.layers };
             LiveState::Callbacks cb;
             cb.supportsPerformanceMode = [] { return true; };
             cb.canLoad = [](int) { return true; };

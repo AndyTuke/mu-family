@@ -3,6 +3,7 @@
 // RetireBin the retired tails, and what mu-Clid keeps per slot on the processor side (play state, sample paths)
 // is moved here, in the order the edit's locked section always had. Partial-class TU split from PluginProcessor.cpp.
 
+#include "Plugin/MuClidLimits.h"
 #include "Audio/SpinLock.h"
 #include "Persistence/ScopedApvtsLoading.h"
 #include "PluginProcessor.h"
@@ -84,7 +85,7 @@ int PluginProcessor::retiredCountForTest(int slot) const noexcept
 
 void PluginProcessor::resetPlayState(int idx)
 {
-    if (idx < 0 || idx >= mu_limits::kMaxLayers) return;
+    if (idx < 0 || idx >= mu_clid::kLimits.layers) return;
     auto& s = sampleRhythm(idx).playState;
     s.patternLength.store(1);
     s.stepsA       .store(1);
@@ -97,7 +98,7 @@ void PluginProcessor::resetPlayState(int idx)
 // a later grow starts from defaults (a restore then fills in what the state carries).
 void PluginProcessor::setRhythmCount(int n)
 {
-    n = juce::jlimit(0, mu_limits::kMaxLayers, n);
+    n = juce::jlimit(0, mu_clid::kLimits.layers, n);
     for (int i = n; i < getNumRhythms(); ++i)
         layerAs<Rhythm>(i) = Rhythm{};
     setLiveRhythms(n);
@@ -105,7 +106,7 @@ void PluginProcessor::setRhythmCount(int n)
 
 void PluginProcessor::setLiveRhythms(int n)
 {
-    n = juce::jlimit(0, mu_limits::kMaxLayers, n);
+    n = juce::jlimit(0, mu_clid::kLimits.layers, n);
     const int current = getNumRhythms();
     for (int i = std::min(n, current); i < std::max(n, current); ++i)
         sampleRhythm(i).cursor.clear();
@@ -143,7 +144,7 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 
     // A slot's tenant changed, so the modulation change-detection starts clean: the next block re-runs a
     // modulated tenant's pass and pattern recompute instead of trusting the previous tenant's memory.
-    for (int i = firstIndex; i <= lastIndex && i < mu_limits::kMaxLayers; ++i)
+    for (int i = firstIndex; i <= lastIndex && i < mu_clid::kLimits.layers; ++i)
         sampleRhythm(i).resetModulationMemory();
 }
 

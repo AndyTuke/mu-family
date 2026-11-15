@@ -1,6 +1,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MixerEngine.h"
 #include "Plugin/MixerFxParams.h"
+#include "TestLimits.h"
 
 // ChannelState::reset() is what addLayer / resetLayer leave a mixer strip at before the strip's
 // parameters are set to their defaults, so it must equal the defaults the shared strip layout
@@ -40,15 +41,15 @@ struct ChannelStateResetTests : juce::UnitTest
                                                    "scSrc", "scAmt", "scAtk", "scRel", "outBus" };
         // A build with group buses also declares ch{n}_bus, the bus the strip feeds.
         static const std::vector<juce::String> withBus = [] { auto v = s; v.push_back("bus"); return v; }();
-        return mu_limits::kMaxBuses > 0 ? withBus : s;
+        return mu_test::kLimits.buses > 0 ? withBus : s;
     }
 
     // Compares one channel's reset ChannelState against the APVTS default of every ch{n}_ parameter.
     void checkLayout(const juce::String& label, const mu_mixfx::ChannelStripOptions& opts)
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-            mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(c) + "_", "Ch ", opts);
+        for (int c = 0; c < mu_test::kLimits.layers; ++c)
+            mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(c) + "_", "Ch ", opts, mu_test::kLimits);
         StubProcessor proc;
         juce::AudioProcessorValueTreeState apvts(proc, nullptr, "ResetState", std::move(layout));
 
@@ -67,7 +68,7 @@ struct ChannelStateResetTests : juce::UnitTest
         expectEquals(stripParams, (int) suffixes().size(), label + ": strip parameter count changed; extend reset() and this test");
 
         // Loop: dirty every field, reset, then compare each against the matching parameter default.
-        for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+        for (int c = 0; c < mu_test::kLimits.layers; ++c)
         {
             MixerEngine::ChannelState st;
             st.level = 0.3f; st.pan = 0.7f; st.sendEffect = 0.4f; st.sendDelay = 0.5f; st.sendReverb = 0.6f;
@@ -90,7 +91,7 @@ struct ChannelStateResetTests : juce::UnitTest
             expectWithinAbsoluteError(st.sidechainAttackMs.load(),  def(c, "scAtk"), 1.0e-3f, ctx + " sidechainAttackMs");
             expectWithinAbsoluteError(st.sidechainReleaseMs.load(), def(c, "scRel"), 1.0e-3f, ctx + " sidechainReleaseMs");
             expectEquals(st.outputBus.load(), juce::roundToInt(def(c, "outBus")),       ctx + " outputBus");
-            if (mu_limits::kMaxBuses > 0)
+            if (mu_test::kLimits.buses > 0)
                 expectEquals(st.busAssign.load(), juce::roundToInt(def(c, "bus")),      ctx + " busAssign");
             else
                 expectEquals(st.busAssign.load(), 0,                                     ctx + " busAssign (no buses)");

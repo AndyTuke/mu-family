@@ -1,4 +1,5 @@
 #include "BusTestRig.h"
+#include "TestLimits.h"
 
 // Group-bus routing in the shared mixer (design: docs/mu-tronic/design.md section 5): a channel's dry signal
 // goes to its bus (ChannelState::busAssign) or the master, the bus sums and feeds the master through its own
@@ -48,11 +49,11 @@ struct BusRoutingTests : juce::UnitTest
             r.run(2);
             expectEquals(r.outL(), 0.8f * kTrim * 0.5f, "on bus 1");
             r.mixer.channels[0].busAssign.store(2);
-            r.run();
-            expectEquals(r.outL(), 0.8f * kTrim * 0.25f, "on bus 2 the next block");
+            r.run(2);   // the bus gains ramp over the first block after a reassign; the second block is settled
+            expectEquals(r.outL(), 0.8f * kTrim * 0.25f, "on bus 2 once the ramp has finished");
             expectEquals(r.mixer.busPeaks[0].load(), 0.0f, "bus 1 went quiet");
             r.mixer.channels[0].busAssign.store(0);
-            r.run();
+            r.run(2);
             expectEquals(r.outL(), 0.8f * kTrim, "back on the master");
             expectEquals(r.mixer.busPeaks[1].load(), 0.0f, "bus 2 went quiet");
         }
@@ -202,7 +203,7 @@ struct BusRoutingTests : juce::UnitTest
         {
             Rig r;
             r.dc[0] = 0.8f;
-            r.mixer.channels[0].busAssign.store(mu_limits::kMaxBuses + 1);
+            r.mixer.channels[0].busAssign.store(mu_test::kLimits.buses + 1);
             r.run();
             expectEquals(r.outL(), 0.8f * kTrim, "master mix");
         }

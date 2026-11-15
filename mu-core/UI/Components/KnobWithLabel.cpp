@@ -129,6 +129,18 @@ void KnobWithLabel::setLockMarks(bool locked, double ghostValue)
     repaint();
 }
 
+void KnobWithLabel::setOverrideMode(OverrideMode mode)
+{
+    if (mode == overrideMode) return;
+    overrideMode = mode;
+    // The ring fill is the category colour, or the absolute (amber) tint in Absolute.
+    slider.setColour(juce::Slider::rotarySliderFillColourId,
+                     MuLookAndFeel::colour(mode == OverrideMode::absolute ? MuLookAndFeel::indicatorAbsoluteTint : knobColour));
+    if (mode == OverrideMode::absolute) slider.getProperties().set(MuLookAndFeel::kKnobOwnTint, true);   // over the app colour
+    else                                slider.getProperties().remove(MuLookAndFeel::kKnobOwnTint);
+    repaint();
+}
+
 void KnobWithLabel::resized()
 {
     using mu_ui::s;
@@ -144,7 +156,11 @@ void KnobWithLabel::mouseDown(const juce::MouseEvent& e)
     if (entries.empty()) return;
     auto actions = std::make_shared<std::vector<MenuEntry>>(entries);
     juce::PopupMenu menu;
-    for (size_t i = 0; i < actions->size(); ++i) menu.addItem((int) i + 1, (*actions)[i].text);
+    for (size_t i = 0; i < actions->size(); ++i)
+    {
+        if ((*actions)[i].separatorBefore) menu.addSeparator();
+        menu.addItem((int) i + 1, (*actions)[i].text, true, (*actions)[i].ticked);
+    }
     menu.showMenuAsync(juce::PopupMenu::Options(), [actions](int picked)
     {
         if (picked > 0 && (*actions)[(size_t) picked - 1].action) (*actions)[(size_t) picked - 1].action();
@@ -344,7 +360,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     if (auto* mlf = dynamic_cast<MuLookAndFeel*>(&getLookAndFeel()))
         mlf->drawKnobValueText(g, slider.getBounds(),
                                slider.getTextFromValue(slider.getValue()),
-                               isSteppedControl());
+                               isSteppedControl() || overrideMode == OverrideMode::absolute);   // an Absolute knob always shows its actual value
 
     // Modulation indicator ring and GR arc overlay.
     if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && ! lockLed && std::isnan(lockGhostNorm)) return;

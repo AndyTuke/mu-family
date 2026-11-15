@@ -22,6 +22,9 @@ namespace
         put("pf", s.preFade ? 1 : 0, 0);       put("pfl", s.preLevelDb, d.preLevelDb);
         put("pfn", s.preLengthMs, d.preLengthMs); put("pft", s.preTone, d.preTone);
         put("one", s.oneShot ? 1 : 0, 1);     put("chk", s.chokeGroup, d.chokeGroup);
+        // A knob set Absolute: "oa<n>" holds its value (its being there is the flag); the offset above is kept, so switching back finds it.
+        for (int k = 0; k < kOverrideFieldCount; ++k)
+            if (s.ov[k].absolute) m.setProperty(("oa" + juce::String(k)).toRawUTF8(), s.ov[k].absValue, nullptr);
     }
 
     SliceSettings readSettings(const juce::ValueTree& m)
@@ -42,6 +45,11 @@ namespace
         s.preLevelDb = f("pfl", s.preLevelDb);  s.preLengthMs = f("pfn", s.preLengthMs);  s.preTone = f("pft", s.preTone);
         s.oneShot = (int) m.getProperty("one", 1) != 0;
         s.chokeGroup = (int) m.getProperty("chk", 0);
+        for (int k = 0; k < kOverrideFieldCount; ++k)
+        {
+            const juce::Identifier id(("oa" + juce::String(k)).toRawUTF8());
+            if (m.hasProperty(id)) { s.ov[k].absolute = true; s.ov[k].absValue = (float) (double) m.getProperty(id); }
+        }
         return sanitised(s);   // a damaged file must not hand the engine a NaN
     }
 }

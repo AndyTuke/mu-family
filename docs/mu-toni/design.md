@@ -158,9 +158,9 @@ integration notes for the reference implementation.
 
 ---
 
-## Licensing / distribution — Pay What You Want
+## Licensing / distribution — free with a reminder, £20 licence
 
-**μ-Toni is Pay What You Want** (GBP 0 or more, suggested GBP 20), like mu-Clid, mu-Tant and mu-On. It is fully functional with no key and has no demo or limited mode. A key (issued even at GBP 0) only removes the Support prompt.
+**μ-Toni is free to download, with a £20 licence** (one-off), like mu-Clid, mu-Tant and mu-On. It is fully functional with no key and has no demo or limited mode. The Support reminder shows on every load; a key only removes it.
 
 - **Shared:** it uses the standard mu-core licensing (`initLicensing`, offline `.lic`, online activation, Support prompt, activation overlay); see "Licensing and the support prompt" in [design-plugin-family.md](../design-plugin-family.md).
 - **Product side:** `Source/License/LicenseKey.h` (`mu_toni`: product id `mu-Toni`, `mutoni.lic`, public key, checkout URL), one `initLicensing` call in `PluginProcessor`, and the three licence `.cpp`s in the CMake plugin and tests targets. The private key is outside the repo.

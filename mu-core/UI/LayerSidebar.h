@@ -90,7 +90,7 @@ public:
 private:
     ProcessorBase& proc;
     juce::String   noun;
-    void updateAddEnabled();   // Add is greyed (not hidden) at kMaxLayers, so the sidebar never reflows
+    void updateAddEnabled();   // Add is greyed (not hidden) at the layer count, so the sidebar never reflows
 
     // Pages. The items of every page exist; only those of the shown page are visible and laid out, by their
     // position within the page.

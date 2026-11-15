@@ -70,7 +70,15 @@ public:
                    float revSize, float revMix_, float revLpHz, float cutHz, float res,
                    float inLpHz = kInLpOpen, float feedback = 0.0f, float fbFilter = 0.0f) noexcept
     {
-        fbAmt  = juce::jlimit(0.0f, 1.0f, feedback) * kMaxFeedback;
+        // The ring is only written while Feedback is on, so when it turns on from off, start from silence rather than the stale
+        // audio the ring held when it was last active.
+        const float newFb = juce::jlimit(0.0f, 1.0f, feedback) * kMaxFeedback;
+        if (fbAmt <= 0.0f && newFb > 0.0f)
+        {
+            fbRing.clear();
+            for (auto& z : fbFilterState) z[0] = z[1] = 0.0f;
+        }
+        fbAmt = newFb;
         setFeedbackFilter(fbFilter);
         inLpCut = juce::jlimit(20.0f, kInLpOpen, inLpHz);
         inLp.setCutoff(inLpCut);

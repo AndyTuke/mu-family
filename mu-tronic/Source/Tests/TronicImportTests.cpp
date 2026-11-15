@@ -87,13 +87,13 @@ namespace
         {
             beginTest("an imported sidechain source follows its layer; the external input becomes this binary's");
             const std::vector<int> slotOf { 4, 5, 6 };
-            const int ext = MixerEngine::kExtSidechainSrc + 1;
-            expectEquals(mu_tronic::remapImportedSidechain(0, 9, slotOf), 0, "off stays off");
-            expectEquals(mu_tronic::remapImportedSidechain(2, 9, slotOf), 6, "product channel 1 sits in slot 5, parameter 6");
-            expectEquals(mu_tronic::remapImportedSidechain(mu_tronic::kProductLayers + 1, 9, slotOf), ext, "the external input (engine value 8)");
-            expectEquals(mu_tronic::remapImportedSidechain(2, 5, slotOf), 0, "a layer cannot duck from itself");
-            expectEquals(mu_tronic::remapImportedSidechain(5, 9, slotOf), 0, "a source that was not imported is off");
-            expectEquals(mu_tronic::remapImportedSidechain(mu_tronic::kProductLayers + 2, 9, slotOf), 0, "the products have no buses");
+            const int ext = mu_tronic::kLimits.layers + 1;
+            expectEquals(mu_tronic::remapImportedSidechain(0, 9, slotOf, mu_tronic::kLimits), 0, "off stays off");
+            expectEquals(mu_tronic::remapImportedSidechain(2, 9, slotOf, mu_tronic::kLimits), 6, "product channel 1 sits in slot 5, parameter 6");
+            expectEquals(mu_tronic::remapImportedSidechain(mu_tronic::kProductLayers + 1, 9, slotOf, mu_tronic::kLimits), ext, "the external input (engine value 8)");
+            expectEquals(mu_tronic::remapImportedSidechain(2, 5, slotOf, mu_tronic::kLimits), 0, "a layer cannot duck from itself");
+            expectEquals(mu_tronic::remapImportedSidechain(5, 9, slotOf, mu_tronic::kLimits), 0, "a source that was not imported is off");
+            expectEquals(mu_tronic::remapImportedSidechain(mu_tronic::kProductLayers + 2, 9, slotOf, mu_tronic::kLimits), 0, "the products have no buses");
         }
 
         void toniPreset()
@@ -204,7 +204,7 @@ namespace
             expect(p.getLayerTypeId(4) == LayerTypeId::Hat);
             expectEquals(plain(p.apvts, "t2_src"), 1.0f, "the Rumble listens to the Kick's new slot");
             expectEquals(plain(p.apvts, "ch3_scSrc"), 2.0f, "the Hat ducks from slot 1 (parameter 2)");
-            expectEquals(plain(p.apvts, "ch4_scSrc"), (float) (MixerEngine::kExtSidechainSrc + 1), "the external input is this binary's");
+            expectEquals(plain(p.apvts, "ch4_scSrc"), (float) (mu_tronic::kLimits.layers + 1), "the external input is this binary's");
 
             // A Rumble whose source layer was not in the preset falls to the first usable slot.
             setRow(slotOf(preset, 1), "src", 7);

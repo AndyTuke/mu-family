@@ -2,6 +2,7 @@
 // construction under a temp storage root, resetLayer against a fresh slot, and the structural
 // edits and wavetable import against processBlock running on a worker thread.
 
+#include "Plugin/MuTantLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
@@ -220,7 +221,7 @@ struct MuTantProcessorSeamTests : juce::UnitTest
             ExposedPluginProcessor p;
             expectEquals(p.getNumLayers(), 1);
             expectEquals(p.numLayers.load(), 1);
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_tant::kLimits.layers; ++i)
                 expect(p.layers[(size_t) i] != nullptr, "all eight voice slots exist from construction");
             expectEquals(p.getContentDir().getFullPathName(),
                          storage.root.getChildFile("content").getChildFile("muTant").getFullPathName());
@@ -442,14 +443,14 @@ struct MuTantProcessorSeamTests : juce::UnitTest
     void expectLayerInvariants(ExposedPluginProcessor& p, const juce::String& where)
     {
         const int n = p.numLayers.load();
-        expect(n >= 1 && n <= mu_limits::kMaxLayers, where + ": count in range");
+        expect(n >= 1 && n <= mu_tant::kLimits.layers, where + ": count in range");
         std::set<const void*> seen;
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < mu_tant::kLimits.layers; ++i)
         {
             expect(p.layers[(size_t) i] != nullptr, where + ": slot " + juce::String(i) + " is filled");
             seen.insert(p.layers[(size_t) i].get());
         }
-        expectEquals((int) seen.size(), mu_limits::kMaxLayers, where + ": no layer appears twice");
+        expectEquals((int) seen.size(), mu_tant::kLimits.layers, where + ": no layer appears twice");
     }
 
     void structuralEditsVersusProcessBlock()

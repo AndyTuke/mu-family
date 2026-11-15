@@ -117,7 +117,7 @@ private:
     // passes of the row) and, on a Hat, which sound it plays. Not parameters: they edit the track's step row.
     KnobWithLabel  stepProbKnob { "Prob" }, stepLevelKnob { "Level" };   // a step's chance to play and its level
     juce::Label    fadeCaption { {}, "Fade" }, repeatCaption { {}, "Repeat" }, rateCaption { {}, "Rate" }, condCaption { {}, "Condition" }, barsCaption { {}, "Plays on Loop" }, octaveCaption { {}, "Octave" }, noteCaption { {}, "Note" };
-    StepBarsSelector barsSelect;                                      // the step's Bars: eight segments, those within its Length clicked on or off
+    StepBarsSelector barsSelect;                                      // the step's Bars: one segment per loop of its Length, each clicked on or off
     HatTuneLink tuneLink;                                             // a Hat: the line and lamp joining its Closed and Open tune
     float linkedTune[2] { 0.0f, 0.0f };                               // the two tunes as last seen, for the link
     int   linkedLayer = -1;
@@ -128,7 +128,7 @@ private:
     juce::Label    chordCaption { {}, "Chord" };
     DropdownSelect chordSelect;
     KnobWithLabel  invKnob { "Inv" }, spreadKnob { "Spread" };   // Octave -2..+2 and Note -12..+12 (a Kick or Bass step's pitch)
-    std::array<int, mu_limits::kMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
+    std::array<int, mu_limits::kAbsoluteMaxLayers> selectedStepOf {};   // each layer's selected step (right-click), shown in the panel
     void refreshNoteItems();                                    // the Note list names the notes the key and tune give
     int  noteSignature = -1;                                    // what the list was last built for
     void refreshBarsSelect(const StepRow& row, int step);        // the Bars list: the bars the Length offers, ticked as the step has them

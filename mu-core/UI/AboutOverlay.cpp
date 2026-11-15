@@ -1,6 +1,6 @@
+#include "SharedJuceName.h"
 #include "AboutOverlay.h"
 #include "License/SupportPromptPolicy.h"
-#include "BuildNumber.h"
 #include "UI/ModalCard.h"   // shared dim + card chrome
 
 AboutOverlay::AboutOverlay()
@@ -12,16 +12,6 @@ AboutOverlay::AboutOverlay()
     addChildComponent(supportBtn);
     addChildComponent(keyBtn);
 
-    // The supporter's tip link, styled like the Settings "Contact Support" link.
-    tipLink.setButtonText("Want to give more?");
-    tipLink.setURL(juce::URL(mu_core::support_prompt::kTipUrl));
-    tipLink.setTooltip("Opens the tip page in your browser");
-    tipLink.setFont(MuLookAndFeel::uiFont(mu_ui::sf(12.0f)), false,
-                    juce::Justification::centredLeft);
-    tipLink.setColour(juce::HyperlinkButton::textColourId,
-                      MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
-    addChildComponent(tipLink);
-
     updateToggle.onClick = [this] { if (onUpdateCheckChanged) onUpdateCheckChanged(updateToggle.getToggleState()); };
     addChildComponent(updateToggle);
 }
@@ -31,7 +21,6 @@ void AboutOverlay::setSupportState(SupportState state)
     supportState = state;
     supportBtn.setVisible(state == SupportState::Unlicensed);
     keyBtn.setVisible(state == SupportState::Unlicensed);
-    tipLink.setVisible(state == SupportState::Supporter);
     repaint();
 }
 
@@ -39,6 +28,7 @@ void AboutOverlay::setProductInfo(const juce::String& displayName,
                                 const juce::StringArray& credits)
 {
     productName    = displayName;
+    mu_core::setSharedProductName(displayName.toRawUTF8());   // JUCE names the accessibility application after it (SharedJuceName.h)
     productCredits = credits;
     repaint();
 }
@@ -81,8 +71,7 @@ void AboutOverlay::resized()
     supportBtn.setBounds(closeBtn.getRight() + s(8), rowY, s(80), s(28));
     keyBtn.setBounds(closeBtn.getX() - s(8) - s(100), rowY, s(100), s(28));
 
-    // A supporter's thank-you (painted) and the tip link sit left-aligned above the Close row.
-    tipLink.setBounds(cardX + s(24), rowY - s(22), s(160), s(18));
+    // A supporter's thank-you is painted left-aligned above the Close row.
     updateToggle.setBounds(cardX + s(24), rowY - s(26), s(180), s(22));
 }
 
@@ -116,7 +105,7 @@ void AboutOverlay::paint(juce::Graphics& g)
 
     g.setFont(MuLookAndFeel::uiFont(sf(11.0f)));
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.drawText("v" + juce::String(MU_VERSION_STRING), tx, ty, textW, s(18),
+    g.drawText("v" + versionText, tx, ty, textW, s(18),
                juce::Justification::centredLeft, false);
     ty += s(20);
 
@@ -133,7 +122,7 @@ void AboutOverlay::paint(juce::Graphics& g)
         ty += s(17);
     }
 
-    // A supporter gets a thank-you above the Close row, with the tip link under it.
+    // A supporter gets a thank-you above the Close row.
     if (supportState == SupportState::Supporter)
     {
         g.setColour(MuLookAndFeel::colour(Id::mutedText));

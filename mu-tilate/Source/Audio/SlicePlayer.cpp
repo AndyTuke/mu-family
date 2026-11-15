@@ -158,25 +158,37 @@ bool SlicePlayer::filterModulation(float& octaves, float& resAdd) const noexcept
     return true;
 }
 
-bool SlicePlayer::insertOffsets(float (&out)[4]) const noexcept
+bool SlicePlayer::insertOffsets(float (&out)[4], unsigned& absMask) const noexcept
 {
+    absMask = 0;
     for (auto& o : out) o = 0.0f;
     const Voice* newest = nullptr;
     for (const auto& v : voices)
         if (v.active && ! v.swell && (newest == nullptr || v.age < newest->age)) newest = &v;
     if (newest == nullptr) return false;
-    for (int i = 0; i < 4; ++i) out[i] = newest->own.insOff[i];
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto& ov = newest->own.ov[(int) OverrideField::Ins0 + i];
+        out[i] = ov.absolute ? ov.absValue : newest->own.insOff[i];
+        if (ov.absolute) absMask |= 1u << i;
+    }
     return true;
 }
 
-bool SlicePlayer::sendOffsets(float (&out)[3]) const noexcept
+bool SlicePlayer::sendOffsets(float (&out)[3], unsigned& absMask) const noexcept
 {
+    absMask = 0;
     for (auto& o : out) o = 0.0f;
     const Voice* newest = nullptr;
     for (const auto& v : voices)
         if (v.active && ! v.swell && (newest == nullptr || v.age < newest->age)) newest = &v;
     if (newest == nullptr) return false;
-    for (int i = 0; i < 3; ++i) out[i] = newest->own.sendOff[i];
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto& ov = newest->own.ov[(int) OverrideField::Send0 + i];
+        out[i] = ov.absolute ? ov.absValue : newest->own.sendOff[i];
+        if (ov.absolute) absMask |= 1u << i;
+    }
     return true;
 }
 

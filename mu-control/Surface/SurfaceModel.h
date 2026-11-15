@@ -93,8 +93,8 @@ private:
 
     // When each layer's playing clip last changed, to time the start-of-clip burst. Written while rendering
     // (message thread only), hence mutable. lastPlaying -2 = not seen yet, so the first frame does not burst.
-    mutable std::array<int, (size_t) mu_limits::kMaxLayers>    lastPlaying;
-    mutable std::array<double, (size_t) mu_limits::kMaxLayers> burstStartMs;
+    mutable std::array<int, (size_t) mu_limits::kAbsoluteMaxLayers>    lastPlaying;   // at the ceiling; the layer view says how many are live
+    mutable std::array<double, (size_t) mu_limits::kAbsoluteMaxLayers> burstStartMs;
 
     // The arrow buttons (AppPrev, AppNext, PerformancePrev, PerformanceNext, PagePrev, PageNext): when an accepted press last
     // flashed each, and which preset arrow was pressed last (it pulses while its switch is queued).

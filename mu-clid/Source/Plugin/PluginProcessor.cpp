@@ -1,3 +1,4 @@
+#include "Plugin/MuClidLimits.h"
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
@@ -31,7 +32,8 @@ PluginProcessor::PluginProcessor()
           .withOutput("Out 8",       juce::AudioChannelSet::stereo(), false)
           .withOutput("FX Returns",  juce::AudioChannelSet::stereo(), false),
           createParameterLayout(),
-          juce::Identifier("MuClidState"))
+          juce::Identifier("MuClidState"),
+          kLimits)
 {
     // Register mu-clid's modulation depth scales with mu-core before any audio runs
     // (once, message thread) — keeps mu-core from enumerating mu-clid param ids.
@@ -65,7 +67,7 @@ PluginProcessor::PluginProcessor()
 
     // Resolve each rhythm parameter once (its raw value pointer for the drain) and build the sorted
     // suffix table the listener searches, before any listener can fire.
-    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
+    for (int ri = 0; ri < mu_clid::kLimits.layers; ++ri)
     {
         const juce::String prefix = "r" + juce::String(ri) + "_";
         for (int i = 0; i < kRhythmParamCount; ++i)
@@ -90,7 +92,7 @@ PluginProcessor::PluginProcessor()
     // All eight rhythms exist for the processor's lifetime (a restored state writes into slots above
     // the live count before it sets the count).
     keepSpareLayers = true;
-    for (int ri = 0; ri < mu_limits::kMaxLayers; ++ri)
+    for (int ri = 0; ri < mu_clid::kLimits.layers; ++ri)
     {
         layers[(size_t) ri] = makeRhythm(ri);
     }
@@ -212,9 +214,9 @@ void PluginProcessor::driveLayers(juce::AudioBuffer<float>& buffer, juce::MidiBu
     t.blockBeats     = transport.playing ? t.beatsPerSample * (double) n : 0.0;
 
     auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
-    std::array<juce::AudioBuffer<float>, MixerEngine::MaxChannels> directBufs;
-    std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> directPtrs {};
-    for (int i = 0; i < MixerEngine::MaxChannels; ++i)
+    std::array<juce::AudioBuffer<float>, mu_clid::kLimits.layers> directBufs;
+    MixerEngine::DirectOuts directPtrs {};
+    for (int i = 0; i < mu_clid::kLimits.layers; ++i)
     {
         const int busIndex = kFirstDirectOutBus + i;
         if (busIndex < getBusCount(false))
@@ -249,7 +251,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
     if (isNonRealtime())
         servicePendingRhythmParams(true);
 
-    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
+    const int numRhythms = juce::jlimit(0, (int) mu_clid::kLimits.layers, (int) view.numLive);
     sendOrphanOffs(midiMessages);
 
     // Each live rhythm starts the block with no hit; the cursors then find this block's.
@@ -258,7 +260,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
 
     if (t.playing)
     {
-        std::array<CursorSteps, mu_limits::kMaxLayers> cursorSteps;
+        std::array<CursorSteps, mu_clid::kLimits.layers> cursorSteps;
         const auto blockResult = advanceCursors(numRhythms, t.startBeat, cursorSteps);
 
         // Phase 1: each rhythm that has a hit takes it (a MIDI note-on now, a sample hit at its render).
@@ -272,7 +274,7 @@ void PluginProcessor::layersBlockStarting(const mu_core::LayerView& view, const 
             requestDeferredWork();
 
         // Update UI play-state atomics.
-        const float frac = static_cast<float>(std::fmod(t.startBeat / RhythmSequencer::StepLengthBeats, 1.0));
+        const float frac = RhythmSequencer::stepFraction(t.startBeat);
         for (int r = 0; r < numRhythms; ++r)
         {
             const auto& cs = cursorSteps[(size_t) r];
@@ -304,7 +306,7 @@ void PluginProcessor::layersBlockRendered(const mu_core::LayerView& view, juce::
         samples.mixPreviewInto(masterView, len);
     }
 
-    const int numRhythms = juce::jlimit(0, (int) mu_limits::kMaxLayers, (int) view.numLive);
+    const int numRhythms = juce::jlimit(0, (int) mu_clid::kLimits.layers, (int) view.numLive);
     for (int r = 0; r < numRhythms; ++r)
         sampleRhythm(r).midi.processBlock(midiMessages, total);
 }
@@ -418,7 +420,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 // BlockResult shape. Like RhythmSequencer::processBlock, nothing runs (no history consumed) with no live rhythm, and
 // the frame's step becomes the previous one only after every cursor walked.
 BlockResult PluginProcessor::advanceCursors(int numRhythms, double beatPos,
-                                            std::array<CursorSteps, mu_limits::kMaxLayers>& steps)
+                                            std::array<CursorSteps, mu_clid::kLimits.layers>& steps)
 {
     BlockResult result;
     if (numRhythms <= 0)

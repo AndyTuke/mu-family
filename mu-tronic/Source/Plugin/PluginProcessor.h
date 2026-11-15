@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/CpuLoadMeter.h"        // mu-core: the processing-load readout
 #include "Plugin/MixerFxParams.h"        // mu-core: shared global-FX / mixer APVTS layout
@@ -11,7 +13,7 @@
 #include <atomic>
 #include <memory>
 
-// mu-Tronic — a performance unit of 16 layer slots (Standalone only, pay what you want).
+// mu-Tronic — a performance unit of 16 layer slots (Standalone only, £30 licence).
 //
 // The ProcessorBase subclass owning the shared platform (the APVTS mixer / FX layout, the MixerEngine and FXChain)
 // and sixteen slots, each holding one layer. A slot starts Empty and takes a layer of any type the build
@@ -24,11 +26,16 @@ namespace mu_tronic
 
 // What a product built on this shell names itself (mu-Host is the one that does): the saved state's root tag, the settings /
 // content folder, and whether the shell asks for mu-Tronic's own licence (a product that licenses per engine switches it off).
+// The counts mu-Tronic itself is built with: 16 slots, 3 group buses of 2 inserts, no host sidechain (a Standalone-only product).
+inline constexpr mu_limits::ProcessorLimits kLimits { 16, 3, 2, false };
+
 struct ProcessorIdentity
 {
     const char* stateType = kStateType;
     const char* appName   = kAppName;
     bool        ownLicence = true;
+    // The slot, bus and insert counts this build has: mu-Tronic's 16 slots and 3 buses of 2 inserts; mu-Host passes one slot and no buses.
+    mu_limits::ProcessorLimits limits = kLimits;
 };
 
 class PluginProcessor : public ProcessorBase
@@ -47,6 +54,7 @@ public:
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tronic")); }
     juce::String getProductSlug() const override { return "mu-tronic"; }
+    juce::String getVersionString() const override { return MU_VERSION_STRING_PRE; }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return true; }   // a Rhythm layer in MIDI output mode sends notes
     bool isMidiEffect() const override { return false; }
@@ -141,7 +149,7 @@ protected:
     int getNumActiveLayers() const override;
 
 private:
-    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout(const mu_limits::ProcessorLimits& limits);
 
     // Cleared by prepareToPlay; the first block after it gives the host's MIDI buffer room for the layers' output, so the
     // one allocation a MIDI merge can cost happens at start-up, before any note.

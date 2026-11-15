@@ -16,6 +16,19 @@ SettingsOverlayBase::SettingsOverlayBase()
     supportLink.setColour(juce::HyperlinkButton::textColourId,
                           MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
     addAndMakeVisible(supportLink);
+
+    // Feedback and feature requests go to their own mailbox, beside the support link.
+    feedbackLink.setButtonText("Send Feedback");
+    feedbackLink.setURL(juce::URL("mailto:feedback@transwarp.me"));
+    feedbackLink.setTooltip("Feedback and feature requests: feedback@transwarp.me");
+    feedbackLink.setFont(MuLookAndFeel::uiFont(sf(12.0f)), false,
+                         juce::Justification::centredLeft);
+    feedbackLink.setColour(juce::HyperlinkButton::textColourId,
+                           MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
+    addAndMakeVisible(feedbackLink);
+
+    bounceBtn.onClick = [this] { if (onBounce) onBounce(); };
+    addChildComponent(bounceBtn);   // hidden until the shell says this is a standalone with a bounce
 }
 
 void SettingsOverlayBase::computeColumn()
@@ -46,9 +59,11 @@ void SettingsOverlayBase::resized()
     const int headerH = s(kHeaderH);
     closeBtn.setBounds(w - s(kPad) - closeW, (headerH - closeH) / 2, closeW, closeH);
 
-    // "Contact Support" footer — bottom-left, aligned under the section headings.
+    // "Contact Support" and "Send Feedback" footer — bottom-left, aligned under the section headings.
     const int linkH = s(20);
-    supportLink.setBounds(columnX(0), getHeight() - s(kPad) - linkH, s(160), linkH);
+    supportLink.setBounds(columnX(0), getHeight() - s(kPad) - linkH, s(110), linkH);
+    feedbackLink.setBounds(supportLink.getRight() + s(16), supportLink.getY(), s(110), linkH);
+    bounceBtn.setBounds(getWidth() - s(kPad) - s(150), supportLink.getY() - s(4), s(150), linkH + s(8));
 
     layoutContent();
 }

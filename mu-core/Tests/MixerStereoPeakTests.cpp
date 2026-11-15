@@ -1,6 +1,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MixerEngine.h"
 #include "Audio/FX/Slots/FXChain.h"
+#include "TestLimits.h"
 
 // The mixer publishes a left and a right peak beside the combined one for every strip, FX return and the
 // master, so the meters can show two true bars. These tests drive the real MixerEngine::processBlock
@@ -28,7 +29,7 @@ struct MixerStereoPeakTests : juce::UnitTest
     {
         beginTest("master peaks follow the master pan: hard left leaves the right side silent");
         {
-            MixerEngine mixer;
+            MixerEngine mixer { mu_test::kLimits };
             FXChain fx;
             mixer.prepare(kRate, kBlock);
             fx.prepare(kRate, kBlock);
@@ -50,7 +51,7 @@ struct MixerStereoPeakTests : juce::UnitTest
 
         beginTest("a mono output buffer reports its one channel as both sides");
         {
-            MixerEngine mixer;
+            MixerEngine mixer { mu_test::kLimits };
             FXChain fx;
             mixer.prepare(kRate, kBlock);
             fx.prepare(kRate, kBlock);
@@ -63,7 +64,7 @@ struct MixerStereoPeakTests : juce::UnitTest
 
         beginTest("FX return peaks follow the return pan, and a silent return reads zero on both sides");
         {
-            MixerEngine mixer;
+            MixerEngine mixer { mu_test::kLimits };
             FXChain fx;
             mixer.prepare(kRate, kBlock);
             fx.prepare(kRate, kBlock);

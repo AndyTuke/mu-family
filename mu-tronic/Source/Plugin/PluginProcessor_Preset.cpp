@@ -13,7 +13,7 @@ namespace mu_tronic
 // Describe the slots once (constructor): the composed state is built and applied from this.
 void PluginProcessor::setupLayerState()
 {
-    initLayerStatePrefixSets(slotPrefixSets());
+    initLayerStatePrefixSets(slotPrefixSets(getLimits().layers));
 }
 
 // Any saved state in the composed shape (an older APVTS dump is rebuilt; mu-Tronic has none, so this is the identity).
@@ -44,7 +44,7 @@ juce::ValueTree PluginProcessor::captureState()
 // not offer becomes Empty. A changed type is a setLayerType: published without muting, the old layer sounding out.
 void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 {
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < getLimits().layers; ++s)
     {
         const auto node = mu_pp::findLayerNode(state, s);
         auto type = slotNodeType(node);
@@ -82,7 +82,7 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
     // The free slots, in order: an Empty slot is the only kind an import may use.
     std::vector<int> freeSlots;
     bool hasPattern = false;
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+    for (int s = 0; s < getLimits().layers; ++s)
     {
         const auto type = getLayerTypeId(s);
         if (type == mu_core::LayerTypeId::Empty) freeSlots.push_back(s);
@@ -115,7 +115,7 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
             auto* param = apvts.getParameter(prefix + row.suffix);
             if (param == nullptr) continue;
             double actual = row.normalised ? (double) param->convertFrom0to1((float) row.value) : row.value;
-            if (row.suffix == "scSrc") actual = remapImportedSidechain((int) std::lround(row.value), slot, slotOfSource);
+            if (row.suffix == "scSrc") actual = remapImportedSidechain((int) std::lround(row.value), slot, slotOfSource, getLimits());
             param->setValueNotifyingHost(param->convertTo0to1((float) actual));
         }
     };
@@ -155,7 +155,7 @@ PluginProcessor::ImportResult PluginProcessor::importProductPreset(const juce::F
                     for (const auto& row : imported.entries[(size_t) i].strip)
                         if (row.suffix == "scSrc")
                             param->setValueNotifyingHost(param->convertTo0to1(
-                                (float) remapImportedSidechain((int) std::lround(row.value), freeSlots[(size_t) i], slotOfSource)));
+                                (float) remapImportedSidechain((int) std::lround(row.value), freeSlots[(size_t) i], slotOfSource, getLimits())));
             }
             else
                 for (const char* suffix : kStripSuffixes)

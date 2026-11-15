@@ -176,7 +176,7 @@ inline std::vector<std::pair<juce::String, juce::String>> legacyLaneParamPrefixR
 
 // The Track type's rows for one layer slot (t{slot}_*): the engine, the Rumble source, every engine's
 // parameters, the groove (swing, accent), then the FM Perc rows (appended last to keep earlier rows in place).
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int numLayers);
 
 // A Rumble track's source (`t{N}_src`) names a layer, so it follows that layer through a remove or a reorder:
 // every slot's source is rewritten through `oldToNew` (a layer index as it was to the index it has now, -1 when

@@ -1,8 +1,9 @@
-// Tests of mu-Host: the mu-Tronic shell built with ONE slot (MU_MAX_LAYERS=1, no buses), on the REAL mu_host::PluginProcessor, headless.
+// Tests of mu-Host: the mu-Tronic shell built with ONE slot (one layer, no buses), on the REAL mu_host::PluginProcessor, headless.
 // One slot that starts Empty, every engine the editor's drop-down offers, saved state under mu-Host's own names, and a rendering audio
 // thread that survives engine changes.
 
 #include "../Plugin/PluginProcessor.h"
+#include "../License/EngineLicensing.h"
 #include "Tests/ProcessorSeamHelpers.h"
 
 #include <cmath>
@@ -13,8 +14,8 @@ juce::AudioProcessorEditor* mu_host::PluginProcessor::createEditor() { return nu
 
 namespace
 {
-    static_assert(mu_limits::kMaxLayers == 1, "mu-host compiles with MU_MAX_LAYERS=1");
-    static_assert(mu_limits::kMaxBuses == 0, "mu-host has no buses");
+    static_assert(mu_host::kLimits.layers == 1, "mu-host has one layer");
+    static_assert(mu_host::kLimits.buses == 0, "mu-host has no buses");
 
     struct HostProcessor : mu_host::PluginProcessor
     {
@@ -104,14 +105,23 @@ struct MuHostTests : juce::UnitTest
                 expect(p.getCheckoutUrl().contains(urlPart), juce::String(productId) + " opens its own checkout page");
                 expectEquals(p.getSuggestedPrice(), price);
             };
-            checkAs(mu_core::LayerTypeId::Kick,    "mu-On",    "3dd813d9", 20);
-            checkAs(mu_core::LayerTypeId::Rumble,  "mu-On",    "3dd813d9", 20);   // another engine of the same product: the same licence
-            checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "12d18415", 20);
-            checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "a0354b49", 20);
-            checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "dbecc900", 20);
-            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "1121cfce", 25);
+            checkAs(mu_core::LayerTypeId::Kick,    "mu-On",    "417bf72a", 20);
+            checkAs(mu_core::LayerTypeId::Rumble,  "mu-On",    "417bf72a", 20);   // another engine of the same product: the same licence
+            checkAs(mu_core::LayerTypeId::Rhythm,  "mu-Clid",  "fcef084d", 20);
+            checkAs(mu_core::LayerTypeId::Pattern, "mu-Tant",  "4777a038", 20);
+            checkAs(mu_core::LayerTypeId::Arp,     "mu-Toni",  "e26972bb", 20);
+            checkAs(mu_core::LayerTypeId::Phrase,  "mu-Tilate", "c86e4101", 20);
             p.licenseEngine(mu_core::LayerTypeId::Empty);
             expect(! p.hasLicensing() && p.isLicensed(), "an Empty slot has no licensing and no prompt");
+        }
+
+        beginTest("the engine list offers only engines of licensed products (none here), and an Empty slot belongs to no product");
+        {
+            mu_seam_test::TempStorage storage;
+            const auto dir = juce::File::createTempFile("muHostLic");
+            for (const auto type : { mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Phrase,
+                                     mu_core::LayerTypeId::Empty })
+                expect(! mu_host::isEngineLicensed(type, dir, "muHost"), "no key, so not offered");
         }
 
         beginTest("changing the engine while the audio thread renders is safe");

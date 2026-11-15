@@ -13,6 +13,7 @@
 #include <functional>
 #include <limits>
 #include <vector>
+#include "Plugin/MuClidLimits.h"
 
 using namespace mu_clid;
 
@@ -24,8 +25,8 @@ namespace
     struct CursorRig
     {
         RhythmStepClock clock;
-        std::array<RhythmCursor, RhythmSequencer::MaxRhythms> cursors;
-        std::array<Rhythm, RhythmSequencer::MaxRhythms>       rhythms;
+        std::array<RhythmCursor, mu_clid::kLimits.layers> cursors;
+        std::array<Rhythm, mu_clid::kLimits.layers>       rhythms;
         int n = 0;
 
         void addRhythm(const Rhythm& r)

@@ -31,7 +31,7 @@ void addPatternGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout&
 
 // The parameter family of a single voice. Called for v0..v7 so each voice gets its own independent
 // osc/xmod/filter/level state in the APVTS.
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int voice)
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int voice, int /*numLayers*/)
 {
     using namespace juce;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };

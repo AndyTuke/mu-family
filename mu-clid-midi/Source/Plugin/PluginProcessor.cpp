@@ -7,9 +7,11 @@
 
 namespace mu_clid_midi {
 
-// A MIDI effect: no audio buses at all.
+// A MIDI effect: no audio buses at all, so its mixer is never used; the counts are the family's usual 8 layers.
+static constexpr mu_limits::ProcessorLimits kLimits { 8, 0, 2, true };
+
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState")),
+    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"), kLimits),
       core(apvts),
       rhythmPlayState(core.rhythmPlayState),
       beatFraction(core.beatFraction),
@@ -55,7 +57,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     const auto transport = deriveTransport(numSamples);
 
-    core.processBlock(transport.playing, transport.beatPos, midiMessages, numSamples);
+    core.processBlock(transport.playing, transport.beatPos, midiMessages, numSamples, transport.beatsPerSample);
 }
 
 void PluginProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -76,7 +78,7 @@ PluginProcessor::BlockTransport PluginProcessor::deriveTransport(int numSamples)
 
     sequencerPlaying.store(t.playing);
     lastBeatPos.store(t.startBeat);
-    return { t.playing, t.startBeat };
+    return { t.playing, t.startBeat, t.beatsPerSample };
 }
 
 //==============================================================================

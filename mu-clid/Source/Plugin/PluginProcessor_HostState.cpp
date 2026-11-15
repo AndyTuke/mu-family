@@ -2,6 +2,7 @@
 // .muClid full-preset tree (+ rows for the parameters it doesn't carry); sessions saved before that (the APVTS
 // dump + r{i}_ properties) still restore through restoreStateFromTree. Partial-class TU split from
 // PluginProcessor_Preset.cpp, which keeps the per-rhythm load helpers and loadPresetFile.
+#include "Plugin/MuClidLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
@@ -83,10 +84,10 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
 
     // A session in this format predates clips, so every bank empties. Done before the lock below:
     // freeing trees is not a microsecond job.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < mu_clid::kLimits.layers; ++i)
         clearLayerClips(i);
 
-    int n = juce::jlimit(1, mu_limits::kMaxLayers,
+    int n = juce::jlimit(1, mu_clid::kLimits.layers,
                          (int)state.getProperty("numRhythms", 1));
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
@@ -100,8 +101,8 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     // The engines the restore drops and the ones it adds are freed and built out here, outside the locks: the
     // shrunk slots' engines land in `shrunkEngines` (declared before the locks, so they destruct after them) and
     // the grown slots' engines are built and prepared now.
-    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> shrunkEngines;
-    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> grownEngines;
+    std::array<std::unique_ptr<VoiceEngine>, mu_clid::kLimits.layers> shrunkEngines;
+    std::array<std::unique_ptr<VoiceEngine>, mu_clid::kLimits.layers> grownEngines;
     for (int i = numLayers.load(std::memory_order_acquire); i < n; ++i)
         grownEngines[(size_t) i] = makeSlotEngine(i);
 
@@ -109,8 +110,8 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     const juce::ScopedLock lw(layoutWriteLock);   // first: the count stores below advance the layout serial
     const juce::ScopedLock sl(layersLock);
 
-    // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    setRhythmCount(mu_limits::kMaxLayers);
+    // Expand to the layer count so parameterChanged can write to every rhythm slot.
+    setRhythmCount(mu_clid::kLimits.layers);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.

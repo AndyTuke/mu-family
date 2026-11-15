@@ -32,7 +32,7 @@ inline constexpr const char* kScaleParamId = "scale";
 
 // The Pattern type's rows for one layer slot (v{slot}_*): oscillators, cross-mod, levels, the two filters,
 // the pitch-envelope depths, the slot level, the gate and the insert.
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/);
 
 // The Pattern type's global rows: the shared tonal centre (root, then scale).
 void addPatternGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout);

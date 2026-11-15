@@ -2,6 +2,7 @@
 #include "UI/InsertSlotUi.h"
 
 #include <vector>
+#include "TestLimits.h"
 
 // Layout and behaviour of the mixer Client strip (design-ui mu-link section 3): nothing
 // overlaps or leaves the strip at any display size, the fader is not capped, the EQ stack runs
@@ -53,7 +54,7 @@ struct ClientStripFitTests : juce::UnitTest
         mu_ui::scale = scale;
         const juce::String tag = "scale " + juce::String(scale, 2) + ": ";
 
-        MixerChannel strip(MixerChannel::Type::Client, "Synth", MuLookAndFeel::layerPalette[2]);
+        MixerChannel strip(MixerChannel::Type::Client, "Synth", MuLookAndFeel::layerPalette[2], mu_test::kLimits);
         strip.setBounds(stripBounds());
 
         const auto bounds = strip.getLocalBounds();
@@ -113,7 +114,7 @@ struct ClientStripFitTests : juce::UnitTest
 
         beginTest("EQ knobs carry the shared EQ table ranges");
         {
-            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red);
+            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red, mu_test::kLimits);
             using Eq = MixerChannel::ClientEq;
             auto range = [&](Eq b) { return strip.getClientEqKnob(b).getSlider().getRange(); };
             expectEquals(range(Eq::High).getStart(), -18.0);
@@ -128,7 +129,7 @@ struct ClientStripFitTests : juce::UnitTest
 
         beginTest("EQ labels carry no units and never change");
         {
-            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red);
+            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red, mu_test::kLimits);
             using Eq = MixerChannel::ClientEq;
             const std::pair<Eq, const char*> expected[] = { { Eq::High, "High" }, { Eq::MidHz, "Mid Hz" },
                                                             { Eq::Mid, "Mid" }, { Eq::Low, "Low" } };
@@ -161,7 +162,7 @@ struct ClientStripFitTests : juce::UnitTest
 
         beginTest("controls call back with the right band, level, mute and solo");
         {
-            MixerChannel strip(MixerChannel::Type::Client, "App", juce::Colours::red);
+            MixerChannel strip(MixerChannel::Type::Client, "App", juce::Colours::red, mu_test::kLimits);
             using Eq = MixerChannel::ClientEq;
             int eqFired = 0;
             Eq lastBand = Eq::Low;
@@ -203,7 +204,7 @@ struct ClientStripFitTests : juce::UnitTest
 
         beginTest("an empty slot is dimmed but stays operable");
         {
-            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red);
+            MixerChannel strip(MixerChannel::Type::Client, "", juce::Colours::red, mu_test::kLimits);
             strip.setActive(false);
             for (auto* c : strip.getChildren())
                 expect(c->isEnabled(), "control still enabled while the slot is empty");

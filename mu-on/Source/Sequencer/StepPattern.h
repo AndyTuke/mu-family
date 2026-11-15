@@ -5,7 +5,7 @@
 #include "Sequencer/StepRow.h"
 #include <array>
 
-// The 909 grid as the processor and the tests address it: one row of steps per layer slot (16 per page by default) (kMaxLayers
+// The 909 grid as the processor and the tests address it: one row of steps per layer slot (16 per page by default) (the layer count
 // rows). A row is owned by the Track that plays it (a StepRow member, with its own steps, swing and accent),
 // so it travels with the track through add / delete / reorder; the pattern is only a view that addresses the
 // tracks' rows by slot. `bind` points a slot at a track's row (the processor does it after every structural
@@ -17,7 +17,7 @@ namespace mu_on
 class StepPattern
 {
 public:
-    static constexpr int kNumTracks = 8;                    // one row per layer slot (mu_limits::kMaxLayers)
+    static constexpr int kNumTracks = 8;                    // one row per layer slot (mu_limits::kAbsoluteMaxLayers)
     static constexpr int kNumSteps  = StepRow::kNumSteps;
 
     StepPattern() : ownedRows(std::make_unique<std::array<StepRow, kNumTracks>>()), owned(*ownedRows) { for (int t = 0; t < kNumTracks; ++t) bound[(size_t) t] = &owned[(size_t) t]; }

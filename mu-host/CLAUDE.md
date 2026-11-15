@@ -16,7 +16,7 @@ Artefacts are `mu-Host.vst3` / `.clap` in `build/mu-host/mu-host_artefacts/<Conf
 
 ## It builds on the mu-Tronic shell
 
-mu-Host is a product of its own on mu-Tronic's shell. Its target compiles mu-Tronic's sources (the shell, with `MU_MAX_LAYERS=1` and no buses; everything but mu-Tronic's `PluginFactory.cpp`) plus its own `Source/`. Nothing is copied. The seams are small and live in mu-Tronic's files:
+mu-Host is a product of its own on mu-Tronic's shell. Its target compiles mu-Tronic's sources (the shell, built with one layer and no buses through `mu_host::kLimits`; everything but mu-Tronic's `PluginFactory.cpp`) plus its own `Source/`. Nothing is copied. The seams are small and live in mu-Tronic's files:
 - `mu_tronic::PluginProcessor` takes a `ProcessorIdentity` (state tag, settings folder, whether it asks for mu-Tronic's own licence); mu-Host passes its own names and no licence.
 - `mu_tronic::PluginEditor` takes `EditorOptions { singleSlot }` (no sidebar, scenes, clips, mixer toggle or full-preset controls) and calls a `slotShown` hook whenever a slot is shown.
 - This product's `PluginProcessor` / `PluginEditor` derive from those and add what makes it mu-Host: its names, the engine drop-down, the window size (the standard one less the sidebar's width, so the voice panels keep their standard size), and the licensing below.
@@ -25,7 +25,9 @@ mu-Host is a product of its own on mu-Tronic's shell. Its target compiles mu-Tro
 
 ## Licensing (Andy, 2026-11-07)
 
-mu-Host has no licence of its own. Opening an engine runs the licence check of the **product** the engine belongs to ([Source/License/EngineLicensing.cpp](Source/License/EngineLicensing.cpp): mu-Clid Rhythm, mu-Tant Pattern, mu-Toni Arp, mu-On Kick / Bass / Hat / Snare / Rumble / FM Perc / Chord, mu-Tilate Phrase), and from then on it is that product's own app: its key (looked up in that product's own content folder and in mu-Host's), activation, checkout page, suggested price and support prompt (once per product per session). A key covers the whole product. `PluginProcessor::licenseEngine` does it; the editor calls it from `slotShown`.
+mu-Host has no licence of its own. Opening an engine runs the licence check of the **product** the engine belongs to ([Source/License/EngineLicensing.cpp](Source/License/EngineLicensing.cpp): mu-Clid Rhythm, mu-Tant Pattern, mu-Toni Arp, mu-On Kick / Bass / Hat / Snare / Rumble / FM Perc / Chord, mu-Tilate Phrase), and from then on it is that product's own app: its key (looked up in that product's own content folder and in mu-Host's), activation, checkout page, price and licence reminder (every load, until Maybe later on that instance). A key covers the whole product. `PluginProcessor::licenseEngine` does it; the editor calls it from `slotShown`.
+
+**Free, in every paid app's install (Andy, 2026-11-11, #1803).** mu-Host itself costs nothing and ships in each paid app's zip. Its engine drop-down lists only the engines whose product has a key (`isEngineLicensed` in `EngineLicensing`, which reads the key files without opening an engine), plus the engine already in the slot so a saved project still shows what it holds. With no licensed product and an empty slot, an instance explains itself in a pop-up on load: what mu-Host is (a lightweight single-channel host) and why the list is empty.
 
 ## Source layout
 

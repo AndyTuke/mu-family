@@ -10,7 +10,7 @@ Design: [docs/mu-tronic/design.md](../docs/mu-tronic/design.md) (architecture ru
 
 ## Release status
 
-A live release product (backlog #1678), released with the rest of the series: **pay what you want**, same terms as mu-Clid / mu-Tant / mu-Toni / mu-On; Windows Standalone only (Linux is no longer built; macOS on hold). Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
+A live release product (backlog #1678), released with the rest of the series: **free download with a licence reminder on every load; a £30 licence removes it** (others £20); Windows Standalone only (Linux is no longer built; macOS on hold). Version base and build number are the family's (`version-pre.txt` carries the same base as `version.txt`; the shared build number never resets). Manual: [docs/mu-tronic/create_manual.ps1](../docs/mu-tronic/create_manual.ps1) (edit the script, not the `.docx`). Site pages: `site/mu-tronic.html`, `site/mu-tronic-releases.html`.
 
 **Licensing is wired** like the other pay-what-you-want products: `Source/License/LicenseKey.h` (product id `mu-Tronic`, `mutronic.lic`, embedded public key; the private key `mutronic.key` is in the OneDrive secrets `keys` folder), one `initLicensing` call in the processor, and the shared Support prompt / activation overlay from the shell. This replaces the freeware ruling of the 2026-10-15 design doc (decided 2026-10-27). Lemon Squeezy product id 1478475 (checkout link in `kCheckoutUrl`).
 
@@ -21,13 +21,13 @@ Static layer libraries compiled into the binary, registered in [Source/Persisten
 ## Rules
 
 - A layer library never includes `Plugin/` or `License/` (`tests/scripts/check-layer-boundary.ps1`); mu-Tronic-only code lives in `mu_tronic::` under `Source/`.
-- Capacities are per-target compile definitions (`MU_MAX_LAYERS=16`, `MU_MAX_BUSES=3`, `MU_BUS_INSERTS=2`); the other products keep 8 layers and no buses. No code may assume 8 or 2 literally (`kLayersPerPage`).
+- Capacities are mu-Tronic's own `mu_tronic::kLimits` (16 layers, 3 buses of 2 inserts, no host sidechain), given to `ProcessorBase` and the parameter layout when the processor is built; mu-core is one compiled library and reads no per-product setting. The other products pass 8 layers and no buses. No code may assume 8 or 2 literally (`kLayersPerPage`).
 - Layer state is text, `RenderContext` mirrors a C struct, `render` makes no host callback (keeps a module ABI possible, design section 2).
 - Tests: `mu-tronic-tests` (builds every default build).
 
 ## mu-Host builds on this shell
 
-[mu-Host](../mu-host/CLAUDE.md) is a product of its own that compiles this product's sources with one slot (`MU_MAX_LAYERS=1`). The seams are `ProcessorIdentity` on `PluginProcessor`, `EditorOptions` and the `slotShown` hook on `PluginEditor`, and `PluginFactory.cpp` (the plug-in factory, its own file so mu-Host can leave it out). Keep them working when the shell changes; `mu-host-tests` covers them.
+[mu-Host](../mu-host/CLAUDE.md) is a product of its own that compiles this product's sources with one slot (`mu_host::kLimits`, 1 layer). The seams are `ProcessorIdentity` on `PluginProcessor`, `EditorOptions` and the `slotShown` hook on `PluginEditor`, and `PluginFactory.cpp` (the plug-in factory, its own file so mu-Host can leave it out). Keep them working when the shell changes; `mu-host-tests` covers them.
 
 ## Mirror rule with mu-On (Andy 2026-10-29)
 

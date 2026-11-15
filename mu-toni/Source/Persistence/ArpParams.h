@@ -52,7 +52,7 @@ inline constexpr const char* kArpPresetTag = "MuToniLayer";
 void addArpRows(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
 
 // The Arp type's rows for one layer slot (a{slot}_*), in vpi order.
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/);
 
 // mu-Toni's non-mixer global rows: which MIDI channel's notes drive the arps (Omni = any).
 void addArpGlobalParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout);

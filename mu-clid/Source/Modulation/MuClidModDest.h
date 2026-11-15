@@ -1,9 +1,7 @@
 #pragma once
 
-#include "UI/ModulatorEditor.h"                     // mu-core: ModDestProvider
-#include "UI/Components/DropdownSelect.h"
+#include "UI/TableModDestProvider.h"               // mu-core: the table-driven destination provider
 #include "Modulation/ModulationDestinations.h"      // mu-clid kTable
-#include "UI/ModTargetDropdown.h"                 // mu-core: the shared destination-dropdown builder
 
 #include <string>
 
@@ -17,28 +15,12 @@
 namespace mu_clid
 {
 
-// `effectName` returns the mixer effect bus's current effect, which names the effect-send target.
+// `effectName` returns the mixer effect bus's current effect, which names the effect-send target. The shared table provider does the
+// rest: the table's stepped-only row (Pitch Octave: no smooth octave glide), the retired rows skipped, and mu-Clid's display order.
 inline ModDestProvider makeModDestProvider(std::function<juce::String()> effectName)
 {
-    ModDestProvider p;
-
-    p.populate = [effectName](DropdownSelect& dd, int driveChar, bool steppedMode)
-    {
-        // The shared builder in mu-Clid's display order (ModDest::kDropdownOrder).
-        // Pitch Octave is stepped-only (no smooth octave glide); Amp Release (row 3) is retired.
-        static const std::vector<int> kOrder(std::begin(ModDest::kDropdownOrder), std::end(ModDest::kDropdownOrder));
-        mu_mod::populateDropdown(dd, ModDest::kTable,
-            { driveChar,
-              [steppedMode](const mu_mod::ModTarget& t) { return steppedMode || std::strcmp(t.id, "pitch.octave") != 0; },
-              kOrder,
-              effectName ? effectName() : juce::String() });
-    };
-
-    wireTableModDestResolve(p,
-        [](int i) { return std::string(ModDest::kTable[i].id); },
-        ModDest::kTableSize);
-
-    return p;
+    static const std::vector<int> kOrder(std::begin(ModDest::kDropdownOrder), std::end(ModDest::kDropdownOrder));
+    return mu_mod::makeTableDestProvider(ModDest::kTable, ModDest::kTableSize, std::move(effectName), kOrder);
 }
 
 } // namespace mu_clid

@@ -54,6 +54,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include "TestLimits.h"
 
 namespace
 {
@@ -93,10 +94,10 @@ namespace
     // exact form; it is enabled directly where a test needs it.
     struct Rig
     {
-        MixerEngine mixer;
+        MixerEngine mixer { mu_test::kLimits };
         FXChain     fx;
         juce::AudioBuffer<float> out { 2, kPrepared };
-        std::array<Src, MixerEngine::MaxChannels> src {};
+        std::array<Src, mu_test::kLimits.layers> src {};
         MixerEngine::RenderChannelFn render;
 
         explicit Rig(bool effectReturn = false, bool delayReturn = false)
@@ -132,7 +133,7 @@ namespace
         }
 
         void run(int channels, int n,
-                 std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                 MixerEngine::DirectOuts* directOuts = nullptr,
                  juce::AudioBuffer<float>* fxReturns = nullptr)
         {
             mixer.processBlock(out, channels, nullptr, fx, n, directOuts, fxReturns, nullptr, &render);
@@ -292,7 +293,7 @@ struct MixerBlockValueTests : juce::UnitTest
             r.mixer.channels[0].sendEffect.store(1.0f);     // ignored on a direct bus
             juce::AudioBuffer<float> bus(2, kPrepared);
             bus.clear();
-            std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> outs {};
+            MixerEngine::DirectOuts outs {};
             outs[0] = &bus;
             r.run(2, 64, &outs);
             expectChannel(bus, 0, 64, [&](int i) { return trimmed(r.src[0].left(i)) * 0.5f; }, "bus L");
@@ -788,7 +789,7 @@ struct MixerBlockValueTests : juce::UnitTest
         {
             Rig r;
             r.src[0] = { 0.5f, true };
-            r.mixer.channels[0].sidechainSource.store(MixerEngine::kExtSidechainSrc);
+            r.mixer.channels[0].sidechainSource.store(mu_test::kExtSidechainSrc);
             r.mixer.channels[0].sidechainAmount.store(duckDepth);
             r.mixer.channels[0].sidechainAttackMs.store(0.0f);
             r.mixer.channels[0].sidechainReleaseMs.store(0.0f);
@@ -1160,13 +1161,13 @@ namespace
     struct StressProcessor : ProcessorBase
     {
         StressProcessor()
-            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout())
+            : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()), makeLayout(), juce::Identifier("MuFamilyState"), mu_test::kLimits)
         {
             keepSpareLayers = true;
             juce::StringArray prefixes;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) prefixes.add("v" + juce::String(i) + "_");
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) prefixes.add("v" + juce::String(i) + "_");
             initLayerState(prefixes);
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i) layers[(size_t) i] = std::make_unique<StressLayer>();
+            for (int i = 0; i < mu_test::kLimits.layers; ++i) layers[(size_t) i] = std::make_unique<StressLayer>();
             numLayers.store(2);
         }
         ~StressProcessor() override { for (auto& l : layers) l.reset(); }
@@ -1174,12 +1175,12 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout layout;
-            for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            for (int i = 0; i < mu_test::kLimits.layers; ++i)
             {
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "v" + juce::String(i) + "_a", 1 }, "A",
                     juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
-                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ");
+                mu_mixfx::addChannelStripParams(layout, "ch" + juce::String(i) + "_", "Ch ", {}, mu_test::kLimits);
             }
             return layout;
         }
@@ -1282,7 +1283,7 @@ struct LockProbeStressTests : juce::UnitTest
                         else
                         {
                             const int n = proc.getNumLayers();
-                            if (n < 1 || n > mu_limits::kMaxLayers) ++badLayerCount;
+                            if (n < 1 || n > mu_test::kLimits.layers) ++badLayerCount;
                             else
                             {
                                 proc.mixerEngine.processBlock(out, n, nullptr, fx, 64, nullptr, nullptr, nullptr, &hook);
@@ -1310,7 +1311,7 @@ struct LockProbeStressTests : juce::UnitTest
                         case 3:         if (n >= 2) proc.removeLayer(0); break;
                         default:
                             // The strip setters the message thread uses between structural edits.
-                            for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+                            for (int c = 0; c < mu_test::kLimits.layers; ++c)
                             {
                                 proc.mixerEngine.channels[(size_t) c].level.store(0.25f * (float) (e % 4));
                                 proc.mixerEngine.channels[(size_t) c].pan.store(((float) (e % 3) - 1.0f) * 0.5f);
@@ -1339,7 +1340,7 @@ struct LockProbeStressTests : juce::UnitTest
                        + juce::String(lockMisses.load()) + " silent from a lock miss, " + juce::String(editSkips.load())
                        + " silent from an edit in flight (information, not asserted)");
             const int count = proc.getNumLayers();
-            expect(count >= 1 && count <= mu_limits::kMaxLayers, "the final layer count is in range");
+            expect(count >= 1 && count <= mu_test::kLimits.layers, "the final layer count is in range");
         }
     }
 };

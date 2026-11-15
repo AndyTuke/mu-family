@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"
+#include "TestLimits.h"
 
 // A minimal ProcessorBase for UI tests: no parameters, no layers, a stub of every pure virtual.
 // The wrapper type is settable so tests can build the standalone and plugin variants of a page.
@@ -8,12 +9,13 @@ struct TestProcessorBase : ProcessorBase
 {
     explicit TestProcessorBase(WrapperType wrapper)
         : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
-                        layoutFor(wrapper)) {}
+                        layoutFor(wrapper), juce::Identifier("MuFamilyState"), mu_test::kLimits) {}
 
     // With a parameter layout, for tests that drive a parameter through the control map.
     TestProcessorBase(WrapperType wrapper, juce::AudioProcessorValueTreeState::ParameterLayout layout)
         : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
-                        (setTypeOfNextNewPlugin(wrapper), std::move(layout))) {}
+                        (setTypeOfNextNewPlugin(wrapper), std::move(layout)),
+                        juce::Identifier("MuFamilyState"), mu_test::kLimits) {}
 
     // wrapperType is const and read from a thread-local at construction, so set it first.
     static juce::AudioProcessorValueTreeState::ParameterLayout layoutFor(WrapperType wrapper)

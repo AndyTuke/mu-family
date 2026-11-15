@@ -7,10 +7,10 @@
 
 namespace mu_core {
 
-SampleLibrary::SampleLibrary(SampleSlotHost& h) : host(h)
+SampleLibrary::SampleLibrary(SampleSlotHost& h, int numSlots) : host(h)
 {
     // One path slot per possible rhythm, so index writes never grow the array.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < numSlots; ++i)
         samplePaths.add(juce::String());
 }
 

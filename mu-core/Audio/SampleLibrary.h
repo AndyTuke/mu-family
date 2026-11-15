@@ -2,6 +2,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Audio/SamplePreview.h"
+#include "MuLimits.h"
 
 class VoiceEngine;
 
@@ -26,11 +27,11 @@ public:
 // user's primary sample-library folder. Owned by PluginProcessor as `samples`.
 //
 // Threading: everything here is message-thread except mixPreviewInto (audio thread).
-// Path slots are indexed by rhythm and stay sized to mu_limits::kMaxLayers.
+// Path slots are indexed by rhythm and stay sized to the owner's layer count.
 class SampleLibrary
 {
 public:
-    explicit SampleLibrary(SampleSlotHost& host);
+    explicit SampleLibrary(SampleSlotHost& host, int numSlots);   // one path slot per layer slot
 
     // Loads a file into the rhythm's voice engine and records its path.
     void load(int rhythmIndex, const juce::File& file);

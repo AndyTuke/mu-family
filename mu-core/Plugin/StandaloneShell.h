@@ -157,6 +157,10 @@ public:
             juce::Array<juce::StandalonePluginHolder::PluginInOuts>{},
             false);
 
+        // Bounce to WAV: the Settings page offers it once the processor can render itself offline.
+        if (auto* pb = dynamic_cast<ProcessorBase*> (holder->processor.get()))
+            pb->bounceToWav = [this, pb] (const ProcessorBase::BounceSettings& s) { return runBounce (*pb, s); };
+
         mainWindow = std::make_unique<CloseConfirmWindow> (
             windowTitle(),
             juce::LookAndFeel::getDefaultLookAndFeel().findColour (
@@ -245,6 +249,43 @@ private:
         }
         prepareRender (*proc, args);
         return mu_core::render_mode::runProduct (*proc, args, name.toRawUTF8(), renderPlaysByDefault (args));
+    }
+
+    // Bounce to WAV: renders `live`'s current state offline (a fresh processor seeded from its session, the way a host restores
+    // one), with the transport stopped after `seconds` so FX tails ring into the tail. Runs on the calling (message) thread.
+    // Returns an empty string on success, else the error.
+    juce::String runBounce (ProcessorBase& live, const ProcessorBase::BounceSettings& s)
+    {
+        juce::MemoryBlock session;
+        live.getStateInformation (session);
+
+        const bool wasPlaying = live.isInternalPlaying();
+        if (wasPlaying) live.toggleInternalPlay();   // the live transport pauses for the render
+        auto resume = [&] { if (wasPlaying && ! live.isInternalPlaying()) live.toggleInternalPlay(); };
+
+        const bool prevSkip = ProcessorBase::skipAutoLoadDefault;
+        ProcessorBase::skipAutoLoadDefault = true;   // the render starts from the session below, not the saved default preset
+        auto processor = juce::createPluginFilterOfType (juce::AudioProcessor::wrapperType_Standalone);
+        ProcessorBase::skipAutoLoadDefault = prevSkip;
+
+        auto* proc = dynamic_cast<ProcessorBase*> (processor.get());
+        if (proc == nullptr) { resume(); return "The sound engine could not be created for the render."; }
+
+        mu_core::render_mode::ProductArgs args;
+        args.valid         = true;
+        args.outputWav     = s.file;
+        args.seconds       = juce::jlimit (0.05, 600.0, s.seconds + s.tailSeconds);
+        args.sampleRate    = juce::jlimit (8000.0, 192000.0, s.sampleRate);
+        args.blockSize     = 512;
+        args.play          = 1;
+        args.stopAtSeconds = juce::jlimit (0.0, args.seconds, s.seconds);
+        args.stateData     = std::move (session);
+        prepareRender (*proc, args);
+
+        const int code = mu_core::render_mode::runProduct (*proc, args, renderName().toRawUTF8(), true);
+        processor.reset();
+        resume();
+        return code == 0 ? juce::String() : "The WAV could not be written to " + s.file.getFullPathName();
     }
 
     Config config;

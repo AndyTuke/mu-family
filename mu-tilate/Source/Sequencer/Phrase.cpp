@@ -393,18 +393,24 @@ void Phrase::renderBlock(const PhraseData* d, PhraseClock clock, juce::AudioBuff
         loop.timeline = &d->timeline;
     }
     playback->render(loop, settings, clock, buf, n);
-    // The newest sounding hit moves the insert's knobs by its own offsets (held to the knob's travel) for this block.
+    // The newest sounding hit moves the insert's knobs by its own offsets (held to the knob's travel) for this block; a knob the hit
+    // sets Absolute takes the hit's value instead of the layer's.
     float held[4], off[4];
+    unsigned insAbs = 0;
     for (int i = 0; i < 4; ++i) held[i] = insertCfg.insertParam[i];
-    if (playback->insertOffsets(off))
-        for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = juce::jlimit(0.0f, 1.0f, held[i] + off[i]);
+    if (playback->insertOffsets(off, insAbs))
+        for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = juce::jlimit(0.0f, 1.0f, (insAbs >> i & 1u) ? off[i] : held[i] + off[i]);
     insert->process(buf, n, buf.getNumChannels(), insertCfg);
     for (int i = 0; i < 4; ++i) insertCfg.insertParam[i] = held[i];
 
     // The newest sounding hit's send offsets ride on the strip's sends like a modulation (the mixer's knobs do not move).
     float sendOff[3];
-    if (playback->sendOffsets(sendOff))
-        stripMod.publish(stripBase[0], stripBase[1] + sendOff[0], stripBase[2] + sendOff[1], stripBase[3] + sendOff[2]);
+    unsigned sendAbs = 0;
+    if (playback->sendOffsets(sendOff, sendAbs))
+    {
+        auto send = [&](int i) { return (sendAbs >> i & 1u) ? juce::jlimit(0.0f, 1.0f, sendOff[i]) : stripBase[1 + i] + sendOff[i]; };
+        stripMod.publish(stripBase[0], send(0), send(1), send(2));
+    }
 }
 
 void Phrase::render(const mu_core::RenderContext& ctx, juce::AudioBuffer<float>& out, int n)

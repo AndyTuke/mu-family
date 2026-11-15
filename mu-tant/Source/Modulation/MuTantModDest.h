@@ -3,7 +3,7 @@
 #include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
-#include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
+#include "UI/TableModDestProvider.h"      // mu-core: the table-driven destination provider
 
 #include <array>
 #include <cstring>
@@ -32,14 +32,14 @@ using ModDest = mu_mod::ModTarget;
 
 inline constexpr ModDest kModDestTable[] = {
     // ── Pitch (osc1) ────────────────────────────────────────────────────────
-    { "osc1.octave",  "Osc1 Octave",   "Osc 1", "o1_oct" },
-    { "osc1.semi",    "Osc1 Semi",     "Osc 1", "o1_semi" },
+    { "osc1.octave",  "Osc1 Octave",   "Osc 1", "o1_oct", 3, true },
+    { "osc1.semi",    "Osc1 Semi",     "Osc 1", "o1_semi", 12 },
     { "osc1.fine",    "Osc1 Fine",     "Osc 1", "o1_fine" },
     { "osc1.pos",     "Osc1 Position", "Osc 1", "o1_pos" },
     { "osc1.penv.prop", "Pitch Env",   "Osc 1", "o1_penv_depth" },
     // ── Pitch (osc2) ────────────────────────────────────────────────────────
-    { "osc2.octave",  "Osc2 Octave",   "Osc 2", "o2_oct" },
-    { "osc2.semi",    "Osc2 Semi",     "Osc 2", "o2_semi" },
+    { "osc2.octave",  "Osc2 Octave",   "Osc 2", "o2_oct", 3, true },
+    { "osc2.semi",    "Osc2 Semi",     "Osc 2", "o2_semi", 12 },
     { "osc2.fine",    "Osc2 Fine",     "Osc 2", "o2_fine" },
     { "osc2.pos",     "Osc2 Position", "Osc 2", "o2_pos" },
     { "osc2.penv.prop", "Pitch Env",   "Osc 2", "o2_penv_depth" },
@@ -80,42 +80,10 @@ inline constexpr ModDest kModDestTable[] = {
 
 inline constexpr int kModDestCount = (int) (sizeof(kModDestTable) / sizeof(kModDestTable[0]));
 
-// Discrete units per direction for a destination, so a STEPPED modulator's editor snaps
-// the graphic to whole units (an octave = 3 steps up/down, a scale degree = 12). Continuous
-// destinations (cutoff, levels, position, fine, x-mod…) return 0 → no snapping.
-inline int unitsPerDirectionFor(const std::string& destId)
-{
-    if (destId == "osc1.octave" || destId == "osc2.octave") return 3;    // ±3 octaves
-    if (destId == "osc1.semi"   || destId == "osc2.semi")   return 12;   // ±12 scale degrees
-    return 0;
-}
-
-// Destinations that only make sense as discrete jumps — a smooth (LFO-style) sweep of them
-// isn't musical, so they're hidden from the destination list when the modulator is Smooth.
-// Octave is the canonical case (a continuous octave glide); scale-degree stays available
-// (it glides between degrees for the envelope / smooth modulators).
-inline bool isSteppedOnlyDest(const char* destId)
-{
-    return std::strcmp(destId, "osc1.octave") == 0 || std::strcmp(destId, "osc2.octave") == 0;
-}
-
+// The provider is the shared table one: stepped-snap units and the stepped-only octave rule are fields on the rows above.
 inline ModDestProvider makeModDestProvider()
 {
-    ModDestProvider p;
-    p.unitsPerDirection = [](const std::string& destId) { return unitsPerDirectionFor(destId); };
-
-    p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
-    {
-        // The shared builder; in Smooth mode stepped-only targets (octave) are omitted.
-        mu_mod::populateDropdown(dd, kModDestTable,
-            { driveChar, [steppedMode](const mu_mod::ModTarget& t) { return steppedMode || ! isSteppedOnlyDest(t.id); } });
-    };
-
-    wireTableModDestResolve(p,
-        [](int i) { return std::string(kModDestTable[i].id); },
-        kModDestCount);
-
-    return p;
+    return mu_mod::makeTableDestProvider(kModDestTable, kModDestCount);
 }
 
 } // namespace mu_tant

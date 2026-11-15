@@ -8,46 +8,39 @@
 // (gain trims, filter band centres, envelope time constants, etc.) stay
 // next to the code they tune.
 //
-// Naming is plugin-agnostic ("channel" / "layer" / "slot"), since mu-core is
-// shared. Each product may re-export a domain alias (e.g. mu-clid's
-// `RhythmSequencer::MaxRhythms = mu_limits::kMaxLayers`) pointing here.
+// Naming is plugin-agnostic ("channel" / "layer" / "slot"), since mu-core is shared.
 //
-// Per-target capacity. mu-core is an INTERFACE library, so every target compiles its own copy of it and
-// may set these macros for itself (a target definition, never an edit here): the four products and
-// mu-core-tests keep the defaults, a 16-layer host defines MU_MAX_LAYERS=16 (mu-core-tests-16 does).
-// One constant, one value per binary: there is no second "framework maximum".
-#ifndef MU_MAX_LAYERS
- #define MU_MAX_LAYERS 8
-#endif
-#ifndef MU_MAX_BUSES
- #define MU_MAX_BUSES 0
-#endif
-#ifndef MU_BUS_INSERTS
- #define MU_BUS_INSERTS 2
-#endif
-#ifndef MU_EXT_SIDECHAIN
- #define MU_EXT_SIDECHAIN 1
-#endif
+// There is no per-product capacity here. mu-core is compiled once, and each product decides its counts when its processor is
+// constructed (ProcessorLimits below, passed to ProcessorBase and to its parameter layout), because the parameters are declared
+// then. This header holds only the fixed ceilings those counts must stay within, and the constants every product shares.
 
 namespace mu_limits
 {
-    // Maximum simultaneous channels (layers). The mixer strip count and
-    // per-channel array sizing across the plugin track this — conceptually the
-    // same number (one mixer strip per channel). A "channel" is a rhythm in
-    // mu-clid, a voice in mu-tant.
-    inline constexpr int kMaxLayers = MU_MAX_LAYERS;
-    // The layer view's frozen mask and the bin's slot loops use 32-bit masks.
-    static_assert(kMaxLayers >= 1 && kMaxLayers <= 32, "MU_MAX_LAYERS must be 1..32");
+    // Fixed ceilings. A count a product chooses (below) can never exceed these: the layer masks are 32-bit and the
+    // parameter ids carry one digit for a bus and one for a bus insert. They bound the few small fixed arrays that
+    // stay fixed; every loop runs to the runtime count, never to a ceiling.
+    inline constexpr int kAbsoluteMaxLayers = 32;
+    inline constexpr int kAbsoluteMaxBuses  = 9;
+    inline constexpr int kAbsoluteBusInserts = 9;
 
-    // Group buses in the shared mixer and the inserts on each (MixerEngine::BusState). 0 buses declares no
-    // parameters and shows no UI; a target opts in with MU_MAX_BUSES. Loops, parameters, the mixer page and the
-    // sidechain source range all run to these, never to a literal.
-    inline constexpr int kMaxBuses   = MU_MAX_BUSES;
-    inline constexpr int kBusInserts = MU_BUS_INSERTS;
+    // The counts one processor is built with. Each product owns one constant and passes it to its parameter layout and to
+    // ProcessorBase, so the two cannot disagree; ProcessorBase keeps it (getLimits()) and everything that needs a count
+    // reads it from there. 0 buses declares no bus parameters and shows no mixer Buses page. externalSidechain is false for a
+    // Standalone-only product (no host sidechain bus), so the mixer does not list a source that can never carry audio.
+    struct ProcessorLimits
+    {
+        int  layers = 8;
+        int  buses = 0;
+        int  busInserts = 2;
+        bool externalSidechain = true;
 
-    // Whether the DAW's external sidechain input is offered as a ducking source. A Standalone-only product
-    // (no host sidechain bus) sets MU_EXT_SIDECHAIN=0 so the mixer does not list a source that can never carry audio.
-    inline constexpr bool kExternalSidechain = MU_EXT_SIDECHAIN != 0;
+        constexpr bool valid() const noexcept
+        {
+            return layers >= 1 && layers <= kAbsoluteMaxLayers
+                && buses >= 0 && buses <= kAbsoluteMaxBuses
+                && busInserts >= 1 && busInserts <= kAbsoluteBusInserts;
+        }
+    };
 
     // Layers shown at once in the sidebar and the mixer (a 16-layer host pages them in two).
     inline constexpr int kLayersPerPage = 8;
@@ -80,7 +73,7 @@ namespace mu_limits
     inline constexpr int kRetireDepth = kMaxRetiredVoiceEngines;
     // Tails sounding at once in one instance. The default never binds (it is the bin's capacity); a host
     // with many layers lowers it from its CPU measurements, and the oldest tail is then evicted.
-    inline constexpr int kMaxLiveRetirees = kMaxLayers * kRetireDepth;
+    inline constexpr int kMaxLiveRetirees = kAbsoluteMaxLayers * kRetireDepth;
     // Hard lifetime of any tail (reverb and comb tails that never report silence), and the declick
     // applied in its last milliseconds.
     inline constexpr double kRetireHardCapSeconds = 30.0;
@@ -105,7 +98,7 @@ namespace mu_limits
 
     // First N channels expose full "<Layer> N " APVTS parameter names so DAW
     // automation lanes are readable; remaining channels use short "N " names.
-    // Raise (up to kMaxLayers) to expose more channels with full names.
+    // Raise (up to the layer count) to expose more channels with full names.
     inline constexpr int kMaxAutomatedChannels = 3;
 
     // Items in one Performance file (a list of full-preset pointers a controller's top row switches between).

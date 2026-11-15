@@ -77,12 +77,10 @@ void MasterInsertBinding::refresh()
 }
 
 // ── Group bus inserts ─────────────────────────────────────────────────────────────────────────────
-static_assert(mu_limits::kMaxBuses == 0 || mu_limits::kBusInserts <= MasterInsertPanel::kSlots,
-              "a bus insert column shows at most the Master panel's boxes: a longer chain needs a taller panel");
-
-int BusInsertBinding::numSlots() noexcept
+// A bus insert column shows at most the Master panel's boxes: a longer chain needs a taller panel, so the count is clamped.
+int BusInsertBinding::numSlots() const noexcept
 {
-    return juce::jlimit(1, MasterInsertPanel::kSlots, mu_limits::kBusInserts);
+    return juce::jlimit(1, MasterInsertPanel::kSlots, proc.getLimits().busInserts);
 }
 
 juce::String BusInsertBinding::algorithmParamId(int bus, int insert)
@@ -109,7 +107,7 @@ BusInsertBinding::BusInsertBinding(ProcessorBase& processor, MasterInsertPanel& 
     panel.onSync      = [this](int slot, bool on) { write(syncParamId(bus, slot), on ? 1.0f : 0.0f); };
 
     // The Compressor / Limiter gain-reduction meters read the bus's own inserts.
-    if (bus >= 0 && bus < mu_limits::kMaxBuses)
+    if (bus >= 0 && bus < proc.getLimits().buses)
         for (int slot = 0; slot < numSlots(); ++slot)
             panel.setGainReductionSource(slot, &proc.mixerEngine.buses[(size_t) bus].insert[slot].processor.grReduction);
 
@@ -133,7 +131,7 @@ void BusInsertBinding::write(const juce::String& parameterId, float plainValue)
 
 void BusInsertBinding::refresh()
 {
-    if (bus < 0 || bus >= mu_limits::kMaxBuses) return;
+    if (bus < 0 || bus >= proc.getLimits().buses) return;
     for (int slot = 0; slot < numSlots(); ++slot)
     {
         const VoiceParams ip = proc.mixerEngine.buses[(size_t) bus].insert[slot].snapshot();

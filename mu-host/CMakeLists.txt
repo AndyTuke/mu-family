@@ -1,7 +1,7 @@
 # mu-Host — one mu instrument channel as a plug-in (VST3 + CLAP, no Standalone).
 #
 # A product of its own on the mu-Tronic shell: it compiles mu-Tronic's sources (the 16-slot shell, built here with ONE slot:
-# MU_MAX_LAYERS=1, no buses) plus its own Source/ (the processor and editor that name it, the engine drop-down, the per-engine
+# one layer, no buses (mu_host::kLimits)) plus its own Source/ (the processor and editor that name it, the engine drop-down, the per-engine
 # licensing). Nothing of mu-Tronic is copied; mu-Tronic's own files are shared as they are. See CLAUDE.md.
 
 # The shell's sources, as mu-tronic's target lists them (relative paths made absolute), without its plug-in factory: this product
@@ -75,15 +75,15 @@ target_include_directories(mu-host
 )
 
 target_compile_definitions(mu-host PUBLIC
-    MU_MAX_LAYERS=1 MU_MAX_BUSES=0 MU_EXT_SIDECHAIN=0 MU_TRONIC_WITH_UI=1
+    MU_TRONIC_WITH_UI=1
     JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""
 )
 
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-host
     PRIVATE
         mu-toni-layer mu-on-layer mu-tant-layer mu-clid-layer mu-tilate-layer
-        mu-core
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -103,7 +103,7 @@ clap_juce_extensions_plugin(TARGET mu-host
     CLAP_FEATURES instrument synthesizer)
 
 # ── mu-host-tests — the real one-slot processor, headless ───────────────────
-# On demand (not in ALL_BUILD). mu-tronic-tests' sources minus mu-Tronic's own tests, with MU_MAX_LAYERS=1, plus this product's
+# On demand (not in ALL_BUILD). mu-tronic-tests' sources minus mu-Tronic's own tests, with mu-Host's one-layer limits, plus this product's
 # processor, licensing and tests.
 get_target_property(MU_HOST_TEST_RAW mu-tronic-tests SOURCES)
 set(MU_HOST_TEST_SOURCES "")
@@ -131,7 +131,7 @@ target_link_libraries(mu-host-tests PRIVATE mu-core-assets
     juce::juce_graphics juce::juce_gui_basics juce::juce_dsp juce::juce_audio_formats juce::juce_audio_utils
     juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
 target_compile_definitions(mu-host-tests PRIVATE
-    MU_MAX_LAYERS=1 MU_MAX_BUSES=0 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+    JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)
 set_target_properties(mu-host-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # ── mu-host-uisoak — the one-slot editor driven in-process ──────────────────
@@ -166,9 +166,8 @@ target_include_directories(mu-host-uisoak
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher")
 target_compile_definitions(mu-host-uisoak PUBLIC
-    MU_MAX_LAYERS=1 MU_MAX_BUSES=0 MU_EXT_SIDECHAIN=0 MU_TRONIC_WITH_UI=1 UISOAK_HOST=1
-    JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\"")
+    MU_TRONIC_WITH_UI=1 UISOAK_HOST=1
+    JUCE_WEB_BROWSER=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
 target_link_libraries(mu-host-uisoak
     PRIVATE mu-toni-layer mu-on-layer mu-tant-layer mu-clid-layer mu-tilate-layer mu-core
         juce::juce_audio_utils juce::juce_dsp juce::juce_gui_basics juce::juce_gui_extra juce::juce_audio_formats
@@ -176,3 +175,6 @@ target_link_libraries(mu-host-uisoak
 target_compile_definitions(mu-host-uisoak_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-host-uisoak_Standalone PRIVATE "${CMAKE_SOURCE_DIR}/mu-tronic/Source/Tests/UiSoakApp.cpp")
 set_target_properties(mu-host-uisoak mu-host-uisoak_Standalone PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

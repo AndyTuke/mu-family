@@ -46,7 +46,7 @@ void addArpRows(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int
     layout.add(std::make_unique<AudioParameterInt>  (pid("stepMask"), lbl("Step Mask"), 0, (1 << ArpAccent::kMaxSteps) - 1, (1 << ArpAccent::kMaxSteps) - 1));
 }
 
-void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot)
+void addLayerParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int /*numLayers*/)
 {
     using namespace juce;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };

@@ -55,9 +55,14 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
 
 MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
     : proc(p), mixer(m),
+      effectReturn(MixerChannel::Type::EffectReturn, "Effect", juce::Colour(0xffD85A30), m.limits()),
+      delayReturn(MixerChannel::Type::DelayReturn, "Delay", juce::Colour(0xffD85A30), m.limits()),
+      reverbReturn(MixerChannel::Type::ReverbReturn, "Reverb", juce::Colour(0xff378ADD), m.limits()),
+      masterChannel(MixerChannel::Type::Master, "Master", juce::Colours::white, m.limits()),
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuLookAndFeel::knobFxSend),
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {
+    jassert(m.numBuses <= MuLookAndFeel::kMixerMaxBuses);   // the Buses page lays out at most this many (a fourth needs a layout ruling)
     buildChannels();
     buildBuses();
     wireReturns();
@@ -115,7 +120,7 @@ int MixerOverlay::getNumChannelPages() const noexcept
 
 int MixerOverlay::getNumPages() const noexcept
 {
-    return getNumChannelPages() + (mu_limits::kMaxBuses > 0 ? 1 : 0);
+    return getNumChannelPages() + (mixer.numBuses > 0 ? 1 : 0);
 }
 
 // "1-8" and "9-16" at two channel pages (four at most read as ranges, beyond that plain numbers), then "Buses".
@@ -132,7 +137,7 @@ void MixerOverlay::syncPageCtrl()
         const int last  = juce::jmin(n, (p + 1) * mu_limits::kLayersPerPage);
         labels.push_back(channelPages <= 4 ? juce::String(first) + "-" + juce::String(last) : juce::String(p + 1));
     }
-    if (mu_limits::kMaxBuses > 0)
+    if (mixer.numBuses > 0)
         labels.push_back("Buses");
     pageCtrl.setLabels(labels);
     shownPage = juce::jlimit(0, pages - 1, shownPage);
@@ -191,13 +196,13 @@ void MixerOverlay::buildChannels()
 
     const auto& palette = MuLookAndFeel::layerPalette;
     const int numActive = proc.getNumLayers();
-    for (int r = 0; r < MixerEngine::MaxChannels; ++r)
+    for (int r = 0; r < mixer.numChannels; ++r)
     {
         bool hasRhythm = r < numActive;
         juce::Colour col = hasRhythm ? palette[proc.getLayerColourIndex(r) % MuLookAndFeel::kLayerPaletteSize]
                                      : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getLayerName(r)) : "-";
-        auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Channel, name, col);
+        auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Channel, name, col, mixer.limits());
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
@@ -217,9 +222,9 @@ void MixerOverlay::refreshSidechainSources()
 {
     juce::StringArray names, busNames;
     const int numActive = proc.getNumLayers();
-    for (int r = 0; r < MixerEngine::MaxChannels; ++r)
+    for (int r = 0; r < mixer.numChannels; ++r)
         names.add((r < numActive && ! channelIsEmpty(r)) ? juce::String(proc.getLayerName(r)) : juce::String());
-    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+    for (int b = 0; b < mixer.numBuses; ++b)
         busNames.add(MixerChannel::busName(b));
     // Each strip lists only the sources its type may legally take (MixerChannel::setSidechainSources).
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
@@ -235,10 +240,10 @@ void MixerOverlay::refreshSidechainSources()
 // The Buses page: for each bus a strip bound to buses[b] and an insert column bound to its insert chain.
 void MixerOverlay::buildBuses()
 {
-    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
+    for (int b = 0; b < mixer.numBuses; ++b)
     {
         auto strip = std::make_unique<MixerChannel>(MixerChannel::Type::Bus, MixerChannel::busName(b),
-                                                    MuLookAndFeel::colour(MuLookAndFeel::globalAccent));
+                                                    MuLookAndFeel::colour(MuLookAndFeel::globalAccent), mixer.limits());
         strip->bindChannel(mixer.buses[(size_t) b], mixer.busPeaks[(size_t) b], &proc, "bus" + juce::String(b) + "_",
                            &mixer.busSidechainGR[(size_t) b]);
         strip->bindClientMeter(mixer.busPeaksL[(size_t) b], mixer.busPeaksR[(size_t) b]);   // stereo bars

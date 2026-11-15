@@ -8,6 +8,7 @@
 #include "Control/SceneState.h"
 #include "UI/LayerSidebar.h"
 #include "UI/SceneGrid.h"
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
@@ -243,7 +244,7 @@ public:
 
         beginTest("the sidebar shows no scenes by default; turned on, the grid sits at the foot and the layer items clear it");
         {
-            auto box = std::make_unique<FakeLayerHost>(mu_limits::kMaxLayers < 8 ? mu_limits::kMaxLayers : 8); auto& p = *box;
+            auto box = std::make_unique<FakeLayerHost>(mu_test::kLimits.layers < 8 ? mu_test::kLimits.layers : 8); auto& p = *box;
             LayerSidebar sidebar(p, "Layer");
             sidebar.setBounds(0, 0, LayerSidebar::kWidth, 814);
             sidebar.refreshItems();

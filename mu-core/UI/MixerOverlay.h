@@ -16,7 +16,7 @@
 
 // Full mixer view: rhythm channel strips | Effect/Delay/Reverb returns | Master
 // + three FX rows (Effect, Delay, Reverb) below the strips. A product with group buses
-// (mu_limits::kMaxBuses > 0) adds a last "Buses" page: one unit per bus (strip + insert column) and the Master.
+// (buses > 0) adds a last "Buses" page: one unit per bus (strip + insert column) and the Master.
 // Replaces the RhythmPanel in the editor when the mixer button is toggled.
 class MixerOverlay : public juce::Component,
                      public juce::AudioProcessorValueTreeState::Listener,
@@ -51,7 +51,7 @@ public:
     // sidebar's once open; `pageOnOpen` (optional) names the sidebar's page to show each time the mixer opens.
     int  getNumPages() const noexcept;           // channel pages, plus the Buses page where there are buses
     int  getNumChannelPages() const noexcept;    // pages of channel strips only
-    bool isBusPage(int page) const noexcept { return mu_limits::kMaxBuses > 0 && page == getNumChannelPages(); }
+    bool isBusPage(int page) const noexcept { return mixer.numBuses > 0 && page == getNumChannelPages(); }
     int  getShownPage() const noexcept { return shownPage; }
     void showPage(int page);
     bool showAdjacentPage(int delta);   // PageUp / PageDown among the channel pages: no wrap; false when there is nowhere to go
@@ -76,10 +76,8 @@ private:
     std::vector<std::unique_ptr<mu_ui::MasterInsertPanel>>   busInsertPanels;
     std::vector<std::unique_ptr<mu_ui::BusInsertBinding>>    busInsertBindings;
 
-    MixerChannel effectReturn  { MixerChannel::Type::EffectReturn, "Effect",  juce::Colour(0xffD85A30) };
-    MixerChannel delayReturn   { MixerChannel::Type::DelayReturn,  "Delay",   juce::Colour(0xffD85A30) };
-    MixerChannel reverbReturn  { MixerChannel::Type::ReverbReturn, "Reverb",  juce::Colour(0xff378ADD) };
-    MixerChannel masterChannel { MixerChannel::Type::Master,       "Master",  juce::Colours::white    };
+    // Built in the constructor, which gives each the mixer's counts.
+    MixerChannel effectReturn, delayReturn, reverbReturn, masterChannel;
     // The master insert column sits right of the Master strip (strip, then panel, as in mu-link).
     mu_ui::MasterInsertPanel   masterInsertPanel;
     mu_ui::MasterInsertBinding masterInsertBinding { proc, masterInsertPanel };

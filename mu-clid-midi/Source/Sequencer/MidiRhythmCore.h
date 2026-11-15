@@ -31,7 +31,9 @@ public:
     // Audio thread. Steps the sequencer and emits this block's MIDI. Takes no lock: it reads only the
     // sequencer's own pattern snapshot and atomics. A block that starts during a session restore is
     // skipped, but a pending note-off is still flushed.
-    void processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples);
+    // `beatsPerSample` lets every 1/16 step inside the block fire at its own sample; 0 (unknown) fires only the step at the block's
+    // start, at sample 0, as before.
+    void processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples, double beatsPerSample = 0.0);
 
     // Audio thread. Emits the note-off of the last note once its 20 ms are up, without triggering
     // anything: for a bypassed or skipped block, which must not leave a note hanging.
@@ -74,7 +76,7 @@ private:
     bool isMessageThread() const;
     void syncRhythmFromApvts();
     void pushRhythmToApvts();
-    void advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples);
+    void advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples, double beatsPerSample);
 
     juce::AudioProcessorValueTreeState& apvts;
     MidiOutputEngine midiEngine;

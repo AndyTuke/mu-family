@@ -9,6 +9,7 @@
 #include <array>
 #include <thread>
 #include <vector>
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 using Bin = mu_core::RetireBin;
@@ -83,7 +84,7 @@ namespace
 
     struct BinRig
     {
-        explicit BinRig(double sr = 48000.0, int bs = 512) : bin(epoch, layout) { bin.setPrepared(sr, bs); out.setSize(2, bs); }
+        explicit BinRig(double sr = 48000.0, int bs = 512) : bin(epoch, layout, mu_test::kLimits.layers) { bin.setPrepared(sr, bs); out.setSize(2, bs); }
         // One audio block: enter, render the slot's tails into a cleared buffer, leave.
         bool block(int slot, int n, uint32_t serial, bool slotHasLive = false)
         {
@@ -535,7 +536,7 @@ struct RetireBinRulesTests : juce::UnitTest
             constexpr int kRounds = 1500;
             mu_core::AudioEpoch epoch;
             std::atomic<uint64_t> layout { 0 };
-            Bin bin(epoch, layout);
+            Bin bin(epoch, layout, mu_test::kLimits.layers);
             bin.setPrepared(48000.0, 256);
             const int before = ProbeTail::destroyed(), outside = ProbeTail::freedOutsideBin();
             std::thread hostThread([&]
@@ -544,7 +545,7 @@ struct RetireBinRulesTests : juce::UnitTest
             });
             for (int i = 0; i < kRounds; ++i)
             {
-                bin.park(i % mu_limits::kMaxLayers, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false);
+                bin.park(i % mu_test::kLimits.layers, std::unique_ptr<mu_core::RetireTail>(new ProbeTail()), 0, false);
                 bin.service();
             }
             hostThread.join();

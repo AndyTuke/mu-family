@@ -171,6 +171,25 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     viewSwitch.onChange = [this](int) { updateView(); };
     addChildComponent(slicePanel);
     slicePanel.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    // The layer's own values, read when a slice knob is switched to Absolute so it starts where it sounds now.
+    slicePanel.layerValues = [this]
+    {
+        auto& ap = host.getPhraseParameters();
+        const auto prefix = layerParamPrefix(currentLayer);
+        auto read = [&ap](const juce::String& id, float def) { const auto* a = ap.getRawParameterValue(id); return a != nullptr ? a->load() : def; };
+        auto row = [&](int r, float def) { return read(prefix + ppi::suffix[r], def); };
+        LayerValues lv;
+        lv.pitchSemi = row(ppi::pSemi, 0.0f);   lv.fineCents = row(ppi::pFine, 0.0f);
+        lv.cutoffHz = row(ppi::fCut, 20000.0f); lv.resonance = row(ppi::fRes, 0.0f);   lv.filterEnvAmt = row(ppi::fEnv, 0.0f);
+        lv.fltA = row(ppi::fltA, 0.0f); lv.fltD = row(ppi::fltD, 100.0f); lv.fltS = row(ppi::fltS, 1.0f); lv.fltR = row(ppi::fltR, 0.0f);
+        lv.ampA = row(ppi::ampA, 0.0f); lv.ampD = row(ppi::ampD, 100.0f); lv.ampS = row(ppi::ampS, 1.0f); lv.ampR = row(ppi::ampR, 0.0f);
+        lv.pan = row(ppi::pPan, 0.0f);  lv.fadeInMs = row(ppi::fadeIn, 0.5f); lv.fadeOutMs = row(ppi::fadeOut, 0.5f);
+        lv.levelDb = juce::Decibels::gainToDecibels(row(ppi::gain, 1.0f), -60.0f);   // the layer's level is a linear gain
+        for (int i = 0; i < 4; ++i) lv.ins[i] = read(prefix + "insP" + juce::String(i + 1), 0.0f);
+        const auto strip = "ch" + juce::String(currentLayer) + "_";
+        lv.send[0] = read(strip + "sendEff", 0.0f); lv.send[1] = read(strip + "sendDly", 0.0f); lv.send[2] = read(strip + "sendRev", 0.0f);
+        return lv;
+    };
     slicePanel.onChange = [this](const SliceSettings& settings)
     {
         const int idx = slicePanel.getSlice();

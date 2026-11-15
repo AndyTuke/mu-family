@@ -1,4 +1,6 @@
 #include "License/EngineLicensing.h"
+#include "License/LicenseManager.h"      // mu-core: the offline .lic verifier
+#include "License/OnlineActivation.h"    // mu-core: the saved online activation
 
 // Each product keeps its licence identity in its own License/LicenseKey.h (the same file name in every product), so they are reached
 // from the repository root rather than through the include path.
@@ -30,6 +32,26 @@ const EngineProduct* productForEngine(mu_core::LayerTypeId type)
         case T::Phrase:  return &tilate;
         default:         return nullptr;
     }
+}
+
+bool isProductLicensed(const EngineProduct& product, const juce::File& hostDir, const char* hostAppName)
+{
+    // The product's own app keeps its key in its own folder beside mu-Host's; a key dropped in mu-Host's folder counts as well.
+    const auto productDir = hostDir.getFileName() == hostAppName ? hostDir.getSiblingFile(product.appName) : hostDir;
+    for (const auto& dir : { productDir, hostDir })
+    {
+        if (dir == juce::File()) continue;
+        if (mu_core::LicenseManager::check(dir, product.id, product.licenceFile, product.publicKey).status == mu_core::LicenseStatus::Licensed
+            || mu_core::OnlineActivation::hasLocalActivation(dir, product.activationFile))
+            return true;
+    }
+    return false;
+}
+
+bool isEngineLicensed(mu_core::LayerTypeId type, const juce::File& hostDir, const char* hostAppName)
+{
+    const auto* product = productForEngine(type);
+    return product != nullptr && isProductLicensed(*product, hostDir, hostAppName);
 }
 
 } // namespace mu_host

@@ -4,6 +4,7 @@
 // verbatim lines of that output) into the real, headless PluginProcessor and check that every value lands
 // on its renamed parameter, and that the modulation tables follow the new ids.
 
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"
 #include "Tests/ProcessorSeamHelpers.h"
@@ -137,7 +138,7 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
         {
             TempStorage storage;
             mu_on::PluginProcessor p;
-            for (int track = 0; track < mu_limits::kMaxLayers; ++track)
+            for (int track = 0; track < mu_on::kLimits.layers; ++track)
                 for (int e = 0; e < mu_on::kNumEngineTypes; ++e)
                 {
                     const auto engine = mu_on::engineFromIndex(e);

@@ -38,3 +38,6 @@ if(MSVC)
     set_source_files_properties("${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
         PROPERTIES COMPILE_FLAGS "/wd4244")
 endif()
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

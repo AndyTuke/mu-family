@@ -110,6 +110,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case indicatorModulationTint: return t.indicators.modulationTint;
         case indicatorGRTint:         return t.indicators.grTint;
         case indicatorLockTint:       return t.indicators.lockTint;
+        case indicatorAbsoluteTint:   return t.indicators.absoluteTint;
         case indicatorGRMeterBg:      return t.indicators.grMeterBg;
         case indicatorGRMeterBar:     return t.indicators.grMeterBar;
         // Mixer extras
@@ -835,6 +836,9 @@ void MuLookAndFeel::useAppColourKnobs(juce::Component& root)
 
 juce::Colour MuLookAndFeel::knobColour(const juce::Slider& slider) const
 {
+    // A knob that tints itself (an Absolute override) keeps its own colour over the app and layer-type colours.
+    if (slider.getProperties().contains(kKnobOwnTint))
+        return slider.findColour(juce::Slider::rotarySliderFillColourId);
     // A layer-type colour over the main page wins over the app colour.
     juce::Colour overridden;
     if (metalStyle && accentOverrideFor(slider, overridden))

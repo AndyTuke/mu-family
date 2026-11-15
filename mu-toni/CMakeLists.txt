@@ -75,13 +75,13 @@ target_compile_definitions(mu-toni
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
-        "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
 )
 
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-toni
     PRIVATE
         mu-toni-layer
-        mu-core
+        mu-core-lib
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -254,3 +254,6 @@ target_link_libraries(mu-toni-layer-tests PRIVATE
 target_compile_definitions(mu-toni-layer-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
 add_dependencies(mu-toni mu-toni-layer-tests)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

@@ -30,6 +30,10 @@ struct ModTarget
     const char* label;
     const char* section;
     const char* param;
+    // Stepped-modulator snap: discrete units per direction (octave 3, scale degree 12); 0 = continuous, no snapping.
+    int unitsPerDirection = 0;
+    // True for a target that is only musical as discrete jumps; hidden from the list while the modulator is Smooth.
+    bool steppedOnly = false;
 };
 
 // The row whose id matches, or nullptr.
@@ -38,6 +42,14 @@ constexpr const ModTarget* findTarget(const ModTarget (&table)[N], std::string_v
 {
     for (const auto& t : table)
         if (t.param != nullptr && id == t.id) return &t;
+    return nullptr;
+}
+
+// The live row whose id matches among the first `n` rows (a table reached through a pointer), or nullptr.
+constexpr const ModTarget* findTarget(const ModTarget* table, std::size_t n, std::string_view id) noexcept
+{
+    for (std::size_t i = 0; i < n; ++i)
+        if (table[i].param != nullptr && id == table[i].id) return &table[i];
     return nullptr;
 }
 
@@ -53,6 +65,15 @@ template <std::size_t N>
 constexpr int indexOfParam(const ModTarget (&table)[N], std::string_view param) noexcept
 {
     return indexOfParam(table, N, param);
+}
+
+// True if `id` names a live (non-reserved) target among the first `n` rows (a table reached through a pointer, such as a
+// per-engine table). The one id check every product's validator and the serialiser use.
+constexpr bool isValidTarget(const ModTarget* table, std::size_t n, std::string_view id) noexcept
+{
+    for (std::size_t i = 0; i < n; ++i)
+        if (table[i].param != nullptr && id == table[i].id) return true;
+    return false;
 }
 
 // True if `id` names a live (non-reserved) target in the table.

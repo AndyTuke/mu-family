@@ -8,6 +8,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Persistence/TronicState.h"
 #include "Tests/ProcessorSeamHelpers.h"
+#include "UI/TableModDestProvider.h"
 
 #include <chrono>
 #include <set>
@@ -35,7 +36,7 @@ namespace
     juce::AudioProcessorValueTreeState::ParameterLayout syntheticLayout(int perSlot)
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
-        for (int s = 0; s < mu_limits::kMaxLayers; ++s)
+        for (int s = 0; s < mu_tronic::kLimits.layers; ++s)
             for (int p = 0; p < perSlot; ++p)
                 layout.add(std::make_unique<juce::AudioParameterFloat>(
                     juce::ParameterID { "x" + juce::String(s) + "_p" + juce::String(p), 1 }, "Parameter " + juce::String(p),
@@ -90,7 +91,7 @@ struct MuTronicLayoutTests : juce::UnitTest
         {
             mu_seam_test::TempStorage storage;
             mu_tronic::PluginProcessor p;
-            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets());   // the layout the processor saves by
+            const auto layout = mu_pp::LayerLayout::withPrefixSets(p, mu_tronic::slotPrefixSets(p.getLimits().layers));   // the layout the processor saves by
 
             // The ids of every parameter, once.
             juce::StringArray ids;
@@ -107,7 +108,7 @@ struct MuTronicLayoutTests : juce::UnitTest
                 expect(letter != 0 && juce::String(mu_tronic::kPrefixLetters).containsChar((juce::juce_wchar) letter),
                        juce::String(info.name) + " names a letter missing from kPrefixLetters (its rows would be saved as globals)");
 
-                for (int slot = 0; slot < mu_limits::kMaxLayers; ++slot)
+                for (int slot = 0; slot < mu_tronic::kLimits.layers; ++slot)
                 {
                     const auto prefix = mu_tronic::slotPrefix(letter, slot);
                     int rows = 0;
@@ -150,16 +151,49 @@ struct MuTronicLayoutTests : juce::UnitTest
             expectEquals(seen.size(), 11, "eleven choices");
         }
 
+        beginTest("every layer type but the Rhythm publishes its modulation targets in the registry, as a table the shared provider resolves both ways");
+        {
+            mu_seam_test::TempStorage storage;
+            mu_tronic::PluginProcessor p;
+            const auto& types = p.getLayerTypes();
+            int published = 0;
+            for (int t = 0; t < types.size(); ++t)
+            {
+                const auto& info = types.at(t);
+                if (info.id == mu_core::LayerTypeId::Rhythm)
+                {
+                    expect(info.modTargets == nullptr, "the Rhythm's targets depend on its effect and step counts: built by its own provider");
+                    continue;
+                }
+                expect(info.modTargets != nullptr && info.numModTargets > 0, juce::String(info.name) + " publishes its targets");
+                if (info.modTargets == nullptr) continue;
+                ++published;
+
+                const auto provider = mu_mod::makeTableDestProvider(info.modTargets, info.numModTargets);
+                std::set<std::string> ids;
+                for (int i = 0; i < info.numModTargets; ++i)
+                {
+                    const auto& row = info.modTargets[i];
+                    expect(row.id != nullptr && row.label != nullptr, juce::String(info.name) + " row " + juce::String(i) + " has an id and a label");
+                    if (row.id == nullptr) continue;
+                    expect(ids.insert(row.id).second, juce::String(info.name) + " id " + row.id + " is unique");
+                    expectEquals(provider.resolveId(i + 1), std::string(row.id), juce::String(info.name) + " resolves dropdown id " + juce::String(i + 1));
+                    expectEquals(provider.findDropdownId(row.id), i + 1, juce::String(info.name) + " finds " + row.id);
+                }
+            }
+            expectEquals(published, 10, "Pattern, Arp, the seven mu-On types and Phrase");
+        }
+
         beginTest("a strip's sidechain source reaches every slot and the external bus");
         {
             mu_seam_test::TempStorage storage;
             mu_tronic::PluginProcessor p;
             auto* sc = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ch0_scSrc"));
             expect(sc != nullptr);
-            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses), "0 off, 1..16 slots, 17 external, 18.. the buses");
+            if (sc != nullptr) expectEquals(sc->getNormalisableRange().end, (float) (mu_tronic::kLimits.layers + 1 + mu_tronic::kLimits.buses), "0 off, 1..16 slots, 17 external, 18.. the buses");
             auto* ret = dynamic_cast<juce::AudioParameterInt*>(p.apvts.getParameter("ret_eff_scSrc"));
             expect(ret != nullptr);
-            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_limits::kMaxLayers + 1 + mu_limits::kMaxBuses));
+            if (ret != nullptr) expectEquals(ret->getNormalisableRange().end, (float) (mu_tronic::kLimits.layers + 1 + mu_tronic::kLimits.buses));
         }
 
         beginTest("cost check on the real layout: the processor with every registered type's rows builds inside the budget");

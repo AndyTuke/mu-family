@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/TableModDestProvider.h"   // a provider from a type's published targets
 #include "Persistence/TrackLayerTypes.h"   // chooseRumbleSource
 #include "Persistence/RhythmLayerType.h"   // isRhythmMidiOutput, clearUnresolvedSample
 
@@ -177,6 +178,19 @@ void PluginEditor::importProductPreset(const juce::File& file)
         getStatusBar().showParam("Import failed", result.message, MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
 }
 
+const ModDestProvider* PluginEditor::destProviderFor(mu_core::LayerTypeId type, const LayerContent* content)
+{
+    if (content != nullptr)
+        if (const auto* own = content->getModDestProvider()) return own;
+
+    const auto* info = proc.getLayerTypes().find(type);
+    if (info == nullptr || info->modTargets == nullptr || info->numModTargets <= 0) return nullptr;
+    for (auto& entry : registryProviders)
+        if (entry.first == type) return &entry.second;
+    registryProviders.emplace_back(type, mu_mod::makeTableDestProvider(info->modTargets, info->numModTargets));
+    return &registryProviders.back().second;   // a vector may move its elements: callers use the pointer only until the next call
+}
+
 LayerContent* PluginEditor::contentFor(mu_core::LayerTypeId type)
 {
     for (auto& entry : contents)
@@ -221,7 +235,7 @@ void PluginEditor::applyEffectSendName()
     if (shownContent == nullptr) return;
     shownContent->setEffectSendName(effectSendName);
     // The destination lists are rebuilt so a target carries the new name.
-    layerPanel.getModulatorPanel().setDestProvider(shownContent->getModDestProvider());
+    layerPanel.getModulatorPanel().setDestProvider(destProviderFor(proc.getLayerTypeId(layerPanel.getLayer()), shownContent));
 }
 
 void PluginEditor::releaseContentArcs()
@@ -264,7 +278,7 @@ void PluginEditor::showSlot(int idx)
     if (shownContent != nullptr) shownContent->setLayer(idx);
     layerPanel.setContent(shownContent);
     if (shownContent != nullptr) shownContent->setEffectSendName(effectSendName);   // before the destination lists are built
-    layerPanel.getModulatorPanel().setDestProvider(shownContent != nullptr ? shownContent->getModDestProvider() : nullptr);
+    layerPanel.getModulatorPanel().setDestProvider(shownContent != nullptr ? destProviderFor(type, shownContent) : nullptr);
     layerPanel.getHeader().setTypeTag(info != nullptr ? juce::String::fromUTF8(info->typeTag) : juce::String());
     if (info != nullptr && info->appColourId != 0)
         MuLookAndFeel::setAccentOverride(layerPanel, MuLookAndFeel::colour((MuLookAndFeel::ColourIds) info->appColourId));

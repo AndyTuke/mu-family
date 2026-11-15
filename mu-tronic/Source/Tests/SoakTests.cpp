@@ -33,7 +33,7 @@ struct MuTronicSoakTests : juce::UnitTest
             static const mu_core::LayerTypeId types[] = { mu_core::LayerTypeId::Empty, mu_core::LayerTypeId::Rhythm, mu_core::LayerTypeId::Pattern,
                 mu_core::LayerTypeId::Arp, mu_core::LayerTypeId::Kick, mu_core::LayerTypeId::Bass, mu_core::LayerTypeId::Hat,
                 mu_core::LayerTypeId::Snare, mu_core::LayerTypeId::Rumble, mu_core::LayerTypeId::FmPerc, mu_core::LayerTypeId::Chord, mu_core::LayerTypeId::Phrase };
-            p.setLayerType((int) (rng() % (unsigned) mu_limits::kMaxLayers), types[rng() % (sizeof(types) / sizeof(types[0]))]);
+            p.setLayerType((int) (rng() % (unsigned) p.getLimits().layers), types[rng() % (sizeof(types) / sizeof(types[0]))]);
         };
         mu_seam_test::runParamSoak(*this, p, o);
     }

@@ -12,6 +12,7 @@
 //   --swap-slot-preset <file> --swap-slot N --swap-slot-at <s>   slot preset staged mid-render
 //   --midi-program P --midi-program-preset <file> --midi-program-at <s>   ch-9 program change
 //   --play / --no-play                       start the internal transport (product default otherwise)
+//   --stop-at <s>                            stop the internal transport at <s> and keep rendering (FX tails ring out)
 //   --save-preset <file>                     after the start preset loads, save the state as a full
 //                                            preset at <file> (the listening tests' round trip)
 //   --host-start-beat <b> [--host-bpm <t>]   run as if in a playing host whose timeline starts at beat
@@ -44,6 +45,10 @@ namespace mu_core::render_mode
         double     midiProgramAtSeconds = -1.0;
 
         int        play = -1;   // -1 = product default, 0 = --no-play, 1 = --play
+        double     stopAtSeconds = -1.0;   // >= 0: the internal transport stops here and the render carries on (a tail)
+
+        // A host session handed over in memory (the Bounce dialog seeds the render from the live state); restored like --state.
+        juce::MemoryBlock stateData;
 
         juce::File savePresetFile;
         juce::File saveStateFile, stateFile;
@@ -98,6 +103,7 @@ namespace mu_core::render_mode
         const auto clockStart  = takeFlagValue(tokens, "--midi-clock-start");
         const auto clockJitter = takeFlagValue(tokens, "--midi-clock-jitter");
         const auto clockMode   = takeFlagValue(tokens, "--midi-clock-mode");
+        const auto stopAt      = takeFlagValue(tokens, "--stop-at");
         if (tokens.contains("--play"))    { a.play = 1; tokens.removeString("--play"); }
         if (tokens.contains("--no-play")) { a.play = 0; tokens.removeString("--no-play"); }
 
@@ -118,6 +124,7 @@ namespace mu_core::render_mode
         if (clockStart.isNotEmpty())  a.midiClockStartAt  = clockStart.getDoubleValue();
         if (clockJitter.isNotEmpty()) a.midiClockJitter   = clockJitter.getIntValue();
         if (clockMode.isNotEmpty())   a.midiClockMode     = juce::jlimit(0, 2, clockMode.getIntValue());
+        if (stopAt.isNotEmpty())      a.stopAtSeconds     = stopAt.getDoubleValue();
         if (presetSlot.isNotEmpty())  a.presetSlot           = presetSlot.getIntValue();
         if (swapAt.isNotEmpty())      a.swapAtSeconds        = swapAt.getDoubleValue();
         if (swapSlot.isNotEmpty())    a.swapSlot             = swapSlot.getIntValue();
@@ -193,6 +200,9 @@ namespace mu_core::render_mode
             proc.setStateInformation(session.getData(), (int) session.getSize());
         }
 
+        if (args.stateData.getSize() > 0)
+            proc.setStateInformation(args.stateData.getData(), (int) args.stateData.getSize());
+
         if (args.presetFile != juce::File{} && ! loadPresetByExtension(proc, args.presetFile, args.presetSlot, product))
             return 2;
 
@@ -248,7 +258,8 @@ namespace mu_core::render_mode
         // Phase 3: render, firing each mid-render action once when its time is reached.
         auto atSample = [&](double s) { return s >= 0.0 ? (int) std::round(s * args.sampleRate) : -1; };
         const int swapAt = atSample(args.swapAtSeconds), slotAt = atSample(args.swapSlotAtSeconds),
-                  progAt = atSample(args.midiProgramAtSeconds);
+                  progAt = atSample(args.midiProgramAtSeconds), stopAt = atSample(args.stopAtSeconds);
+        bool stopDone = false;
         bool swapDone = false, slotDone = false, progDone = false, fullPending = false;
 
         auto log = [&](const juce::String& what, int sample)
@@ -284,6 +295,12 @@ namespace mu_core::render_mode
                     if (nextPulse == startPulse) midi.addEvent(juce::MidiMessage((juce::uint8) 0xFA), offset);
                     midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), offset);
                 }
+            }
+            if (stopAt >= 0 && ! stopDone && written >= stopAt)
+            {
+                if (proc.isInternalPlaying()) proc.toggleInternalPlay();   // the tail: the transport is off, the sound rings out
+                stopDone = true;
+                log("transport stopped", written);
             }
             if (swapAt >= 0 && ! swapDone && written >= swapAt)
             {

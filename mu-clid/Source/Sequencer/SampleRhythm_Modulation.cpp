@@ -3,15 +3,17 @@
 // the processor (E5.4a); the processor still calls it once per live rhythm per block.
 
 #include "Sequencer/SampleRhythm.h"
+#include <cmath>
 #include "Audio/SpinLock.h"            // mu-core: spin lock helpers
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
+#include "Modulation/LaneModulation.h"  // mu-core: the shared per-lane resolve
 
 namespace mu_clid {
 
 // Each modulation destination this file reads or writes, as its ModDest::kTable index (compile
-// time). applyModulation reaches the values through modSlot[] — no per-block key hashing.
+// time). applyModulation reaches the values through the lane (base() / out()) — no per-block key hashing.
 namespace md
 {
     constexpr int accentDb          = ModDest::indexOf("accentDb");
@@ -98,32 +100,46 @@ namespace md
 
 SampleRhythm::SampleRhythm()
 {
-    // Pre-populate the modulation map so lookups never allocate on the audio thread.
-    modParamValues.reserve(50);
-    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
-                              "filter.cutoff", "filter.resonance",
-                              "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones", "pitch.octave",
-                              // Stage 36: 4 generic insert slots — semantics per
-                              // active algorithm via mu_ui::kInsertAlgoSlots.
-                              "insert.p1", "insert.p2", "insert.p3", "insert.p4",
-                              "pitch.envDepth", "amp.level", "accentDb",
-                              "euclid.a.hits", "euclid.a.rotate",
-                              "euclid.a.prePad", "euclid.a.postPad",
-                              "euclid.a.insSt", "euclid.a.insLen",
-                              "euclid.b.hits", "euclid.b.rotate",
-                              "euclid.b.prePad", "euclid.b.postPad",
-                              "euclid.b.insSt", "euclid.b.insLen",
-                              "euclid.c.hits", "euclid.c.rotate",
-                              "euclid.c.prePad", "euclid.c.postPad",
-                              "euclid.c.insSt", "euclid.c.insLen",
-                              "filter.lowCut",
-                              "amp.pan", "send.effect", "send.delay", "send.reverb" })
-        modParamValues[key] = 0.0f;
-    // Point each destination's slot at its map value (no rehash after this: keys are fixed).
-    for (auto& [key, value] : modParamValues)
-        if (const int i = ModDest::indexOf(key); i >= 0)
-            modSlot[(size_t) i] = &value;
+    // Pre-populate the modulation map from the target table, so a new row can never make the audio thread insert.
+    modParamValues.reserve((size_t) ModDest::kTableSize);
+    for (const auto& t : ModDest::kTable)
+        if (t.param != nullptr)
+            modParamValues[t.id] = 0.0f;
+
+    // The lane: every live (non-reserved) row of the target table, with its knob range. A destination is seeded as its knob's
+    // proportion and written back through the same range, so a modulation depth is a % of the knob's travel whatever its skew.
+    using mu_clid::mod_skew::LinRange;
+    using Range = juce::NormalisableRange<float>;
+    auto lin = [](LinRange r) { return Range(r.lo, r.hi); };
+    // The skewed knobs keep their exact curves (ModulationSkew.h): ADSR times 0..10 s, filter low cut 0..1000 Hz, filter cutoff 20..20000 Hz.
+    const Range adsr(0.0f, 10.0f, [](float, float, float p) { return mod_skew::adsrFromProp(p); },
+                                  [](float, float, float v) { return mod_skew::propFromAdsr(v); });
+    const Range lowCut(0.0f, 1000.0f, [](float, float, float p) { return mod_skew::lowCutFromProp(p); },
+                                      [](float, float, float v) { return mod_skew::propFromLowCut(v); });
+    const Range cutoff(20.0f, 20000.0f, [](float, float, float p) { return mod_skew::cutoffFromProp(p); },
+                                        [](float, float, float v) { return mod_skew::propFromCutoff(v); });
+    laneOfDest.fill(-1);
+    for (int i = 0; i < ModDest::kTableSize; ++i)
+        if (ModDest::kTable[i].param != nullptr)
+        {
+            laneOfDest[(size_t) i] = laneCount;
+            laneIds[(size_t) laneCount] = ModDest::kTable[i].id;
+            laneRange[(size_t) laneCount] = Range(0.0f, 1.0f);
+            ++laneCount;
+        }
+    for (int d : { md::amp_attack, md::amp_decay, md::fenv_attack, md::fenv_decay }) range(d) = adsr;
+    range(md::amp_sustain)      = lin(mod_skew::kSustain);
+    range(md::filter_cutoff)    = cutoff;
+    range(md::filter_resonance) = lin(mod_skew::kResonance);
+    range(md::filter_lowCut)    = lowCut;
+    range(md::fenv_depth)       = lin(mod_skew::kFenvDepth);
+    range(md::pitch_semitones)  = lin(mod_skew::kPitchSemi);
+    range(md::pitch_octave)     = lin(mod_skew::kPitchOctave);
+    range(md::pitch_envDepth)   = lin(mod_skew::kPitchEnvDepth);
+    range(md::amp_level)        = lin(mod_skew::kAmpLevel);
+    range(md::accentDb)         = lin(mod_skew::kAccent);
+    range(md::amp_pan)          = Range(-1.0f, 1.0f);
+    // The insert slots (normalised), the sends and the Euclid knobs stay 0..1; the Euclid ranges are set every block (fillLaneBase).
 }
 
 EuclidOverrides SampleRhythm::modulatedEuclidOverrides() const noexcept
@@ -164,103 +180,79 @@ static std::pair<int, int> insertStartKnobRange(const HitGenerator& g) noexcept
     return HitGenerator::insertStartBounds(g.steps, lay.prePad, lay.postPad, lay.insertLength, g.prePadMode);
 }
 
-// Phase 1 — seed every destination with its knob value as the matrix expects it: a proportion
-// of the knob's range for skewed / step-count-dependent knobs, the offset 0 for pitch.
-void SampleRhythm::seedModulation(const VoiceParams& modParams, const MixerEngine::ChannelState& strip)
+// A step-count dependent knob's range for this block: [lo, hi], never empty (an empty range cannot be converted to a proportion).
+static void setDynamicRange(juce::NormalisableRange<float>& r, float lo, float hi) noexcept
+{
+    r.start = lo;
+    r.end   = hi > lo ? hi : lo + 1e-3f;
+}
+
+// Phase 1 — every destination's current value in its own units, and this block's Euclid ranges. Values come from the rhythm's
+// own fields (a staged preset applies there at its boundary, the parameters may lag them).
+void SampleRhythm::fillLaneBase(const VoiceParams& modParams, const MixerEngine::ChannelState& strip)
 {
     const Rhythm& rhythm = *this;
-    // PROPORTION-SPACE modulation for skewed-slider destinations:
-    // additive-in-display-units modulation on a skewed slider gives
-    // variable visual arc length (the same display delta covers a
-    // different visual proportion at different knob positions). Seed
-    // these destinations as the slider's proportion (0..1), apply
-    // modulation additively in proportion-space, then convert back
-    // via the slider's skew at write-back. ADSR times use skewFactor
-    // 0.3 on a 0..10 range; filter.lowCut uses skewFactor 0.35 on 0..1000.
-    // amp.level is dB-linear (-60..+6) so the slider's "proportion" is
-    // (dB + 60) / 66 — modulate in dB.
-    // Skew conversions (forward + inverse) live in ModulationSkew.h so the
-    // seed / snapshot / write-back blocks share one definition (test C5).
-    using namespace mu_clid::mod_skew;   // skew conversions + linear knob ranges (kSustain, kPad, ...)
+    base(md::amp_attack)       = modParams.ampEnvAtk;
+    base(md::amp_decay)        = modParams.ampEnvDec;
+    base(md::amp_sustain)      = modParams.ampEnvSus;
+    // amp.release is not a modulation target (no note-off on a step trigger, so the release stage is never entered).
+    base(md::filter_cutoff)    = modParams.filterCutoff;
+    base(md::filter_resonance) = modParams.filterRes;
+    base(md::fenv_attack)      = modParams.filterEnvAtk;
+    base(md::fenv_decay)       = modParams.filterEnvDec;
+    base(md::fenv_depth)       = modParams.filterEnvDepth;
+    base(md::filter_lowCut)    = modParams.filterLowCutHz;
+    base(md::pitch_semitones)  = (float) modParams.pitchSemitones;
+    base(md::pitch_octave)     = (float) modParams.pitchOctave;
+    // The four generic insert slots, normalised 0..1; each algorithm de-normalises in its own process() through the config table.
+    base(md::insert_p1) = modParams.insertParam[0];
+    base(md::insert_p2) = modParams.insertParam[1];
+    base(md::insert_p3) = modParams.insertParam[2];
+    base(md::insert_p4) = modParams.insertParam[3];
+    base(md::pitch_envDepth)   = modParams.pitchEnvDepth;
+    base(md::amp_level)        = modParams.ampLevel;
+    base(md::accentDb)         = modParams.accentDb;
 
-    mv(md::amp_attack)       = propFromAdsr(modParams.ampEnvAtk);
-    mv(md::amp_decay)        = propFromAdsr(modParams.ampEnvDec);
-    mv(md::amp_sustain)      = kSustain.prop(modParams.ampEnvSus);
-    // amp.release is not a modulation target (no note-off on a step
-    // trigger, so the release stage is never entered; see Finding 2).
-    mv(md::filter_cutoff)    = propFromCutoff(modParams.filterCutoff);  // proportion-space, log-skewed
-    mv(md::filter_resonance) = kResonance.prop(modParams.filterRes);
-    mv(md::fenv_attack)      = propFromAdsr(modParams.filterEnvAtk);
-    mv(md::fenv_decay)       = propFromAdsr(modParams.filterEnvDec);
-    mv(md::fenv_depth)       = kFenvDepth.prop(modParams.filterEnvDepth);
-    mv(md::filter_lowCut)    = propFromLowCut(modParams.filterLowCutHz);
-    // pitch.octave and pitch.semitones are OFFSETS from the knob (seeded 0, in proportion
-    // of the knob's range); summed in semitones at write-back → pitchMod.
-    mv(md::pitch_semitones)  = 0.0f;
-    mv(md::pitch_octave)     = 0.0f;
-    // Stage 36: insert mod targets the 4 generic slots directly.
-    // Each algorithm's process() converts slot ↔ actual via the
-    // per-algo config table; modulation only sees normalised 0..1
-    // so the same destination name (`insert.p1`) means "knob 1
-    // of the active algorithm" regardless of which algo is loaded.
-    mv(md::insert_p1) = modParams.insertParam[0];
-    mv(md::insert_p2) = modParams.insertParam[1];
-    mv(md::insert_p3) = modParams.insertParam[2];
-    mv(md::insert_p4) = modParams.insertParam[3];
-    // new destinations
-    mv(md::pitch_envDepth)   = kPitchEnvDepth.prop(modParams.pitchEnvDepth);
-    mv(md::amp_level)        = kAmpLevel.prop(modParams.ampLevel);
-    mv(md::accentDb)         = kAccent.prop(modParams.accentDb);
-    // Stage A: seed euclid pattern destinations with base gen values.
-    // hits/rotate/insSt use PROPORTION-SPACE modulation because their
-    // slider ranges depend on the current step count — proportion-space gives
-    // 100%-mod = 100%-knob-turn regardless of step count. prePad/postPad/insLen are
-    // likewise proportions of their knobs' current ranges (HitGenerator::padKnobMaxima).
-    const int stepsA_seed = juce::jmax(1, rhythm.genA.steps);
-    const int stepsB_seed = juce::jmax(1, rhythm.genB.steps);
-    const int stepsC_seed = juce::jmax(1, rhythm.genC.steps);
-    const auto padMaxA = rhythm.genA.padKnobMaxima();
-    const auto padMaxB = rhythm.genB.padKnobMaxima();
-    const auto padMaxC = rhythm.genC.padKnobMaxima();
-    auto propOf = [](int v, int max) { return max > 0 ? (float) v / (float) max : 0.0f; };
-    mv(md::euclid_a_hits)    = (float) rhythm.genA.hits         / (float) stepsA_seed;
-    mv(md::euclid_a_rotate)  = (float) rhythm.genA.rotate       / (float) juce::jmax(1, stepsA_seed - 1);
-    mv(md::euclid_a_prePad)  = propOf(rhythm.genA.prePad,       padMaxA.prePad);
-    mv(md::euclid_a_postPad) = propOf(rhythm.genA.postPad,      padMaxA.postPad);
-    const auto insRangeA = insertStartKnobRange(rhythm.genA);
-    const auto insRangeB = insertStartKnobRange(rhythm.genB);
-    const auto insRangeC = insertStartKnobRange(rhythm.genC);
-    mv(md::euclid_a_insSt)   = propOf(juce::jlimit(insRangeA.first, insRangeA.second, rhythm.genA.insertStart) - insRangeA.first, insRangeA.second - insRangeA.first);
-    mv(md::euclid_a_insLen)  = propOf(rhythm.genA.insertLength, padMaxA.insertLength);
-    mv(md::euclid_b_hits)    = (float) rhythm.genB.hits         / (float) stepsB_seed;
-    mv(md::euclid_b_rotate)  = (float) rhythm.genB.rotate       / (float) juce::jmax(1, stepsB_seed - 1);
-    mv(md::euclid_b_prePad)  = propOf(rhythm.genB.prePad,       padMaxB.prePad);
-    mv(md::euclid_b_postPad) = propOf(rhythm.genB.postPad,      padMaxB.postPad);
-    mv(md::euclid_b_insSt)   = propOf(juce::jlimit(insRangeB.first, insRangeB.second, rhythm.genB.insertStart) - insRangeB.first, insRangeB.second - insRangeB.first);
-    mv(md::euclid_b_insLen)  = propOf(rhythm.genB.insertLength, padMaxB.insertLength);
-    mv(md::euclid_c_hits)    = (float) rhythm.genC.hits         / (float) stepsC_seed;
-    mv(md::euclid_c_rotate)  = (float) rhythm.genC.rotate       / (float) juce::jmax(1, stepsC_seed - 1);
-    mv(md::euclid_c_prePad)  = propOf(rhythm.genC.prePad,       padMaxC.prePad);
-    mv(md::euclid_c_postPad) = propOf(rhythm.genC.postPad,      padMaxC.postPad);
-    mv(md::euclid_c_insSt)   = propOf(juce::jlimit(insRangeC.first, insRangeC.second, rhythm.genC.insertStart) - insRangeC.first, insRangeC.second - insRangeC.first);
-    mv(md::euclid_c_insLen)  = propOf(rhythm.genC.insertLength, padMaxC.insertLength);
+    // Euclid: hits / rotate / pads / insert start and length are proportions of their knobs' CURRENT ranges (the step count and the
+    // pad maxima), so 100% modulation is a full knob turn whatever the layout.
+    struct Gen { const HitGenerator& g; int hits, rot, pre, post, insSt, insLen; };
+    const Gen gens[3] = {
+        { rhythm.genA, md::euclid_a_hits, md::euclid_a_rotate, md::euclid_a_prePad, md::euclid_a_postPad, md::euclid_a_insSt, md::euclid_a_insLen },
+        { rhythm.genB, md::euclid_b_hits, md::euclid_b_rotate, md::euclid_b_prePad, md::euclid_b_postPad, md::euclid_b_insSt, md::euclid_b_insLen },
+        { rhythm.genC, md::euclid_c_hits, md::euclid_c_rotate, md::euclid_c_prePad, md::euclid_c_postPad, md::euclid_c_insSt, md::euclid_c_insLen } };
+    for (const auto& e : gens)
+    {
+        const int steps = juce::jmax(1, e.g.steps);
+        const auto padMax = e.g.padKnobMaxima();
+        const auto insRange = insertStartKnobRange(e.g);
+        setDynamicRange(range(e.hits),   0.0f, (float) steps);
+        setDynamicRange(range(e.rot),    0.0f, (float) (steps - 1));
+        setDynamicRange(range(e.pre),    0.0f, (float) padMax.prePad);
+        setDynamicRange(range(e.post),   0.0f, (float) padMax.postPad);
+        setDynamicRange(range(e.insSt),  (float) insRange.first, (float) insRange.second);
+        setDynamicRange(range(e.insLen), 0.0f, (float) padMax.insertLength);
+        base(e.hits)   = (float) e.g.hits;
+        base(e.rot)    = (float) e.g.rotate;
+        base(e.pre)    = (float) e.g.prePad;
+        base(e.post)   = (float) e.g.postPad;
+        base(e.insSt)  = (float) juce::jlimit(insRange.first, insRange.second, e.g.insertStart);
+        base(e.insLen) = (float) e.g.insertLength;
+    }
 
-    // Mixer strip: pan + FX sends, seeded from the mixer channel as proportions of
-    // their knobs (pan -1..+1 → 0..1; sends are 0..1 already).
-    mv(md::amp_pan)     = (strip.pan.load(std::memory_order_relaxed) + 1.0f) * 0.5f;
-    mv(md::send_effect) = strip.sendEffect.load(std::memory_order_relaxed);
-    mv(md::send_delay)  = strip.sendDelay.load(std::memory_order_relaxed);
-    mv(md::send_reverb) = strip.sendReverb.load(std::memory_order_relaxed);
+    // Mixer strip: pan and the FX sends.
+    base(md::amp_pan)     = strip.pan.load(std::memory_order_relaxed);
+    base(md::send_effect) = strip.sendEffect.load(std::memory_order_relaxed);
+    base(md::send_delay)  = strip.sendDelay.load(std::memory_order_relaxed);
+    base(md::send_reverb) = strip.sendReverb.load(std::memory_order_relaxed);
 }
 
 // Phase 3 — hand the modulated pan / sends to the mixer channel for this block.
 SampleRhythm::StripMod SampleRhythm::applyStripModulation(MixerEngine::ChannelState& strip)
 {
-    // Hand the modulated strip values to the mixer for this block.
-    const float modPan = juce::jlimit(-1.0f, 1.0f, mv(md::amp_pan) * 2.0f - 1.0f);
-    const float modEff = juce::jlimit(0.0f, 1.0f, mv(md::send_effect));
-    const float modDly = juce::jlimit(0.0f, 1.0f, mv(md::send_delay));
-    const float modRev = juce::jlimit(0.0f, 1.0f, mv(md::send_reverb));
+    const float modPan = juce::jlimit(-1.0f, 1.0f, out(md::amp_pan));
+    const float modEff = juce::jlimit(0.0f, 1.0f, out(md::send_effect));
+    const float modDly = juce::jlimit(0.0f, 1.0f, out(md::send_delay));
+    const float modRev = juce::jlimit(0.0f, 1.0f, out(md::send_reverb));
     strip.panMod       .store(modPan, std::memory_order_relaxed);
     strip.sendEffectMod.store(modEff, std::memory_order_relaxed);
     strip.sendDelayMod .store(modDly, std::memory_order_relaxed);
@@ -271,178 +263,97 @@ SampleRhythm::StripMod SampleRhythm::applyStripModulation(MixerEngine::ChannelSt
 // Phase 4 — publish each destination's modulated ACTUAL value for the knobs' live arcs.
 void SampleRhythm::publishModSnapshot(const VoiceParams& modParams, const StripMod& stripMod)
 {
-    const Rhythm& rhythm = *this;
-    using namespace mu_clid::mod_skew;
-    const auto padMaxA = rhythm.genA.padKnobMaxima();
-    const auto padMaxB = rhythm.genB.padKnobMaxima();
-    const auto padMaxC = rhythm.genC.padKnobMaxima();
-    const float modPan = stripMod.pan, modEff = stripMod.effect, modDly = stripMod.delay, modRev = stripMod.reverb;
-    // Snapshot pre-normalised values for the UI live-arc indicator.
-    {
-        auto& snap = modSnapshot;
-        // Proportion-space destinations — modParamValues holds slider proportion 0..1.
-        // Snap stores the ACTUAL value (seconds / Hz / dB) so the UI's setModulatedActual
-        // routes via valueToProportionOfLength and matches the needle's visual position
-        // by construction. Same pattern as filter.cutoff and insert.pN (Stage 36).
-        // adsrFromProp / lowCutFromProp / cutoffFromProp come from ModulationSkew.h
-        // (brought in via the using-declarations above).
-        snap[kSnapAmpAtk]      .store(adsrFromProp(mv(md::amp_attack)));
-        snap[kSnapAmpDec]      .store(adsrFromProp(mv(md::amp_decay)));
-        snap[kSnapAmpSus]      .store(juce::jlimit(0.0f, 1.0f, mv(md::amp_sustain)));
-        // Filter Cutoff: proportion-space modulation — snap stores ACTUAL Hz
-        // converted from the proportion, so the UI's setModulatedActual goes
-        // through the slider's setSkewFactorFromMidPoint(640) via valueToProportionOfLength
-        // and the arc matches the visual knob by construction.
-        snap[kSnapFilterCutoff].store(cutoffFromProp(mv(md::filter_cutoff)));
-        snap[kSnapFilterRes]   .store(juce::jlimit(0.0f, 1.0f, mv(md::filter_resonance)));
-        // Filter ADSR times: proportion-space modulation — convert back to actual seconds.
-        snap[kSnapFenvAtk]     .store(adsrFromProp(mv(md::fenv_attack)));
-        snap[kSnapFenvDec]     .store(adsrFromProp(mv(md::fenv_decay)));
-        // fenv.depth, pitch.envDepth, accentDb: voiceParams units (semis or dB) differ from the
-        // slider's 0..100 display. Store the DISPLAY value (slider units) so setModulatedActual
-        // routes through the slider's valueToProportionOfLength correctly.
-        snap[kSnapFenvDepth]   .store(kFenvDepth.value(mv(md::fenv_depth)));     // semitones 0..48
-        // pitch.semitones: snap stores BASE + OFFSET (in semitones) so the arc tracks the modulated
-        // knob position regardless of where the base sits. Pre-fix stored only the offset, so a
-        // negative mod read as ABOVE the needle when base was negative (proportion-space follow-up).
-        snap[kSnapPitchSemi]   .store(modParams.pitchSemitones + mv(md::pitch_semitones) * kPitchSemi.width());
-        // Insert mod snapshots store ACTUAL slider values (per
-        // the active algo's slot range / skew) so the UI can run
-        // them through `slider.valueToProportionOfLength` via
-        // setModulatedActual. Same reasoning as filter cutoff:
-        // the slider's log-skew (setSkewFactorFromMidPoint(sqrt(min·max)))
-        // is NOT the same curve as the storage-space norm-to-actual
-        // (lo · (max/lo)^norm), so a raw normalised snapshot would
-        // disagree with the visual needle position. Converting to
-        // actual + delegating proportion lookup to the slider
-        // guarantees agreement regardless of slot skew (Linear,
-        // Log, or IntStep) and regardless of which algorithm is
-        // active.
-        const int algForSnap = (int) modParams.insertAlgo;
-        snap[kSnapInsP1].store(mu_ui::normToActual(mv(md::insert_p1), algForSnap, 0));
-        snap[kSnapInsP2].store(mu_ui::normToActual(mv(md::insert_p2), algForSnap, 1));
-        snap[kSnapInsP3].store(mu_ui::normToActual(mv(md::insert_p3), algForSnap, 2));
-        snap[kSnapInsP4].store(mu_ui::normToActual(mv(md::insert_p4), algForSnap, 3));
-        // new destinations — sliders now match voiceParams units (Step 0),
-        // so snapshots store the raw value and setModulatedActual routes through the
-        // slider's valueToProportionOfLength directly.
-        snap[kSnapPitchEnvDep] .store(kPitchEnvDepth.value(mv(md::pitch_envDepth)));  // semitones 0..24
-        snap[kSnapAmpLvl]      .store(kAmpLevel.value(mv(md::amp_level)));            // dB -60..+6
-        snap[kSnapAccent]      .store(kAccent.value(mv(md::accentDb)));               // dB 0..12
-        // filter.lowCut: proportion-space modulation → actual Hz for setModulatedActual.
-        snap[kSnapFilterLowCut].store(lowCutFromProp(mv(md::filter_lowCut)));
-        // T5 follow-up — pitch.octave: modParamValues holds the modulation offset in SEMITONES (write-back
-        // sums it with pitch.semitones into pitchMod). To show the arc on the pitchOctave knob (range -4..+4
-        // octaves, linear), store base octave value + offset/12. UI uses setModulatedActual.
-        snap[kSnapPitchOctave] .store(modParams.pitchOctave + mv(md::pitch_octave) * kPitchOctave.width());
-        // Mixer strip: the actual pan (-1..+1) and send (0..1) values.
-        snap[kSnapPan]         .store(modPan);
-        snap[kSnapSendEff]     .store(modEff);
-        snap[kSnapSendDly]     .store(modDly);
-        snap[kSnapSendRev]     .store(modRev);
-        // Euclid pattern destinations:
-        //   hits/rotate/insSt: proportion-space mod (modParamValues already holds 0..1
-        //     slider proportion). snap stores the proportion directly — UI uses
-        //     setModulatedNorm.
-        //   prePad/postPad/insLen: proportions of the knob's current range; snap
-        //     stores the actual step value — UI uses setModulatedActual and maps it
-        //     onto that range.
-        auto prop = [](float v) { return juce::jlimit(0.0f, 1.0f, v); };
-        auto act  = [](float v, int max) { return juce::jlimit(0.0f, 1.0f, v) * (float) max; };
-        snap[kSnapEucAHits]    .store(prop(mv(md::euclid_a_hits)));
-        snap[kSnapEucARotate]  .store(prop(mv(md::euclid_a_rotate)));
-        snap[kSnapEucAPrePad]  .store(act(mv(md::euclid_a_prePad),  padMaxA.prePad));
-        snap[kSnapEucAPostPad] .store(act(mv(md::euclid_a_postPad), padMaxA.postPad));
-        snap[kSnapEucAInsSt]   .store(prop(mv(md::euclid_a_insSt)));
-        snap[kSnapEucAInsLen]  .store(act(mv(md::euclid_a_insLen),  padMaxA.insertLength));
-        snap[kSnapEucBHits]    .store(prop(mv(md::euclid_b_hits)));
-        snap[kSnapEucBRotate]  .store(prop(mv(md::euclid_b_rotate)));
-        snap[kSnapEucBPrePad]  .store(act(mv(md::euclid_b_prePad),  padMaxB.prePad));
-        snap[kSnapEucBPostPad] .store(act(mv(md::euclid_b_postPad), padMaxB.postPad));
-        snap[kSnapEucBInsSt]   .store(prop(mv(md::euclid_b_insSt)));
-        snap[kSnapEucBInsLen]  .store(act(mv(md::euclid_b_insLen),  padMaxB.insertLength));
-        snap[kSnapEucCHits]    .store(prop(mv(md::euclid_c_hits)));
-        snap[kSnapEucCRotate]  .store(prop(mv(md::euclid_c_rotate)));
-        snap[kSnapEucCPrePad]  .store(act(mv(md::euclid_c_prePad),  padMaxC.prePad));
-        snap[kSnapEucCPostPad] .store(act(mv(md::euclid_c_postPad), padMaxC.postPad));
-        snap[kSnapEucCInsSt]   .store(prop(mv(md::euclid_c_insSt)));
-        snap[kSnapEucCInsLen]  .store(act(mv(md::euclid_c_insLen),  padMaxC.insertLength));
-    }
+    auto& snap = modSnapshot;
+    // The knob's proportion of a modulated value, for the arcs that are drawn in proportion.
+    auto prop = [this](int d) { return juce::jlimit(0.0f, 1.0f, range(d).convertTo0to1(out(d))); };
+
+    snap[kSnapAmpAtk]      .store(out(md::amp_attack));
+    snap[kSnapAmpDec]      .store(out(md::amp_decay));
+    snap[kSnapAmpSus]      .store(prop(md::amp_sustain));
+    snap[kSnapFilterCutoff].store(out(md::filter_cutoff));
+    snap[kSnapFilterRes]   .store(prop(md::filter_resonance));
+    snap[kSnapFenvAtk]     .store(out(md::fenv_attack));
+    snap[kSnapFenvDec]     .store(out(md::fenv_decay));
+    snap[kSnapFenvDepth]   .store(out(md::fenv_depth));        // semitones 0..48
+    snap[kSnapPitchSemi]   .store(out(md::pitch_semitones));   // the modulated knob position (base plus modulation)
+    // Insert slots store the ACTUAL slider value of the active algorithm, so setModulatedActual maps it through the slider's own curve.
+    const int algForSnap = (int) modParams.insertAlgo;
+    snap[kSnapInsP1].store(mu_ui::normToActual(out(md::insert_p1), algForSnap, 0));
+    snap[kSnapInsP2].store(mu_ui::normToActual(out(md::insert_p2), algForSnap, 1));
+    snap[kSnapInsP3].store(mu_ui::normToActual(out(md::insert_p3), algForSnap, 2));
+    snap[kSnapInsP4].store(mu_ui::normToActual(out(md::insert_p4), algForSnap, 3));
+    snap[kSnapPitchEnvDep] .store(out(md::pitch_envDepth));    // semitones 0..24
+    snap[kSnapAmpLvl]      .store(out(md::amp_level));         // dB -60..+6
+    snap[kSnapAccent]      .store(out(md::accentDb));          // dB 0..12
+    snap[kSnapFilterLowCut].store(out(md::filter_lowCut));
+    snap[kSnapPitchOctave] .store(out(md::pitch_octave));
+    snap[kSnapPan]         .store(stripMod.pan);
+    snap[kSnapSendEff]     .store(stripMod.effect);
+    snap[kSnapSendDly]     .store(stripMod.delay);
+    snap[kSnapSendRev]     .store(stripMod.reverb);
+    // Euclid: hits / rotate / insert start as the knob's proportion (setModulatedNorm); pads and insert length as the step value.
+    snap[kSnapEucAHits]    .store(prop(md::euclid_a_hits));
+    snap[kSnapEucARotate]  .store(prop(md::euclid_a_rotate));
+    snap[kSnapEucAPrePad]  .store(out(md::euclid_a_prePad));
+    snap[kSnapEucAPostPad] .store(out(md::euclid_a_postPad));
+    snap[kSnapEucAInsSt]   .store(prop(md::euclid_a_insSt));
+    snap[kSnapEucAInsLen]  .store(out(md::euclid_a_insLen));
+    snap[kSnapEucBHits]    .store(prop(md::euclid_b_hits));
+    snap[kSnapEucBRotate]  .store(prop(md::euclid_b_rotate));
+    snap[kSnapEucBPrePad]  .store(out(md::euclid_b_prePad));
+    snap[kSnapEucBPostPad] .store(out(md::euclid_b_postPad));
+    snap[kSnapEucBInsSt]   .store(prop(md::euclid_b_insSt));
+    snap[kSnapEucBInsLen]  .store(out(md::euclid_b_insLen));
+    snap[kSnapEucCHits]    .store(prop(md::euclid_c_hits));
+    snap[kSnapEucCRotate]  .store(prop(md::euclid_c_rotate));
+    snap[kSnapEucCPrePad]  .store(out(md::euclid_c_prePad));
+    snap[kSnapEucCPostPad] .store(out(md::euclid_c_postPad));
+    snap[kSnapEucCInsSt]   .store(prop(md::euclid_c_insSt));
+    snap[kSnapEucCInsLen]  .store(out(md::euclid_c_insLen));
 }
 
-// Phase 5 — write the modulated values back: the voice params for this block, and the euclid
-// overrides (whole steps) that drive the pattern recompute.
+// Phase 5 — write the modulated values back: the voice params for this block, and the Euclid overrides (whole steps) that drive
+// the pattern recompute.
 void SampleRhythm::writeBackModulation(VoiceParams& modParams)
 {
-    const Rhythm& rhythm = *this;
-    using namespace mu_clid::mod_skew;
-    const auto padMaxA = rhythm.genA.padKnobMaxima();
-    const auto padMaxB = rhythm.genB.padKnobMaxima();
-    const auto padMaxC = rhythm.genC.padKnobMaxima();
-    // Write modulated values back, clamping to safe ranges. Proportion-space
-    // destinations convert prop → actual via the shared inverse-skew
-    // helpers in ModulationSkew.h (adsrFromProp / lowCutFromProp / cutoffFromProp).
-    modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromProp(mv(md::amp_attack)));
-    modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromProp(mv(md::amp_decay)));
-    modParams.ampEnvSus      = kSustain.value(mv(md::amp_sustain));
-    modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, cutoffFromProp(mv(md::filter_cutoff)));
-    modParams.filterRes      = kResonance.value(mv(md::filter_resonance));
-    modParams.filterEnvAtk   = juce::jmax(0.001f, adsrFromProp(mv(md::fenv_attack)));
-    modParams.filterEnvDec   = juce::jmax(0.001f, adsrFromProp(mv(md::fenv_decay)));
-    modParams.filterEnvDepth = kFenvDepth.value(mv(md::fenv_depth));
-    modParams.filterLowCutHz = lowCutFromProp(mv(md::filter_lowCut));
-    // single pitch destination, no more octave×12 + fine/100 stacking.
-    // Offsets in proportion of each knob's range → semitones (octave knob ±3 oct = 72 st).
+    modParams.ampEnvAtk      = juce::jmax(0.001f, out(md::amp_attack));
+    modParams.ampEnvDec      = juce::jmax(0.001f, out(md::amp_decay));
+    modParams.ampEnvSus      = out(md::amp_sustain);
+    modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, out(md::filter_cutoff));
+    modParams.filterRes      = out(md::filter_resonance);
+    modParams.filterEnvAtk   = juce::jmax(0.001f, out(md::fenv_attack));
+    modParams.filterEnvDec   = juce::jmax(0.001f, out(md::fenv_decay));
+    modParams.filterEnvDepth = out(md::fenv_depth);
+    modParams.filterLowCutHz = out(md::filter_lowCut);
+    // One pitch offset in semitones: how far the octave and semitone knobs were moved from their own values (12 semitones an octave).
     modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
-                                             mv(md::pitch_octave) * kPitchOctave.width() * 12.0f
-                                           + mv(md::pitch_semitones) * kPitchSemi.width());
-    // Stage 36: insert mod write-back to the 4 generic slots.
-    // Values stay normalised 0..1; per-algo de-normalisation
-    // happens inside each InsertAlgorithm::process via the config
-    // table. No algorithm-specific branching needed.
-    modParams.insertParam[0] = juce::jlimit(0.0f, 1.0f, mv(md::insert_p1));
-    modParams.insertParam[1] = juce::jlimit(0.0f, 1.0f, mv(md::insert_p2));
-    modParams.insertParam[2] = juce::jlimit(0.0f, 1.0f, mv(md::insert_p3));
-    modParams.insertParam[3] = juce::jlimit(0.0f, 1.0f, mv(md::insert_p4));
-    // new destinations write-back
-    modParams.pitchEnvDepth  = kPitchEnvDepth.value(mv(md::pitch_envDepth));
-    modParams.ampLevel       = kAmpLevel.value(mv(md::amp_level));
-    modParams.accentDb       = kAccent.value(mv(md::accentDb));
+                                            (out(md::pitch_octave)    - modParams.pitchOctave) * 12.0f
+                                          + (out(md::pitch_semitones) - modParams.pitchSemitones));
+    modParams.insertParam[0] = juce::jlimit(0.0f, 1.0f, out(md::insert_p1));
+    modParams.insertParam[1] = juce::jlimit(0.0f, 1.0f, out(md::insert_p2));
+    modParams.insertParam[2] = juce::jlimit(0.0f, 1.0f, out(md::insert_p3));
+    modParams.insertParam[3] = juce::jlimit(0.0f, 1.0f, out(md::insert_p4));
+    modParams.pitchEnvDepth  = out(md::pitch_envDepth);
+    modParams.ampLevel       = out(md::amp_level);
+    modParams.accentDb       = out(md::accentDb);
 
-    // Stage A: write modulated euclid values back to the per-rhythm
-    // overrides snapshot. hits/rotate/insSt are proportions of the current step
-    // count; prePad/postPad/insLen are proportions of their knobs' current ranges.
-    // Both convert back to whole steps.
-    auto modPropToSteps = [&](int slot, int steps) {
-        return juce::roundToInt(juce::jlimit(0.0f, 1.0f, mv(slot)) * (float) steps);
+    // Euclid values to whole steps, each held inside what the pattern allows.
+    const Rhythm& rhythm = *this;
+    auto toOverrides = [this](EuclidGenOverrides& o, const HitGenerator& g, int hits, int rot, int pre, int post, int insSt, int insLen)
+    {
+        const int steps = juce::jmax(1, g.steps);
+        const auto& insR = range(insSt);
+        o.hits         = juce::jlimit(0, steps,     juce::roundToInt(out(hits)));
+        o.rotate       = juce::jlimit(0, steps - 1, juce::roundToInt(out(rot)));
+        o.prePad       = juce::roundToInt(out(pre));
+        o.postPad      = juce::roundToInt(out(post));
+        o.insertStart  = juce::jlimit(juce::roundToInt(insR.start), juce::roundToInt(insR.start) + juce::jmax(0, (int) std::lround(insR.end - insR.start)),
+                                      juce::roundToInt(out(insSt)));
+        o.insertLength = juce::roundToInt(out(insLen));
     };
-    const int stepsA_wb = juce::jmax(1, rhythm.genA.steps);
-    const int stepsB_wb = juce::jmax(1, rhythm.genB.steps);
-    const int stepsC_wb = juce::jmax(1, rhythm.genC.steps);
-    lastEuclidOverrides.a.hits         = juce::jlimit(0, stepsA_wb,        modPropToSteps(md::euclid_a_hits,  stepsA_wb));
-    lastEuclidOverrides.a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps(md::euclid_a_rotate, stepsA_wb - 1));
-    lastEuclidOverrides.a.prePad       = modPropToSteps(md::euclid_a_prePad, padMaxA.prePad);
-    lastEuclidOverrides.a.postPad      = modPropToSteps(md::euclid_a_postPad, padMaxA.postPad);
-    const auto insRangeA = insertStartKnobRange(rhythm.genA);
-    const auto insRangeB = insertStartKnobRange(rhythm.genB);
-    const auto insRangeC = insertStartKnobRange(rhythm.genC);
-    lastEuclidOverrides.a.insertStart  = juce::jlimit(insRangeA.first, insRangeA.second,
-                                                insRangeA.first + modPropToSteps(md::euclid_a_insSt, insRangeA.second - insRangeA.first));
-    lastEuclidOverrides.a.insertLength = modPropToSteps(md::euclid_a_insLen, padMaxA.insertLength);
-    lastEuclidOverrides.b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps(md::euclid_b_hits,  stepsB_wb));
-    lastEuclidOverrides.b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps(md::euclid_b_rotate, stepsB_wb - 1));
-    lastEuclidOverrides.b.prePad       = modPropToSteps(md::euclid_b_prePad, padMaxB.prePad);
-    lastEuclidOverrides.b.postPad      = modPropToSteps(md::euclid_b_postPad, padMaxB.postPad);
-    lastEuclidOverrides.b.insertStart  = juce::jlimit(insRangeB.first, insRangeB.second,
-                                                insRangeB.first + modPropToSteps(md::euclid_b_insSt, insRangeB.second - insRangeB.first));
-    lastEuclidOverrides.b.insertLength = modPropToSteps(md::euclid_b_insLen, padMaxB.insertLength);
-    lastEuclidOverrides.c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps(md::euclid_c_hits,  stepsC_wb));
-    lastEuclidOverrides.c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps(md::euclid_c_rotate, stepsC_wb - 1));
-    lastEuclidOverrides.c.prePad       = modPropToSteps(md::euclid_c_prePad, padMaxC.prePad);
-    lastEuclidOverrides.c.postPad      = modPropToSteps(md::euclid_c_postPad, padMaxC.postPad);
-    lastEuclidOverrides.c.insertStart  = juce::jlimit(insRangeC.first, insRangeC.second,
-                                                insRangeC.first + modPropToSteps(md::euclid_c_insSt, insRangeC.second - insRangeC.first));
-    lastEuclidOverrides.c.insertLength = modPropToSteps(md::euclid_c_insLen, padMaxC.insertLength);
+    toOverrides(lastEuclidOverrides.a, rhythm.genA, md::euclid_a_hits, md::euclid_a_rotate, md::euclid_a_prePad, md::euclid_a_postPad, md::euclid_a_insSt, md::euclid_a_insLen);
+    toOverrides(lastEuclidOverrides.b, rhythm.genB, md::euclid_b_hits, md::euclid_b_rotate, md::euclid_b_prePad, md::euclid_b_postPad, md::euclid_b_insSt, md::euclid_b_insLen);
+    toOverrides(lastEuclidOverrides.c, rhythm.genC, md::euclid_c_hits, md::euclid_c_rotate, md::euclid_c_prePad, md::euclid_c_postPad, md::euclid_c_insSt, md::euclid_c_insLen);
 }
 
 void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& strip, int lastEffectiveStep,
@@ -480,13 +391,13 @@ void SampleRhythm::applyModulation(double beatPos, MixerEngine::ChannelState& st
     bool modulationRan = false;
     if (runModulationPass)
     {
-        if (mu_core::trySpinLock(rhythm.modLock))
+        fillLaneBase(modParams, strip);                                                // phase 1
+        // Phase 2: seed, run the matrix under its try-lock, back to units. A missed lock leaves the block on last block's values.
+        if (mu_mod::resolveLaneSeeded(this, beatPos, laneCount, laneIds.data(), laneRange.data(), modParamValues, laneOut.data(),
+                                      nullptr, [this](int k) { return laneBase[(size_t) k]; }))
         {
             modulationRan = true;
-            seedModulation(modParams, strip);                                          // phase 1
-            rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);   // phase 2
             const StripMod stripMod = applyStripModulation(strip);                     // phase 3
-            mu_core::spinUnlock(rhythm.modLock);
             publishModSnapshot(modParams, stripMod);                                   // phase 4
             writeBackModulation(modParams);                                            // phase 5
         }

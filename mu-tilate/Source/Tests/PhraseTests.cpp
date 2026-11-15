@@ -285,6 +285,24 @@ struct PhraseTests : public juce::UnitTest
             expectGreaterThan(opened, 1.5 * closed);                      // three octaves up lets much more of the noise through
             expectLessThan(closed, 0.7 * off);                            // the layer's low-pass takes level off the noise
             expectWithinAbsoluteError(off, offMoved, 1.0e-6);             // with the layer's filter off the offsets do nothing
+
+            // Absolute: the hit's own cutoff in Hz replaces the layer's, wherever the layer's is and whatever offset is kept beside it.
+            auto levelAbsolute = [lp12](float layerHz, float absHz)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                juce::Random rng(5);
+                for (int i = 0; i < 24000; ++i) r.audio.setSample(0, i, 0.5f * (rng.nextFloat() * 2.0f - 1.0f));
+                r.timeline.place(0, 0.0, 0.0);
+                SliceSettings own; own.cutoffOct = -3.0f;                 // kept for switching back: must not act
+                own.ov[(int) OverrideField::CutoffOct] = { true, absHz };
+                r.timeline.setSettings(0, own);
+                r.settings.filterType = lp12; r.settings.cutoffHz = layerHz; r.settings.resonance = 0.0f;
+                return rms(r.run(24000, 256), 4000, 16000);
+            };
+            expectWithinAbsoluteError(levelAbsolute(500.0f, 4000.0f), levelAbsolute(9000.0f, 4000.0f), 0.01);   // the layer's cutoff no longer matters
+            expectGreaterThan(levelAbsolute(500.0f, 4000.0f), 1.5 * closed);                                       // 4 kHz lets more through than the layer's 500 Hz
+            expectLessThan(levelAbsolute(500.0f, 300.0f), 0.8 * levelAbsolute(500.0f, 4000.0f));                   // and 300 Hz less
         }
 
         beginTest("a pre-fade of a slice that plays backwards swells in the end of the slice");
@@ -571,6 +589,22 @@ struct PhraseTests : public juce::UnitTest
             };
             expectGreaterThan(early(50.0f, -50.0f), 3.0 * early(50.0f, 0.0f));   // the offset cancels the layer's attack
             expectGreaterThan(early(50.0f, 0.0f), 1.6 * early(50.0f, 50.0f));    // and a longer one slows it further (twice the attack, half the level)
+
+            // Absolute: the hit's value replaces the layer's attack whatever it is, and the offset kept beside it is ignored.
+            auto earlyAbs = [](float layerAttack, float absAttack)
+            {
+                Rig r;
+                r.hitsStartWithSliceSettings = false;
+                r.timeline.place(1, 0.0, 0.0);
+                SliceSettings own; own.ampA = 400.0f;                     // the offset it keeps for switching back: must not act
+                own.ov[(int) OverrideField::AmpA] = { true, absAttack };
+                r.timeline.setSettings(0, own);
+                r.settings.ampA = layerAttack;
+                return rms(r.run(4800, 256), 0, 480);
+            };
+            expectWithinAbsoluteError(earlyAbs(50.0f, 0.0f), early(50.0f, -50.0f), 0.01);   // Absolute 0 is the same as cancelling the layer's 50
+            expectWithinAbsoluteError(earlyAbs(500.0f, 0.0f), earlyAbs(0.0f, 0.0f), 0.01);   // the layer's own attack no longer matters
+            expectGreaterThan(earlyAbs(0.0f, 0.0f), 1.6 * earlyAbs(0.0f, 50.0f));            // and an Absolute 50 ms is slower
         }
 
         beginTest("the newest hit's insert offsets are reported while it sounds");
@@ -581,11 +615,31 @@ struct PhraseTests : public juce::UnitTest
             SliceSettings own; own.insOff[1] = 0.25f; own.insOff[3] = -0.5f;
             r.timeline.setSettings(0, own);
             float off[4] = { 9, 9, 9, 9 };
-            expect(! r.playback.insertOffsets(off));                      // nothing sounding yet
+            unsigned absMask = 0;
+            expect(! r.playback.insertOffsets(off, absMask));                      // nothing sounding yet
             expectEquals(off[1], 0.0f);
             r.run(2400, 256);
-            expect(r.playback.insertOffsets(off));
+            expect(r.playback.insertOffsets(off, absMask));
             expectEquals(off[0], 0.0f); expectEquals(off[1], 0.25f); expectEquals(off[2], 0.0f); expectEquals(off[3], -0.5f);
+        }
+
+        beginTest("an insert knob a hit sets Absolute reaches the insert as its value, not an offset");
+        {
+            Rig r;
+            r.hitsStartWithSliceSettings = false;
+            r.timeline.place(0, 0.0, 0.0);
+            SliceSettings own; own.insOff[1] = 0.25f;
+            own.ov[(int) OverrideField::Ins3] = { true, 0.8f };
+            own.ov[(int) OverrideField::Send2] = { true, 0.6f };
+            r.timeline.setSettings(0, own);
+            float off[4] = { 9, 9, 9, 9 }, send[3] = { 9, 9, 9 };
+            unsigned insMask = 0, sendMask = 0;
+            r.run(2400, 256);
+            expect(r.playback.insertOffsets(off, insMask));
+            expectEquals(off[1], 0.25f); expectEquals(off[3], 0.8f);
+            expectEquals((int) insMask, 8);                                                   // only knob 3 is Absolute
+            expect(r.playback.sendOffsets(send, sendMask));
+            expectEquals(send[2], 0.6f); expectEquals((int) sendMask, 4);
         }
 
         beginTest("a Stretch phrase renders without touching the heap");

@@ -48,17 +48,12 @@ namespace
     }
 
    #if MU_TRONIC_WITH_UI
-    // mu-Tilate's Phrase content over the services' adapter, with the Phrase's modulation destinations: the one content
-    // instance the editor keeps for every Phrase slot.
+    // mu-Tilate's Phrase content over the services' adapter: the one content instance the editor keeps for every Phrase slot
+    // (its modulation destinations come from the registry: the type publishes its table).
     class PhraseSlotContent : public mu_tilate::PhraseContent
     {
     public:
         PhraseSlotContent(ProcessorBase& p, PhraseSlotServices& s) : mu_tilate::PhraseContent(p, s) {}
-
-        const ModDestProvider* getModDestProvider() const noexcept override { return &destinations; }
-
-    private:
-        ModDestProvider destinations = mu_tilate::makeModDestProvider();
     };
 
     std::unique_ptr<LayerContent> createPhraseContent(ProcessorBase& host, int slot)
@@ -85,6 +80,8 @@ mu_core::LayerTypeInfo phraseLayerType()
 {
     auto info = mu_tilate::phraseLayerTypeInfo();
     info.createServices = &createPhraseServices;
+    info.modTargets = mu_tilate::kModDestTable;   // published through the registry
+    info.numModTargets = mu_tilate::kNumModDests;
     info.appColourId = (int) MuLookAndFeel::appBlue;   // the main area is painted in mu-Tilate's blue
     info.typeTag = "\xCE\xBC" "-Tilate";   // UTF-8: the product name with the real mu
    #if MU_TRONIC_WITH_UI

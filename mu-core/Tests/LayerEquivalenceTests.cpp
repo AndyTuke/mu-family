@@ -4,6 +4,7 @@
 
 #include "LayerContractFixtures.h"
 #include "LayerEquivalence.h"
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
@@ -63,7 +64,7 @@ struct LayerEquivalenceTests : juce::UnitTest
             // Load-sensitive: the ratio is logged, never asserted (tests.md section 6.7 sets the budget later).
             auto time = [](bool layerPath, int block)
             {
-                FakeLayerHost p(mu_limits::kMaxLayers);
+                FakeLayerHost p(mu_test::kLimits.layers);
                 p.setUseLayerRenderForTest(layerPath);
                 Driver d(p);
                 for (int i = 0; i < 50; ++i) d.block(block);   // warm up
@@ -74,7 +75,7 @@ struct LayerEquivalenceTests : juce::UnitTest
             for (int block : { 64, 128, 512 })
             {
                 const double oldPath = time(false, block), layerPath = time(true, block);
-                logMessage("cpu: " + juce::String(mu_limits::kMaxLayers) + " fake layers, block " + juce::String(block)
+                logMessage("cpu: " + juce::String(mu_test::kLimits.layers) + " fake layers, block " + juce::String(block)
                            + ": old chain " + juce::String(oldPath * 1000.0, 2) + " ms, shared driver "
                            + juce::String(layerPath * 1000.0, 2) + " ms per 1000 blocks, ratio "
                            + juce::String(oldPath > 0.0 ? layerPath / oldPath : 0.0, 3) + " (information)");

@@ -117,10 +117,11 @@ target_compile_definitions(mu-clid
         JUCE_USE_MP3AUDIOFORMAT=1
 )
 
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-clid
     PRIVATE
         mu-clid-layer
-        mu-core
+        mu-core-lib
         mu-clid-resources
         juce::juce_audio_utils
         juce::juce_dsp
@@ -396,3 +397,6 @@ set_target_properties(mu-clid-layer-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # A link regression in the layer shows up in a normal build (as mu-tant does).
 add_dependencies(mu-clid mu-clid-layer-tests)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

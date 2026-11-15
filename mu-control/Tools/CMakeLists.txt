@@ -41,3 +41,6 @@ target_link_libraries(mu-control-probe PRIVATE
 target_compile_definitions(mu-control-probe PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0 JUCE_MODAL_LOOPS_PERMITTED=1)
 
 set_target_properties(mu-control-probe PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()

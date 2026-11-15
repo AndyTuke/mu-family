@@ -5,12 +5,13 @@
 #include <cmath>
 #include "Audio/MixerEngine.h"
 #include "Audio/FX/Slots/FXChain.h"
+#include "TestLimits.h"
 
 // Shared fixture for the group-bus tests (BusRoutingTests, BusSidechainTests, BusInsertTests,
 // BusStateResetTests): a real MixerEngine driven through the render hook, so no voice engine is needed.
 // Every channel plays a constant (DC) level or a tone you set; the mixer's own gains are then exact
 // products (the -6 dB headroom trim, the faders) and a test can state the expected output sample.
-// The bus tests run only in a build that has buses (mu_limits::kMaxBuses > 0): mu-core-tests-16 and
+// The bus tests run only in a build that has buses (mu_test::kLimits.buses > 0): mu-core-tests-16 and
 // mu-core-tests-bus1; the default mu-core-tests has none and skips them.
 namespace bus_test
 {
@@ -20,18 +21,19 @@ inline constexpr float  kTrim  = MixerEngine::kHeadroomTrim;   // the fixed pre-
 
 struct Rig
 {
-    MixerEngine mixer;
+    MixerEngine mixer { mu_test::kLimits };
     FXChain     fx;
     juce::AudioBuffer<float> out { 2, kBlock };
     int numActive;
 
     // Per-channel source: a constant level (dc) unless `tone` is set, in which case a sine of that amplitude.
-    std::array<float, MixerEngine::MaxChannels> dc {};
-    std::array<float, MixerEngine::MaxChannels> tone {};
+    std::array<float, mu_limits::kAbsoluteMaxLayers> dc {};
+    std::array<float, mu_limits::kAbsoluteMaxLayers> tone {};
     long long samplePos = 0;
     MixerEngine::RenderChannelFn render;
 
-    explicit Rig(int activeChannels = 4) : numActive(activeChannels)
+    explicit Rig(int activeChannels = 4, const mu_limits::ProcessorLimits& limits = mu_test::kLimits)
+        : mixer(limits), numActive(activeChannels)
     {
         mixer.prepare(kRate, kBlock);
         fx.prepare(kRate, kBlock);
@@ -52,7 +54,7 @@ struct Rig
         {
             if (direct0 != nullptr)
             {
-                std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels> d {};
+                MixerEngine::DirectOuts d {};
                 d[0] = direct0;
                 mixer.processBlock(out, numActive, nullptr, fx, kBlock, &d, nullptr, nullptr, &render);
             }
@@ -75,9 +77,9 @@ struct Rig
 // True (and logs why not) when this build has no buses, so a test can return early.
 inline bool hasBuses(juce::UnitTest& t, int atLeast = 1)
 {
-    if (mu_limits::kMaxBuses >= atLeast) return true;
-    t.logMessage("skipped: this build has fewer than " + juce::String(atLeast) + " group buses (mu_limits::kMaxBuses = "
-                 + juce::String(mu_limits::kMaxBuses) + ")");
+    if (mu_test::kLimits.buses >= atLeast) return true;
+    t.logMessage("skipped: this build has fewer than " + juce::String(atLeast) + " group buses (mu_test::kLimits.buses = "
+                 + juce::String(mu_test::kLimits.buses) + ")");
     return false;
 }
 } // namespace bus_test

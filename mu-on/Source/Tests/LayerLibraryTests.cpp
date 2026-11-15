@@ -5,6 +5,7 @@
 // streams with the ones mu-on-tests records through the real processor (Tests/TrackLayerFixture.h). A layer
 // that secretly needed the processor would fail to link here; one the processor fed differently would not match.
 
+#include "Plugin/MuOnLimits.h"
 #include "Sequencer/Track.h"
 #include "Persistence/TrackParams.h"
 #include "Tests/TrackLayerFixture.h"
@@ -36,8 +37,8 @@ namespace
         static juce::AudioProcessorValueTreeState::ParameterLayout layout()
         {
             juce::AudioProcessorValueTreeState::ParameterLayout l;
-            mu_on::addLayerParams(l, 0);
-            mu_on::addLayerParams(l, 1);
+            mu_on::addLayerParams(l, 0, mu_on::kLimits.layers);
+            mu_on::addLayerParams(l, 1, mu_on::kLimits.layers);
             return l;
         }
         juce::AudioProcessorValueTreeState apvts { *this, nullptr, "TrackLayer", layout() };
@@ -71,7 +72,7 @@ struct MuOnLayerLibraryTests : juce::UnitTest
         const double bps = (fx::kBpm / 60.0) / fx::kSampleRate;
         double ppq = 0.0;
         std::array<juce::AudioBuffer<float>, 2> out { juce::AudioBuffer<float>(2, fx::kBlock), juce::AudioBuffer<float>(2, fx::kBlock) };
-        std::array<mu_core::PeerTap, mu_limits::kMaxLayers> peers {};
+        std::array<mu_core::PeerTap, mu_on::kLimits.layers> peers {};
         fx::StreamHash hash;
         for (int b = 0; b < fx::kBlocks; ++b)
         {
@@ -95,7 +96,7 @@ struct MuOnLayerLibraryTests : juce::UnitTest
             auto c1 = ctx;
             c1.slot = 1;
             c1.peers = peers.data();
-            c1.numPeers = mu_limits::kMaxLayers;
+            c1.numPeers = mu_on::kLimits.layers;
             out[1].clear();
             tracks[1].render(c1, out[1], fx::kBlock);
 

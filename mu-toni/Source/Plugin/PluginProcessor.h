@@ -1,5 +1,8 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
+#include "Plugin/MuToniLimits.h"
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Persistence/LayerParamIds.h"   // layerParamPrefix / layerParamId
 #include "Persistence/ArpParams.h"       // the Arp type's parameter table (vpi, addLayerParams)
@@ -45,6 +48,7 @@ public:
 
     const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Toni")); }
     juce::String getProductSlug() const override { return "mu-toni"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING_PRE; }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
@@ -61,15 +65,15 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     // getNumLayers / getLayer are the base defaults over the owned layer storage (the count is
-    // `numLayers`, 1..kMaxLayers).
+    // `numLayers`, 1..kLimits.layers).
     juce::String getLayerName(int idx)       const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? "Layer " + juce::String(idx + 1) : juce::String();
+        return (idx >= 0 && idx < mu_toni::kLimits.layers) ? "Layer " + juce::String(idx + 1) : juce::String();
     }
     // The palette colour is allocated per layer and follows it through delete / reorder.
     int          getLayerColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
+        return (idx >= 0 && idx < mu_toni::kLimits.layers) ? layers[(size_t) idx]->colourIndex : 0;
     }
 
     // Add / delete / reorder / reset are ProcessorBase::addLayer / removeLayer / swapLayers /
@@ -143,7 +147,7 @@ public:
     // target knob's parameter units. Written each block by the layer; read by the knobs' live arcs.
     float getModLive(int layer, int dest) const noexcept override
     {
-        return getArp(juce::jlimit(0, mu_limits::kMaxLayers - 1, layer)).getModLive(dest);
+        return getArp(juce::jlimit(0, mu_toni::kLimits.layers - 1, layer)).getModLive(dest);
     }
     // ── ArpHost: what ArpContent reads (message thread) ───────────────────────
     juce::AudioProcessorValueTreeState& getArpParameters() noexcept override { return apvts; }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UI/ModulatorEditor.h"            // mu-core: ModDestProvider
+#include "UI/TableModDestProvider.h"       // mu-core: the table-driven destination provider
 #include "UI/Components/DropdownSelect.h"   // mu-core
 #include "Persistence/TrackParams.h"            // EngineType
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
@@ -300,9 +300,7 @@ inline bool isValidEngineDest(EngineType engine, const std::string& id) noexcept
 {
     int n = 0;
     const ModDestEntry* t = destsForEngine(engine, n);
-    for (int i = 0; i < n; ++i)
-        if (id == t[i].id) return true;
-    return false;
+    return mu_mod::isValidTarget(t, (std::size_t) n, id);
 }
 
 // Build the mu-core ModDestProvider for one engine (drives the destination dropdown +
@@ -310,24 +308,9 @@ inline bool isValidEngineDest(EngineType engine, const std::string& id) noexcept
 // hands the shown track's provider to the panel on selection.
 inline ModDestProvider makeModDestProvider(EngineType engine)
 {
-    ModDestProvider p;
-
-    p.populate = [engine](DropdownSelect& dd, int driveChar, bool /*steppedMode*/)
-    {
-        // The shared builder over this engine's table (engine tables have no sections); the active
-        // insert algorithm decides which insert slots are offered.
-        int n = 0;
-        const ModDestEntry* t = destsForEngine(engine, n);
-        mu_mod::populateDropdown(dd, t, n, { driveChar });
-    };
-
-    int count = 0;
-    destsForEngine(engine, count);
-    wireTableModDestResolve(p,
-        [engine](int i) { int n = 0; return std::string(destsForEngine(engine, n)[i].id); },
-        count);
-
-    return p;
+    int n = 0;
+    const ModDestEntry* t = destsForEngine(engine, n);
+    return mu_mod::makeTableDestProvider(t, n);
 }
 
 } // namespace mu_on

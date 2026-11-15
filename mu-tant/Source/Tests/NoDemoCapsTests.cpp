@@ -8,6 +8,7 @@
 // reachable from this console target (PluginProcessor drags in the UI tree), so the
 // numVoices clamp itself is covered by the manual smoke plan.
 
+#include "Plugin/MuTantLimits.h"
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include "MuLimits.h"
@@ -49,7 +50,7 @@ public:
         using namespace mu_tant;
 
         beginTest ("limit: eight voices is the family maximum");
-        expectEquals (mu_limits::kMaxLayers, 8);
+        expectEquals (mu_tant::kLimits.layers, 8);
 
         beginTest ("gate longer than 16 cells survives deserialise uncapped");
         {
@@ -74,8 +75,8 @@ public:
             const char* tags[] = { "Gate", "FilterGate", "PitchGate" };
 
             juce::ValueTree preset ("MuTantPreset");
-            preset.setProperty ("numVoices", mu_limits::kMaxLayers, nullptr);
-            for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+            preset.setProperty ("numVoices", mu_tant::kLimits.layers, nullptr);
+            for (int v = 0; v < mu_tant::kLimits.layers; ++v)
             {
                 juce::ValueTree voice ("Voice");
                 for (const char* tag : tags)

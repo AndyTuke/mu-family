@@ -10,6 +10,26 @@
 namespace mu_tilate
 {
 
+// The knobs of the Slice view that can hold an absolute value instead of an offset from the layer's own value, one per knob (the
+// order is the saved order of nothing: each is saved under its own key).
+enum class OverrideField : int
+{
+    PitchSemi, FineCents, CutoffOct, ResOffset, FilterEnvAmt, FltA, FltD, FltS, FltR,
+    LevelDb, Pan, FadeIn, FadeOut, AmpA, AmpD, AmpS, AmpR,
+    Ins0, Ins1, Ins2, Ins3, Send0, Send1, Send2,
+    Count
+};
+inline constexpr int kOverrideFieldCount = (int) OverrideField::Count;
+
+// One knob's choice: Offset (the default; the knob's value is the offset member of the settings) or Absolute, where the knob sets the
+// parameter's actual value for this slice or hit and the layer's own value is ignored. The offset is left alone while the knob is
+// Absolute, so switching back finds it where it was; Clear puts both back to nothing.
+struct FieldOverride
+{
+    bool  absolute = false;
+    float absValue = 0.0f;   // the actual value, in the control's own unit (cutoff in Hz, level in dB, ...)
+};
+
 struct SliceSettings
 {
     // Slice
@@ -65,7 +85,107 @@ struct SliceSettings
     float envInCurve  = 0.0f;   // -1..1: how the fade-in bends (0 straight, above 0 slow start, below 0 fast start), the handle in the middle of the fade
     float envOutCurve = 0.0f;   // -1..1: the same for the fade-out
 
+    // Which knobs are Absolute (see FieldOverride); every other knob is the offset member above.
+    FieldOverride ov[kOverrideFieldCount];
 };
+
+// The offset member a knob edits.
+inline float& offsetRef(SliceSettings& s, OverrideField f) noexcept
+{
+    switch (f)
+    {
+        case OverrideField::PitchSemi:    return s.pitchSemi;
+        case OverrideField::FineCents:    return s.fineCents;
+        case OverrideField::CutoffOct:    return s.cutoffOct;
+        case OverrideField::ResOffset:    return s.resOffset;
+        case OverrideField::FilterEnvAmt: return s.filterEnvAmt;
+        case OverrideField::FltA:         return s.fltA;
+        case OverrideField::FltD:         return s.fltD;
+        case OverrideField::FltS:         return s.fltS;
+        case OverrideField::FltR:         return s.fltR;
+        case OverrideField::LevelDb:      return s.levelDb;
+        case OverrideField::Pan:          return s.pan;
+        case OverrideField::FadeIn:       return s.fadeInMs;
+        case OverrideField::FadeOut:      return s.fadeOutMs;
+        case OverrideField::AmpA:         return s.ampA;
+        case OverrideField::AmpD:         return s.ampD;
+        case OverrideField::AmpS:         return s.ampS;
+        case OverrideField::AmpR:         return s.ampR;
+        case OverrideField::Ins0:         return s.insOff[0];
+        case OverrideField::Ins1:         return s.insOff[1];
+        case OverrideField::Ins2:         return s.insOff[2];
+        case OverrideField::Ins3:         return s.insOff[3];
+        case OverrideField::Send0:        return s.sendOff[0];
+        case OverrideField::Send1:        return s.sendOff[1];
+        case OverrideField::Send2:        return s.sendOff[2];
+        case OverrideField::Count:        break;
+    }
+    return s.pitchSemi;   // not reached
+}
+inline float offsetOf(const SliceSettings& s, OverrideField f) noexcept { return offsetRef(const_cast<SliceSettings&>(s), f); }
+
+// The layer's own values of the overridable knobs, in the knobs' absolute units (level in dB, cutoff in Hz, the insert knobs 0..1,
+// the sends 0..1). The Slice view reads them to jump a knob to what it sounds like now; the player resolves with the same numbers.
+struct LayerValues
+{
+    float pitchSemi = 0.0f, fineCents = 0.0f, cutoffHz = 20000.0f, resonance = 0.0f, filterEnvAmt = 0.0f;
+    float fltA = 0.0f, fltD = 0.0f, fltS = 1.0f, fltR = 0.0f;
+    float levelDb = 0.0f, pan = 0.0f, fadeInMs = 0.0f, fadeOutMs = 0.0f;
+    float ampA = 0.0f, ampD = 0.0f, ampS = 1.0f, ampR = 0.0f;
+    float ins[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float send[3] = { 0.0f, 0.0f, 0.0f };
+};
+
+inline float layerValueOf(const LayerValues& v, OverrideField f) noexcept
+{
+    switch (f)
+    {
+        case OverrideField::PitchSemi:    return v.pitchSemi;
+        case OverrideField::FineCents:    return v.fineCents;
+        case OverrideField::CutoffOct:    return v.cutoffHz;
+        case OverrideField::ResOffset:    return v.resonance;
+        case OverrideField::FilterEnvAmt: return v.filterEnvAmt;
+        case OverrideField::FltA:         return v.fltA;
+        case OverrideField::FltD:         return v.fltD;
+        case OverrideField::FltS:         return v.fltS;
+        case OverrideField::FltR:         return v.fltR;
+        case OverrideField::LevelDb:      return v.levelDb;
+        case OverrideField::Pan:          return v.pan;
+        case OverrideField::FadeIn:       return v.fadeInMs;
+        case OverrideField::FadeOut:      return v.fadeOutMs;
+        case OverrideField::AmpA:         return v.ampA;
+        case OverrideField::AmpD:         return v.ampD;
+        case OverrideField::AmpS:         return v.ampS;
+        case OverrideField::AmpR:         return v.ampR;
+        case OverrideField::Ins0:         return v.ins[0];
+        case OverrideField::Ins1:         return v.ins[1];
+        case OverrideField::Ins2:         return v.ins[2];
+        case OverrideField::Ins3:         return v.ins[3];
+        case OverrideField::Send0:        return v.send[0];
+        case OverrideField::Send1:        return v.send[1];
+        case OverrideField::Send2:        return v.send[2];
+        case OverrideField::Count:        break;
+    }
+    return 0.0f;
+}
+
+// What the knob sounds like for these settings against the layer's values, in the knob's absolute unit: the absolute value when the
+// knob is Absolute, else the layer's value moved by the offset (the cutoff is the layer's Hz moved by octaves).
+inline float effectiveValue(const SliceSettings& s, const LayerValues& layer, OverrideField f) noexcept
+{
+    const auto& o = s.ov[(int) f];
+    if (o.absolute) return o.absValue;
+    const float base = layerValueOf(layer, f), off = offsetOf(s, f);
+    return f == OverrideField::CutoffOct ? base * std::exp2(off) : base + off;
+}
+
+// The offset a knob contributes to the player, given the layer's own value in the same unit: an Absolute knob replaces the layer's
+// value, so its offset is the distance from it.
+inline float resolvedOffset(const SliceSettings& s, OverrideField f, float layerValue) noexcept
+{
+    const auto& o = s.ov[(int) f];
+    return o.absolute ? o.absValue - layerValue : offsetOf(s, f);
+}
 
 // Brings every setting inside its documented range and replaces NaN or infinity with the default: a saved file or a host can
 // hand over anything, and a NaN cutoff would turn the filter's state, and then the output, into NaN.
@@ -94,6 +214,7 @@ inline SliceSettings sanitised(SliceSettings s) noexcept
     s.fltS = fix(s.fltS, -1.0f, 1.0f, d.fltS);         s.fltR = fix(s.fltR, -1000.0f, 1000.0f, d.fltR);
     for (auto& o : s.insOff) o = fix(o, -1.0f, 1.0f, 0.0f);
     for (auto& o : s.sendOff) o = fix(o, -1.0f, 1.0f, 0.0f);
+    for (auto& o : s.ov) o.absValue = std::isfinite(o.absValue) ? std::clamp(o.absValue, -1.0e5f, 1.0e5f) : 0.0f;
     s.chokeGroup = std::clamp(s.chokeGroup, 0, 8);
     s.trimInBeats = fix(s.trimInBeats, 0.0f, 4096.0f, 0.0f);
     s.retime = fix(s.retime, 0.25f, 4.0f, 1.0f);

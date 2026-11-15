@@ -6,14 +6,15 @@
 #include "LayerContractFixtures.h"
 #include "UI/LayerSidebar.h"
 #include "UI/MixerOverlay.h"
+#include "TestLimits.h"
 
 using namespace mu_contract_test;
 
 namespace
 {
     constexpr int kPerPage = mu_limits::kLayersPerPage;
-    constexpr bool kPaged = mu_limits::kMaxLayers > kPerPage;
-    constexpr int kPages = (mu_limits::kMaxLayers + kPerPage - 1) / kPerPage;
+    constexpr bool kPaged = mu_test::kLimits.layers > kPerPage;
+    constexpr int kPages = (mu_test::kLimits.layers + kPerPage - 1) / kPerPage;
 
     // A host with `live` layers on which the sidebar and mixer are built.
     struct PagedHost : FakeLayerHost
@@ -49,7 +50,7 @@ struct SidebarPagingTests : juce::UnitTest
         }
 
         beginTest("the page switch shows when there is more than a page, one segment per page");
-        auto box = std::make_unique<PagedHost>(mu_limits::kMaxLayers); auto& p = *box;
+        auto box = std::make_unique<PagedHost>(mu_test::kLimits.layers); auto& p = *box;
         LayerSidebar sidebar(p, "Layer");
         sidebar.setBounds(0, 0, 82, 700);
         std::vector<int> selected;
@@ -108,7 +109,7 @@ struct MixerPagingTests : juce::UnitTest
             MixerOverlay mixer(p, p.mixerEngine);
             mixer.setBounds(0, 0, 1088, 800);
             expectEquals(mixer.getNumChannelPages(), 1);
-            expectEquals(mixer.getNumPages(), 1 + (mu_limits::kMaxBuses > 0 ? 1 : 0), "the Buses page follows the channel pages where there are buses");
+            expectEquals(mixer.getNumPages(), 1 + (mu_test::kLimits.buses > 0 ? 1 : 0), "the Buses page follows the channel pages where there are buses");
             expect(! mixer.showAdjacentPage(1));
             expectEquals(mixer.getShownPage(), 0);
         }
@@ -120,10 +121,10 @@ struct MixerPagingTests : juce::UnitTest
         }
 
         beginTest("pages follow the layer count; PageUp / PageDown do not wrap");
-        auto box = std::make_unique<PagedHost>(mu_limits::kMaxLayers); auto& p = *box;
+        auto box = std::make_unique<PagedHost>(mu_test::kLimits.layers); auto& p = *box;
         MixerOverlay mixer(p, p.mixerEngine);
         mixer.setBounds(0, 0, 1088, 800);
-        const int busPages = mu_limits::kMaxBuses > 0 ? 1 : 0;
+        const int busPages = mu_test::kLimits.buses > 0 ? 1 : 0;
         expectEquals(mixer.getNumChannelPages(), kPages);
         expectEquals(mixer.getNumPages(), kPages + busPages);
         expect(! mixer.showAdjacentPage(-1));
@@ -176,7 +177,7 @@ struct MixerBusPageTests : juce::UnitTest
 
     void runTest() override
     {
-        if (mu_limits::kMaxBuses == 0)
+        if (mu_test::kLimits.buses == 0)
         {
             beginTest("(the Buses page exists in a build with group buses)");
             MixerOverlay* none = nullptr;
@@ -193,7 +194,7 @@ struct MixerBusPageTests : juce::UnitTest
         mixer.showPage(mixer.getNumPages() - 1);
         expect(mixer.isBusPage(mixer.getShownPage()));
         std::vector<juce::Rectangle<int>> bounds;
-        expectEquals(visibleStrips(mixer, &bounds), mu_limits::kMaxBuses + 1, "Buses page: one strip per bus and the Master");
+        expectEquals(visibleStrips(mixer, &bounds), mu_test::kLimits.buses + 1, "Buses page: one strip per bus and the Master");
 
         // Nothing overlaps and everything lies inside the overlay; the strips are at least a channel strip wide.
         for (size_t i = 0; i < bounds.size(); ++i)

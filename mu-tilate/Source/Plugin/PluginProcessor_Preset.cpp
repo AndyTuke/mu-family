@@ -1,3 +1,4 @@
+#include "Plugin/MuTilateLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Persistence/PresetFiles.h"   // mu-core: shared preset-file handling
 
@@ -11,7 +12,7 @@ namespace mu_tilate
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
-    for (int l = 0; l < mu_limits::kMaxLayers; ++l) prefixes.add(layerParamPrefix(l));
+    for (int l = 0; l < mu_tilate::kLimits.layers; ++l) prefixes.add(layerParamPrefix(l));
     initLayerState(prefixes, {});
 }
 
@@ -27,7 +28,7 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
 
     // A restored layer names its loop by path: load it again, keeping the slices and timeline the file carried. (Embedding
     // the loop in the preset is a later step.)
-    for (int l = 0; l < mu_limits::kMaxLayers; ++l)
+    for (int l = 0; l < mu_tilate::kLimits.layers; ++l)
         reloadLoopIfNeeded(l);
 }
 
@@ -39,7 +40,7 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 
 juce::ValueTree PluginProcessor::captureLayerPresetTree(int layer)
 {
-    if (layer < 0 || layer >= mu_limits::kMaxLayers) return {};
+    if (layer < 0 || layer >= mu_tilate::kLimits.layers) return {};
     return captureLayerNode(layer, kPhrasePresetTag);
 }
 
@@ -53,7 +54,7 @@ void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 
 void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 {
-    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
+    if (layer < 0 || layer >= mu_tilate::kLimits.layers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName(kPhrasePresetTag))
     {
@@ -66,7 +67,7 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 void PluginProcessor::stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)
 {
     juce::ignoreUnused(keepIdentity);   // a layer node carries no name or colour
-    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! tree.isValid()) return;
+    if (layer < 0 || layer >= mu_tilate::kLimits.layers || ! tree.isValid()) return;
     layerSwapper.useSlot(layer, std::move(tree));
 }
 

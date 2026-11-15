@@ -27,20 +27,21 @@
 // says modulation is off for them they are set back to the lock after the matrix runs.
 namespace mu_mod {
 
-inline bool resolveLane(Layer* slot, double beat, int count,
-                        const char* const* ids,
-                        const std::atomic<float>* const* atoms,
-                        const juce::NormalisableRange<float>* ranges,
-                        std::unordered_map<std::string_view, float>& map,
-                        float* out,
-                        const mu_core::LockSeed* lock = nullptr)
+// The same resolve with the seeds supplied by the caller: `actualOf(i)` is destination i's current value in its own units. A
+// layer that keeps its values in its own fields (applied from a staged preset at a boundary, so the parameters may lag them)
+// seeds from those, not from the parameters.
+template <class SeedFn>
+inline bool resolveLaneSeeded(Layer* slot, double beat, int count,
+                              const char* const* ids,
+                              const juce::NormalisableRange<float>* ranges,
+                              std::unordered_map<std::string_view, float>& map,
+                              float* out,
+                              const mu_core::LockSeed* lock,
+                              SeedFn&& actualOf)
 {
     for (int i = 0; i < count; ++i)
-    {
-        const float v = atoms[i] != nullptr ? atoms[i]->load(std::memory_order_relaxed)
-                                            : ranges[i].start;
-        map[ids[i]] = lock != nullptr && i < 32 && (lock->mask >> i & 1u) ? lock->value01[(size_t) i] : ranges[i].convertTo0to1(v);
-    }
+        map[ids[i]] = lock != nullptr && i < 32 && (lock->mask >> i & 1u) ? lock->value01[(size_t) i]
+                                                                           : ranges[i].convertTo0to1(actualOf(i));
 
     bool resolved = true;
     if (slot != nullptr)
@@ -60,6 +61,21 @@ inline bool resolveLane(Layer* slot, double beat, int count,
     for (int i = 0; i < count; ++i)
         out[i] = ranges[i].convertFrom0to1(juce::jlimit(0.0f, 1.0f, map[ids[i]]));
     return resolved;
+}
+
+// The usual form: each destination is seeded from its parameter's atomic (a null atomic seeds the range's start).
+inline bool resolveLane(Layer* slot, double beat, int count,
+                        const char* const* ids,
+                        const std::atomic<float>* const* atoms,
+                        const juce::NormalisableRange<float>* ranges,
+                        std::unordered_map<std::string_view, float>& map,
+                        float* out,
+                        const mu_core::LockSeed* lock = nullptr)
+{
+    return resolveLaneSeeded(slot, beat, count, ids, ranges, map, out, lock, [&](int i)
+    {
+        return atoms[i] != nullptr ? atoms[i]->load(std::memory_order_relaxed) : ranges[i].start;
+    });
 }
 
 } // namespace mu_mod

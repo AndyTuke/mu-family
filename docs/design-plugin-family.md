@@ -349,11 +349,20 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 | mu-Toni | `kModDestTable` — [MuToniModDest.h](../mu-toni/Source/Modulation/MuToniModDest.h) | `mu_mod::resolveLane` |
 | mu-On | one table per lane — [MuOnModDest.h](../mu-on/Source/Modulation/MuOnModDest.h) | `mu_mod::resolveLane` |
 | mu-Tilate | `kModDestTable` in `mu-tilate/Source/Modulation/MuTilateModDest.h` (check the file exists before relying on this row); targets listed in [mu-tilate/design.md](mu-tilate/design.md) | `mu_mod::resolveLane` |
-| mu-Clid | `ModDest::kTable` — [ModulationDestinations.h](../mu-clid/Source/Modulation/ModulationDestinations.h) | hand-written seed / write-back in `PluginProcessor.cpp` (values come from per-rhythm state and step-count-dependent ranges), using the knob ranges in [ModulationSkew.h](../mu-clid/Source/Modulation/ModulationSkew.h) — the APVTS layout is built from the same constants |
+| mu-Clid | `ModDest::kTable` — [ModulationDestinations.h](../mu-clid/Source/Modulation/ModulationDestinations.h) | `mu_mod::resolveLaneSeeded` (see below), using the knob ranges in [ModulationSkew.h](../mu-clid/Source/Modulation/ModulationSkew.h) — the APVTS layout is built from the same constants |
+
+**Shared machinery (built, backlog #1771).**
+- `mu_mod::ModTarget` gained two defaulted fields: `unitsPerDirection` (stepped-snap units per direction; 0 = continuous) and `steppedOnly` (row hidden while the modulator is Smooth). mu-Tant's octave rule therefore lives on the rows, not in product code.
+- `mu_mod::findTarget` / `isValidTarget` have pointer + count forms; every product's validator uses them. The layer-type registry exists only in mu-Tronic, so the standalones keep their own tables behind the one function.
+- `LayerTypeInfo` carries `modTargets` / `numModTargets`. `nullptr` = the type publishes none there (mu-Clid's targets depend on effect and step counts).
+- [`makeTableDestProvider`](../mu-core/UI/TableModDestProvider.h) builds the destination dropdown provider from a table. Used by mu-Tant, mu-Toni, mu-On, mu-Tilate, mu-Toni MIDI and mu-Tronic's registry providers.
+- `mu_mod::resolveLaneSeeded` takes the seed values from the caller; `resolveLane` is the wrapper that reads the parameter atomics. mu-Clid uses the seeded form: it seeds from the rhythm's own fields, so a staged preset applied at a boundary cannot play a block of old values. The Euclid ranges are set per block, and skewed knobs keep their exact curves through `NormalisableRange` lambdas.
+
+**Per-product remainder (family consistency).** mu-Clid keeps its own destination provider, for the effect-send label; it is the only product that does not use `makeTableDestProvider`.
 
 **Coverage rule (owner, 2026-11-02): every continuous layer parameter is a target.** A product ships its target table complete from the start: pitch, filter, envelopes, pan, level, sends, insert knobs and every product-specific knob. Not targets: choice, toggle and integer rows (mode, grid, filter type, insert algorithm) and settings that are not read per block (e.g. mu-Tilate's detector settings). Each exemption is written in the product's test next to its reason, and `mu_mod::checks::unlistedContinuousParams` fails the test for any continuous layer parameter that is neither a target nor exempt. A new parameter therefore brings its row, or an explained exemption, in the same change. The knob's modulation arc comes from the same table (the shared knob binds by name), so no extra UI step.
 
-**How it works.** Each target is seeded into the `ModulationMatrix` as its knob's 0..1 proportion; the matrix adds `source% × depth% / 10000`; the product converts back through the knob's range (clamped at the ends; stepped targets rounded to whole steps by the product). Offset-style targets (mu-Clid's pitch octave / semitones) are seeded 0 and read back as an offset of the same proportion of the knob's range.
+**How it works.** Each target is seeded into the `ModulationMatrix` as its knob's 0..1 proportion; the matrix adds `source% × depth% / 10000`; the product converts back through the knob's range (clamped at the ends; stepped targets rounded to whole steps by the product). Offset-style targets (mu-Clid's pitch octave / semitones) are seeded 0 and read back as an offset of the same proportion of the knob's range. (Details of the shared resolve helpers follow the table.)
 
 **Preset data.** `serialiseModulators` writes `depthUnits="range"` on every `<Modulators>` tree. Data without it predates the standard; mu-Clid upgrades it on load (Pre / Post Pad depth was % of 12 steps → rescaled to % of 0..63, so old presets move the same number of steps). No other target's old units differed.
 
@@ -921,9 +930,9 @@ each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer typ
   `PluginProcessor&` (the UI uses a `<Type>Host` interface), and every relative path is unique across `mu-core` and the libraries
   (`tests/scripts/check-layer-boundary.ps1`, to be written in Stage T0). Each product's parameter table is `addLayerParams(layout, slot)` in its `Persistence/`.
 - **Each standalone product moves onto the shared render path** in the same stage in which its layer is extracted, so per-block glue exists once.
-- **Capacity:** `mu_limits::kMaxLayers` is a per-target compile-time constant (`MU_MAX_LAYERS`, default 8; mu-Tronic 16). One constant, one value per binary.
-- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in compile-time counts `MU_MAX_BUSES` (default 0, mu-Tronic 3) and
-  `MU_BUS_INSERTS` (default 2), `ChannelState::busAssign`,
+- **Capacity:** a product's counts are its own `mu_limits::ProcessorLimits` constant (`kLimits`: layers, buses, inserts per bus, host sidechain), given to `ProcessorBase` and to the parameter layout when the processor is built; mu-core is ONE compiled library and reads no per-product setting (`check-core-boundary.ps1` forbids the old `MU_MAX_*` macros). Clid/Tant/Toni/On/Tilate 8 layers, mu-Tronic 16 with 3 buses, mu-Host 1. Fixed ceilings (`kAbsoluteMaxLayers` 32, buses and inserts 9) bound the few fixed arrays; layer-library code shared with the hosts sizes to the ceiling.
+- **Buses:** `MixerEngine::BusState` (a `ChannelState` plus a chain of `kBusInserts` layer inserts), opt-in counts `ProcessorLimits::buses` (0 except mu-Tronic's 3) and
+  `busInserts` (2), `ChannelState::busAssign`,
   graph channels -> buses -> returns -> master, no bus-to-bus, a channel's sidechain source is never a bus. The existing `outputBus` is the DAW direct out and is relabelled
   "Out" in the UI (not offered in mu-Tronic). All of it is `mu-core`.
 - **Layer types are finer than products:** the registry lists each mu-On engine (Kick, Bass, Hat, Snare, Rumble, and from 2026-10-21 FM Perc) as its own `LayerTypeId` over the one `Track` class
@@ -1998,6 +2007,8 @@ product only has to override/​wire those.
 
 ## Licensing and the support prompt — family standard (ruled 2026-10-11)
 
+> **Superseded in part (Andy, 2026-11-11, #1803).** The model is now a free download that shows the licence reminder **every time an instance loads**; a **fixed-price licence (£20, mu-Tronic £30)** removes it. Pay-what-you-want and the once-per-process rule are gone, and so is "Don't show again" (and its `supportPromptHidden` setting). The policy is `shouldShow(hasLicensing, isSupporter, dismissedThisInstance)`; "Maybe later" sets a per-instance flag on the processor (`isSupportPromptDismissed`, not saved), so the next instance asks again. mu-Host lists only the engines whose product is licensed and, with none, explains itself in a pop-up. The text below is the original 2026-10-11 ruling and is kept for the placement and testing reasoning.
+
 **Owner decision.** The source is GPLv3. mu-Clid, mu-Tant, mu-Toni and mu-On are pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20; a key is issued even at £0). mu-Clid MIDI and mu-Link are freeware. An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, and no "Lite" free tier (the former mu-Clid Lite is now a separate MIDI-effect product, see "The MIDI-effect product" below). Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, removes the prompt, and unlocks nothing). The four Pay What You Want products call `initLicensing`; the freeware mu-Clid MIDI and mu-Link never do, so they never show the dialog.
 
 ### What is deleted, what is kept
@@ -2188,6 +2199,15 @@ signing (the Apple side of #99).
 > no Mac build is shipped and `release.yml` no longer runs a macOS runner. The `APPLE` / AU
 > plumbing above is kept intact so the work can resume without re-plumbing.
 
+### Shared libraries: mu-core and mu-juce
+
+Two static libraries are compiled once per configuration and linked by every product, wrapper and test app:
+
+- **`mu-core-lib`** (mu-core's own sources). It reads no per-product setting: a product's layer, bus and insert counts are its `kLimits` given to `ProcessorBase`, and its version string is its `getVersionString()`.
+- **`mu-juce`** (the JUCE modules: core, events, graphics, gui, audio, dsp, animation and the rest; 44 source files). A JUCE module target adds its source wrapper to every target that links it, so before this each of ~40 targets recompiled JUCE. Now a directory's `CMakeLists.txt` ends with `mu_use_shared_juce()`: that links `mu-juce` into the directory's targets and marks the module wrappers header-only there, so the targets still link `juce::juce_*` for include paths and definitions but do not compile them. **A new product or tool directory must call it** or it recompiles JUCE and the link fails with duplicate symbols. `juce_audio_plugin_client` and the CLAP wrapper are not in the set: they stay per target.
+- **What is shared, so what must not differ per target:** the JUCE flags every target already agrees on (`JUCE_WEB_BROWSER=0`, `JUCE_USE_CURL=0`, `JUCE_VST3_CAN_REPLACE_VST2=0`, `JUCE_USE_MP3AUDIOFORMAT=1`), plus `JUCE_MODAL_LOOPS_PERMITTED=1` (only adds methods, so tests that use modal loops and products that do not agree on the class layout) and `JUCE_ASIO=1` when `MUFAMILY_WITH_ASIO` is ON. The one JUCE code path that read a per-product define, `JucePlugin_Name` (the accessibility application name), reads `mu_core_shared_product_name()` instead (`SharedJuceName.h`, registered by `AboutOverlay::setProductInfo`; `SharedJuceNameTests` pins it). Nothing else in the compiled modules reads a `JucePlugin_*` or `JUCE_STANDALONE_APPLICATION` value (audited against the pinned JUCE; re-check on a JUCE bump).
+- **Measured** (clean full Debug, this PC): 923 s and 26.7 GB before, 442 s and 17.6 GB after. Binary sizes unchanged within 1 percent; Release `mu-juce` plus bench link 67 s; mixer benchmark unchanged.
+
 ### Build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](../cmake/IncrementBuildNumber.cmake))
 
 1. A build is a **Debug** build unless the owner asks for Release (when to build: CLAUDE.md, "Keep working until a build is worth it"). Every full Debug build **increments the number by
@@ -2221,7 +2241,7 @@ Eight JUCE features the family does not use yet, checked against the JUCE 9.0.4 
 
 ### Version numbering
 
-The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.1 (the UI rework, build 972). The pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt), currently 0.1 (the .1 marks the metal-panel design upgrade, Andy 2026-10-11). Plugins show `v1.1.0.NNN` / `v0.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
+The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.2 (1.1 was the UI rework, build 972; 1.2 is the compiled shared mu-core library with runtime counts, Andy 2026-11-14, #1811). [version-pre.txt](version-pre.txt) is 1.2 too since 2026-10-15 when every product moved to one family version. Plugins show `v1.2.0.NNN`, commits `v1.2.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
 
 ### Shipping a Release (two ways, every time)
 

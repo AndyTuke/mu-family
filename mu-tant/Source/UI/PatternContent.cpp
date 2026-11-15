@@ -317,7 +317,7 @@ void PatternContent::timerCallback()
 
 void PatternContent::setLayer(int voiceIndex)
 {
-    voiceIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, voiceIndex);
+    voiceIndex = juce::jlimit(0, mu_limits::kAbsoluteMaxLayers - 1, voiceIndex);
 
     // Rebuild the APVTS attachments only when the voice actually changes (or on
     // the very first bind). The pattern + modulator-slot pointers are (re)bound

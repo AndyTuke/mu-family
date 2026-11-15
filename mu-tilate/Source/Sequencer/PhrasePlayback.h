@@ -75,9 +75,9 @@ public:
 
     bool isActive() const noexcept { return player.isActive(); }
     // How far the newest sounding hit moves the layer's four insert knobs (fractions of their travel). False, with zeros, when none sounds.
-    bool insertOffsets(float (&out)[4]) const noexcept { return player.insertOffsets(out); }
+    bool insertOffsets(float (&out)[4], unsigned& absMask) const noexcept { return player.insertOffsets(out, absMask); }
     // How far the newest sounding hit moves the layer's Effect, Delay and Reverb sends. False, with zeros, when none sounds.
-    bool sendOffsets(float (&out)[3]) const noexcept { return player.sendOffsets(out); }
+    bool sendOffsets(float (&out)[3], unsigned& absMask) const noexcept { return player.sendOffsets(out, absMask); }
     // How many blocks the last render call looked at when scanning for pre-fades to start (a test of the scan's cost).
     int  preBlocksExamined() const noexcept { return examined; }
 

@@ -54,10 +54,13 @@ endif()
 # Runtime number + full version string for the About panel and update banner.
 file(WRITE "${HEADER_FILE}"
     "#pragma once\n#define BUILD_NUMBER ${BUILD_NUMBER}\n"
-    "// Live products use this base; pre-release products override MU_VERSION_BASE per target.\n"
-    "#ifndef MU_VERSION_BASE\n#define MU_VERSION_BASE \"${VERSION_BASE}\"\n#endif\n"
+    "// Live products return MU_VERSION_STRING from getVersionString(), pre-release products MU_VERSION_STRING_PRE.\n"
+    "// The compiled mu-core library reads neither: it is one library for every product.\n"
+    "#define MU_VERSION_BASE \"${VERSION_BASE}\"\n"
+    "#define MU_VERSION_BASE_PRE \"${PRE_VERSION_BASE}\"\n"
     "#define MU_STR_(x) #x\n#define MU_STR(x) MU_STR_(x)\n"
-    "#define MU_VERSION_STRING MU_VERSION_BASE \".0.\" MU_STR(BUILD_NUMBER)\n")
+    "#define MU_VERSION_STRING MU_VERSION_BASE \".0.\" MU_STR(BUILD_NUMBER)\n"
+    "#define MU_VERSION_STRING_PRE MU_VERSION_BASE_PRE \".0.\" MU_STR(BUILD_NUMBER)\n")
 
 # ── Regenerate the Windows version resources from THIS (post-increment) number ──
 # The .rc is otherwise baked at configure time (before the build-time bump), which

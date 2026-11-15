@@ -74,7 +74,7 @@ mu_core::LayerView ProcessorBase::makeLayerView() const
 {
     mu_core::LayerView v;
     v.numLive = numLayers.load(std::memory_order_relaxed);
-    for (int s = 0; s < mu_limits::kMaxLayers; ++s) v.layer[(size_t) s] = layers[(size_t) s].get();
+    for (int s = 0; s < layers.size(); ++s) v.layer[(size_t) s] = layers[s].get();
     return v;
 }
 

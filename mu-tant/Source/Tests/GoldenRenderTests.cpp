@@ -18,6 +18,7 @@
 
 // This translation unit carries the allocation probe's global operator new / delete (test executable only).
 #define MU_ALLOCATION_PROBE_DEFINE_OPERATORS
+#include "Plugin/MuTantLimits.h"
 #include "GoldenTestRig.h"
 #include "Tests/GoldenAllocationCheck.h"
 #include "Tests/GoldenRender.h"
@@ -564,7 +565,7 @@ namespace
             // that is dropped mid-render (its retire tail included) is still heard alone.
             sc.stemSetup = [](ProcessorBase& pb, int stem)
             {
-                for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+                for (int c = 0; c < mu_tant::kLimits.layers; ++c)
                 {
                     setParam(pb.apvts, "ch" + juce::String(c) + "_solo", 0.0f);
                     setParam(pb.apvts, "ch" + juce::String(c) + "_mute", c == stem ? 0.0f : 1.0f);

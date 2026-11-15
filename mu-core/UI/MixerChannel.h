@@ -23,14 +23,16 @@ public:
     // A per-layer channel strip (Channel) vs the FX-return / master strips. The
     // product's layer is a rhythm in mu-clid, a voice in mu-tant.
     // Client is an external-app strip (mu-link): name LCD, four-knob EQ, fader, no sends or sidechain.
-    // Bus is a group bus (mu_limits::kMaxBuses): a channel strip without a layer, its insert column
+    // Bus is a group bus (limits.buses): a channel strip without a layer, its insert column
     // beside it, and no Out selector (a bus goes to the master).
     enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client, Bus };
 
     // The name of group bus `index` (0-based) as the strips and the Out selector show it.
     static juce::String busName(int index) { return "Bus " + juce::String(index + 1); }
 
-    MixerChannel(Type type, const juce::String& name, juce::Colour colour);
+    // `limits` are the owning mixer's counts (buses, layers, external sidechain): they decide the Out selector and the sidechain list.
+    MixerChannel(Type type, const juce::String& name, juce::Colour colour,
+                 const mu_limits::ProcessorLimits& limits);
     ~MixerChannel() override;
 
     // status-bar coverage for outBus + scSource dropdowns. Colour is the
@@ -149,6 +151,7 @@ private:
 
     using Id = MuLookAndFeel::ColourIds;
 
+    mu_limits::ProcessorLimits limits_;
     Type         channelType;
     juce::String channelName;
     juce::Colour channelColour;

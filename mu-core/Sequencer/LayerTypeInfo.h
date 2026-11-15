@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Sequencer/LayerServices.h"
+#include "Modulation/ModTarget.h"
 
 #include <cstring>
 #include <functional>
@@ -12,7 +13,7 @@ struct Layer;
 class ProcessorBase;
 class LayerContent;   // mu-core/UI/LayerContent.h: a type's content component for the shown slot
 
-// Layer types: family vocabulary (as kMaxLayers is), so the ids live in mu-core. docs/mu-tronic/design.md
+// Layer types: family vocabulary (as the layer count is), so the ids live in mu-core. docs/mu-tronic/design.md
 // 2.5. A type is described and constructed by its LayerTypeInfo; it is never dispatched through it
 // (rendering stays virtual on Layer). A host of several types lists them in a LayerTypeRegistry; a product
 // that hosts one type uses create / addLayerParams itself.
@@ -63,7 +64,8 @@ namespace mu_core
     // builds its own UI (the four list products); mu-Tronic's editor builds the shown slot's UI through them.
     struct LayerTypeInfo
     {
-        using AddParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot);
+        // `numLayers` is the host's slot count, for a row whose range depends on it (a layer index).
+        using AddParamsFn = void (*)(juce::AudioProcessorValueTreeState::ParameterLayout& layout, int slot, int numLayers);
         // `type` lets one function make several types of one class (the five mu-On Track types).
         using CreateFn    = std::unique_ptr<Layer> (*)(int slot, LayerTypeId type);
         // The type a layer-preset tree holds; Empty when the tree names none.
@@ -109,6 +111,11 @@ namespace mu_core
         const char* descriptor = "";           // one short line for the chooser card ("Generative arpeggiator")
         const char* discInitial = "";          // one character on the type's disc (sidebar and chooser card); unique across a host's choices
         bool        takesNotes = false;        // the type plays from MIDI notes, so a slot of it shows the Notes In channel control
+        // The type's modulation targets: the one table the modulator panel's dropdown, the id checks and the serialiser read
+        // through the registry, so a new type's targets appear everywhere with no framework edit. Null = the type publishes
+        // none here (mu-Clid's depend on the effect and step counts and are built by its own provider).
+        const mu_mod::ModTarget* modTargets = nullptr;
+        int         numModTargets = 0;
         bool        hasClipBank = true;        // a slot of the type stores clips; false (a type that processes another layer's audio) hides the strip
     };
 }

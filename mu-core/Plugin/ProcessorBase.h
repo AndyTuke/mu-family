@@ -9,10 +9,16 @@
 // sidechain. The header is only on the include path when this TU is compiled into a `_CLAP`
 // target (clap_juce_extensions is PUBLIC there), so guard with __has_include — the VST3/Standalone
 // builds compile with no CLAP dependency at all.
-#if __has_include(<clap-juce-extensions/clap-juce-extensions.h>)
+// The compiled mu-core library defines MU_CORE_HAS_CLAP=1 for every target that links it (so the library and its products see one
+// class layout); a test app that compiles the sources itself falls back to __has_include.
+#if defined(MU_CORE_HAS_CLAP) && MU_CORE_HAS_CLAP
  #include <clap-juce-extensions/clap-juce-extensions.h>
+#elif __has_include(<clap-juce-extensions/clap-juce-extensions.h>)
+ #include <clap-juce-extensions/clap-juce-extensions.h>
+ #undef MU_CORE_HAS_CLAP
  #define MU_CORE_HAS_CLAP 1
 #else
+ #undef MU_CORE_HAS_CLAP
  #define MU_CORE_HAS_CLAP 0
 #endif
 
@@ -76,8 +82,12 @@ class ProcessorBase : public ProcessorCore,
 public:
     ProcessorBase(const BusesProperties& props,
                   juce::AudioProcessorValueTreeState::ParameterLayout layout,
-                  const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"));
+                  const juce::Identifier& stateTreeType,
+                  mu_limits::ProcessorLimits limits);
     ~ProcessorBase() override;
+
+    // The layer, bus and insert counts this processor was built with (docs/design-runtime-counts.md). Fixed for its lifetime.
+    const mu_limits::ProcessorLimits& getLimits() const noexcept { return limits_; }
 
     // Public so UI panels (MixerOverlay, FXRow, MixerChannel, etc.) can access
     // them directly — matches the layout PluginProcessor had before extraction.
@@ -179,7 +189,7 @@ public:
     // (typedLayerPresetDir); for the four list products it is a harmless store.
     void setSelectedSlot(int slot) noexcept
     {
-        selectedSlot.store(juce::jlimit(0, mu_limits::kMaxLayers - 1, slot), std::memory_order_relaxed);
+        selectedSlot.store(juce::jlimit(0, limits_.layers - 1, slot), std::memory_order_relaxed);
     }
     int  getSelectedSlot() const noexcept { return selectedSlot.load(std::memory_order_relaxed); }
     // The shell's delete: a list product removes the layer (the ones above shift down); a slot host empties it.
@@ -533,7 +543,7 @@ public:
     void cancelAllStagedSwaps()
     {
         cancelPendingFullPreset();
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+        for (int i = 0; i < limits_.layers; ++i)
             cancelPendingSwap(i);
     }
     std::function<void(int slot)> onLayerPresetCommitted;
@@ -542,6 +552,19 @@ public:
     // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
     // Products call publishPresetName(...) from their loadPreset override.
     std::function<void(const juce::String&)> onPresetNameChanged;
+
+    // ─── Bounce to WAV (Standalone only) ─────────────────────────────────────
+    // Set by the standalone app: renders the current state offline to a WAV, on the calling (message) thread, and returns an
+    // empty string on success or the error text. Empty in a plugin, whose host has its own bounce; the UI offers Bounce only when set.
+    struct BounceSettings
+    {
+        juce::File file;
+        double     seconds    = 8.0;    // how long the transport plays
+        double     tailSeconds = 1.0;   // extra time after it stops, so FX tails ring out
+        double     sampleRate = 48000.0;
+    };
+    std::function<juce::String(const BounceSettings&)> bounceToWav;
+    bool canBounce() const noexcept { return bounceToWav != nullptr; }
     void publishPresetName(const juce::String& name) { if (onPresetNameChanged) onPresetNameChanged(name); }
 
     // Content directory — where preset / sample-library / keybindings folders live:
@@ -583,7 +606,7 @@ public:
     {
         return mu_core::support_prompt::isSupporter(licensingEnabled, offlineLicensed, isOnlineActivated());
     }
-    // Where the prompt's "Pay what you like" button opens (empty when the product supplies none).
+    // Where the prompt's "Get a licence" button opens (empty when the product supplies none).
     juce::String getCheckoutUrl() const { return checkoutUrl; }
     // The suggested amount (GBP) the prompt quotes.
     int getSuggestedPrice() const noexcept { return suggestedPrice; }
@@ -596,9 +619,9 @@ public:
         onlineActivated.store(false, std::memory_order_relaxed);
         activateOnlineFn = nullptr;
     }
-    // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
-    bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
-    void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
+    // "Maybe later": the licence reminder is closed for this instance (not saved, so the next instance asks again).
+    bool isSupportPromptDismissed() const noexcept { return supportPromptDismissed.load(std::memory_order_relaxed); }
+    void setSupportPromptDismissed(bool dismissed) noexcept { supportPromptDismissed.store(dismissed, std::memory_order_relaxed); }
     juce::PropertiesFile* getAppSettingsFile() noexcept override { return appSettings.get(); }
 
     // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
@@ -621,6 +644,7 @@ public:
     bool isFillHeld() const noexcept     { return fillHeld.load(std::memory_order_relaxed); }
     std::atomic<bool> fillHeld { false };
     std::atomic<bool> onlineActivated { false };
+    std::atomic<bool> supportPromptDismissed { false };   // "Maybe later" pressed on this instance
     bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
 
     // The machine "challenge" code shown in the overlay's offline path (and what a `.lic` is
@@ -714,7 +738,7 @@ protected:
     // filled (keepSpareLayers) reaches the spares too; any other reaches the live layers.
     Layer* slotLayer(int i)
     {
-        if (keepSpareLayers) return (i >= 0 && i < mu_limits::kMaxLayers) ? layers[(size_t) i].get() : nullptr;
+        if (keepSpareLayers) return (i >= 0 && i < limits_.layers) ? layers[(size_t) i].get() : nullptr;
         return getLayer(i);
     }
     // `legacyPrefixes` (same slot order) are the prefixes a renamed product used before; only the
@@ -733,7 +757,7 @@ protected:
     // Applies the parameters and extras, then (canEditLayers only) stores the count last and restores
     // the colours, so the audio thread never sees a count ahead of the data.
     void            applyComposedState(const juce::ValueTree& state);
-    // The live layer count a composed state carries, clamped to 1..kMaxLayers; `unsavedLayerCount`
+    // The live layer count a composed state carries, clamped to 1..the layer count; `unsavedLayerCount`
     // when the state has none (an older file). A product that must act on the old and the new count
     // before the apply reads it here.
     int             savedLayerCount(const juce::ValueTree& state) const;
@@ -833,13 +857,13 @@ protected:
     // constructor and calls flagSwapBoundaries from processBlock; the commit runs in
     // runDeferredWork. A product with its own stager (mu-Clid) overrides the three swap queries.
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
-    mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
+    mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kAbsoluteMaxLayers> layerSwapper;   // slots in use: getLimits().layers
     mu_core::ControlAttachment* controlAttachment = nullptr;   // message thread only
     mu_core::LiveState liveState;   // Performance mode (message thread only; never read on the audio thread)
     uint32_t productFullCommits = 0;                       // full presets applied outside layerSwapper (message thread only)
     // The tree of each layer's last non-clip stage that is still waiting for its boundary (invalid when none).
     // A store captures it instead of the live layer, which does not show that preset yet.
-    std::array<juce::ValueTree, mu_limits::kMaxLayers> pendingPresetTree;
+    mu_core::FlatArray<juce::ValueTree> pendingPresetTree;
 
     // Clip auto-save tracker of one layer (message thread only, never saved).
     struct ClipWatch
@@ -854,7 +878,7 @@ protected:
         int             wait   = 0;       // rounds still to skip before the next visit
         void reset() { *this = ClipWatch(); }
     };
-    std::array<ClipWatch, mu_limits::kMaxLayers> clipWatch;
+    mu_core::FlatArray<ClipWatch> clipWatch;
     int      clipWatchCursor     = 0;       // the next layer the round robin looks at
     double   nextClipStepMs      = 0.0;     // when the poll next takes a step
     uint32_t clipWatchFullCommits = 0;      // the full-commit count the trackers were last valid for
@@ -878,13 +902,13 @@ protected:
     bool writeWatchedClip(int slot, int clip, const juce::ValueTree& capture);
     // Per slot, the preset (file stem or clip name) the layer's state last came from; empty = none known.
     // Message thread only; follows its layer through remove / swap, and is forgotten by a non-clip stage and a reset.
-    std::array<juce::String, mu_limits::kMaxLayers> presetLabels;
+    mu_core::FlatArray<juce::String> presetLabels;
     int lastTransportState = 0;                            // message thread: the transport state the live state was last told about
     std::atomic<bool> muteChanged { false };               // a strip mute parameter changed on some thread; the poll tells the live state
-    std::array<juce::RangedAudioParameter*, mu_limits::kMaxLayers> muteParams {};   // ch{N}_mute, cached (null = none)
+    mu_core::FlatArray<juce::RangedAudioParameter*> muteParams;   // ch{N}_mute, cached (null = none)
     // ch{N}_midiIn raw values, cached (null = the product declares none: every layer hears every channel). The rows
     // move with a layer through swap / remove, so slot N's atomic is always the channel of the layer now in slot N.
-    std::array<std::atomic<float>*, mu_limits::kMaxLayers> midiInRaw {};
+    mu_core::FlatArray<std::atomic<float>*> midiInRaw;
     // Audio thread. Sets the call's channel mask for the layer in slot `s`, and raises MidiView::inputReset for the one call
     // after the mask changed: the keys the layer holds were filtered under the old mask, so a note-off the new mask no longer
     // passes would strand them. On that call, and on a layer's first call, the keys physically held on the channels the mask
@@ -908,8 +932,8 @@ protected:
     // poll is gone first on destruction; prepareForDestruction empties it before any product member goes.
     // Held on the heap (built with the processor, on the constructing thread) so ProcessorBase stays small
     // for hosts and tests that construct it on a stack.
-    std::unique_ptr<mu_core::RetireBin> retireBinStorage = std::make_unique<mu_core::RetireBin>(layerAccess.epoch, layerAccess.layout);
-    mu_core::RetireBin& retireBin = *retireBinStorage;
+    std::unique_ptr<mu_core::RetireBin> retireBinStorage;   // built in the constructor with the layer count
+    mu_core::RetireBin& retireBin;
     // The layer types this host offers a slot (see getLayerTypes). Filled in the product's constructor.
     mu_core::LayerTypeRegistry layerTypes;
 
@@ -963,11 +987,11 @@ protected:
     // layer (live or a parked spare) caches its layer's loopBeats(); an empty slot the default bar.
     double layerLoopBeats(int slot) const noexcept
     {
-        return slot >= 0 && slot < mu_limits::kMaxLayers ? renderState.loopBeats[(size_t) slot] : -1.0;
+        return slot >= 0 && slot < limits_.layers ? renderState.loopBeats[(size_t) slot] : -1.0;
     }
 
     // prepareToPlay (message or host thread, not processing; call it OUTSIDE layersLock): sizes the per-slot
-    // scratch (kMaxLayers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
+    // scratch (layers x 2 x blockSize) and the block's MIDI storage, prepares every slot's layer (spares
     // included), flushes the bin (cutAll then service) and resets the transport latches. Nothing it sizes is
     // ever grown on the audio thread: a longer host block is chunked.
     void prepareLayerRender(double sampleRate, int maxBlockSize);
@@ -990,7 +1014,7 @@ protected:
     // out stays in the block's storage for mergeLayerMidiOut. A 0-frame block renders nothing and calls no hook;
     // its edges reach the next rendered block. The host's beat bound is t.beatWrap.
     void renderAndMix(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi, const mu_core::BlockTransport& t,
-                      std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                      MixerEngine::DirectOuts* directOuts = nullptr,
                       juce::AudioBuffer<float>* fxReturnsOut = nullptr) noexcept;
 
     // Audio thread, called by renderAndMix only in a host block that renders (its LayerBlock succeeded), with
@@ -1176,7 +1200,7 @@ protected:
                           int                                      numVoices,
                           int                                      numSamples,
                           double                                   effectiveBpm,
-                          std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
+                          MixerEngine::DirectOuts* directOuts = nullptr,
                           juce::AudioBuffer<float>*                fxReturnsOut = nullptr,
                           const RetiredVoices*                     retired      = nullptr,
                           const MixerEngine::RenderChannelFn*      renderChannel = nullptr);
@@ -1232,7 +1256,7 @@ protected:
         const char*    licenceFile;
         const uint8_t* publicKey;
         const char*    activationFile;
-        const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
+        const char*    checkoutUrl = nullptr;   // checkout page the support prompt opens
         int            suggestedPrice = 20;     // the amount (GBP) the prompt suggests; matches the store
         juce::File     contentDir {};           // where the licence file and the activation record live; empty = this app's content folder
         juce::File     alsoCheckDir {};         // a second folder whose licence file counts too (mu-Host: its own folder beside the product's)
@@ -1340,11 +1364,12 @@ private:
         int    prepared = 0;            // prepared block size: the longest call any layer or the mixer gets
         int    mixCount = 0;            // channels handed to the mixer this block (the count policy)
 
-        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> scratch;   // per slot, 2 x prepared
-        std::array<juce::AudioBuffer<float>, mu_limits::kMaxLayers> view;      // per-call views of scratch (no storage)
-        std::array<mu_core::PeerTap, mu_limits::kMaxLayers> peers {};
-        std::array<bool, mu_limits::kMaxLayers> live {};
-        std::array<double, mu_limits::kMaxLayers> loopBeats {};                // cached per slot, last rendered block
+        mu_core::FlatArray<juce::AudioBuffer<float>> scratch;   // per slot, 2 x prepared
+        mu_core::FlatArray<juce::AudioBuffer<float>> directViews;   // per-call views of the host's direct-out buffers (no storage)
+        mu_core::FlatArray<juce::AudioBuffer<float>> view;      // per-call views of scratch (no storage)
+        mu_core::FlatArray<mu_core::PeerTap> peers;
+        mu_core::FlatArray<bool> live;
+        mu_core::FlatArray<double> loopBeats;                // cached per slot, last rendered block
 
         // The block's MIDI: input decoded at the front, the live layers' output after it, the note-off
         // reserve (tails' owed note-offs) in the last kMidiNoteOffReserve entries.
@@ -1407,5 +1432,8 @@ private:
     void renderLayers(const mu_core::LayerBlock& block, const mu_core::BlockTransport& t,
                       int offset, int numSamples, bool firstChunk, bool lastChunk) noexcept;
 
+    const mu_limits::ProcessorLimits limits_;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };
+

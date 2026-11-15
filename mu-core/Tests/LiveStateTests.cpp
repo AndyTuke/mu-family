@@ -6,6 +6,7 @@
 
 #include "Control/LiveState.h"
 #include <array>
+#include "TestLimits.h"
 
 namespace
 {
@@ -32,7 +33,7 @@ struct Fake
     bool refuseLaunch = false;
     std::vector<std::pair<int, int>> launched;
     // One entry per layer slot (the live state walks every slot up to kMaxLayers, 8 or 16 by build).
-    static constexpr size_t kSlots = (size_t) mu_limits::kMaxLayers;
+    static constexpr size_t kSlots = (size_t) mu_test::kLimits.layers;
     static std::array<int, kSlots> noClips() { std::array<int, kSlots> a {}; a.fill(-1); return a; }
     std::array<bool, kSlots>     slotPend {};
     std::array<uint32_t, kSlots> slotSer {};
@@ -128,7 +129,7 @@ public:
 
         beginTest("the mode needs a performance and a product that supports it; every other action needs the mode");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             expect(! s.perform(mode(-1)), "no performance loaded: refused");
             expect(! s.isPerformanceMode());
             expect(s.loadPerformance(makeList(4), file));
@@ -153,7 +154,7 @@ public:
 
         beginTest("an item stages and queues; the commit makes it current; a loaded item's own press is a no-op");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             expect(s.perform(act(ControlActionType::PerformanceItem, 0, 2)));
@@ -171,7 +172,7 @@ public:
 
         beginTest("pressing the playing item while another is queued cancels the switch");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::PerformanceItem, 0, 1)); f.commit(s);
@@ -185,7 +186,7 @@ public:
 
         beginTest("a stopped transport applies at once: the item becomes current without a queue");
         {
-            Fake f; f.stopped = true; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             expect(s.perform(act(ControlActionType::PerformanceItem, 0, 3)));
@@ -195,7 +196,7 @@ public:
 
         beginTest("a load that fails is refused: nothing queued, nothing current, nothing staged");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             f.failNext = true;
@@ -206,7 +207,7 @@ public:
 
         beginTest("an item that cannot load, or an index out of range, is refused and stages nothing");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(8), file);
             s.perform(mode(1));
             expect(! s.perform(act(ControlActionType::PerformanceItem, 0, 4)), "item 4 is missing");
@@ -217,7 +218,7 @@ public:
 
         beginTest("another preset staged over the queued item: the queue clears, and its commit leaves no item current");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::PerformanceItem, 0, 1)); f.commit(s);
@@ -235,7 +236,7 @@ public:
 
         beginTest("a queued item applied early (without a commit hook) settles at the next reconcile");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::PerformanceItem, 0, 3));
@@ -247,7 +248,7 @@ public:
 
         beginTest("Prev and Next wrap, skip unusable items and step from the queued item");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());   // loadable: 0 1 2 3 and 6
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());   // loadable: 0 1 2 3 and 6
             s.loadPerformance(makeList(8), file);
             s.perform(mode(1));
             expect(s.perform(act(ControlActionType::PerformanceNext)));
@@ -270,7 +271,7 @@ public:
         beginTest("Prev and Next with no other loadable item refuse");
         {
             Fake f; for (bool& b : f.loadable) b = false; f.loadable[2] = true;
-            LiveState s; s.setCallbacks(f.callbacks());
+            LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(8), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::PerformanceItem, 0, 2)); f.commit(s);
@@ -280,7 +281,7 @@ public:
 
         beginTest("SelectLayer is absolute, bounded by the live layer count, and bumps the revision only on a change");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(2), file);
             s.perform(mode(1));
             const auto rev = s.getRevision();
@@ -297,7 +298,7 @@ public:
 
         beginTest("a commit that shrinks the layer count pulls the selected layer back inside it");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::SelectLayer, 3));
@@ -309,7 +310,7 @@ public:
 
         beginTest("leaving the mode drops a queued item and cancels its staged preset; a list cannot be swapped while it is on");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
             s.perform(act(ControlActionType::PerformanceItem, 0, 1));
@@ -321,7 +322,7 @@ public:
 
         beginTest("listeners hear every change on the message thread");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             CountingListener l; s.addListener(&l);
             s.loadPerformance(makeList(4), file);
             s.perform(mode(1));
@@ -335,7 +336,7 @@ public:
 
         beginTest("the session keeps the performance path, current item and mode; not the selection or the queue");
         {
-            Fake f; LiveState s; s.setCallbacks(f.callbacks());
+            Fake f; LiveState s { mu_test::kLimits.layers }; s.setCallbacks(f.callbacks());
             auto list = makeList(4);
             expect(list.save(file));
             mu_pp::PerformanceFile loaded; mu_pp::PerformanceFile::load(file, loaded);
@@ -346,7 +347,7 @@ public:
             juce::ValueTree state("MuTantState");
             s.saveTo(state);
 
-            LiveState t; t.setCallbacks(f.callbacks());
+            LiveState t { mu_test::kLimits.layers }; t.setCallbacks(f.callbacks());
             t.restoreFrom(state);
             expect(t.isPerformanceMode(), "the mode returns");
             expectEquals(t.getCurrentItem(), 3);
@@ -355,25 +356,25 @@ public:
             expectEquals(t.getPerformance().count(), 4);
 
             f.supported = false;
-            LiveState u; u.setCallbacks(f.callbacks());
+            LiveState u { mu_test::kLimits.layers }; u.setCallbacks(f.callbacks());
             u.restoreFrom(state);
             expect(! u.isPerformanceMode(), "an unsupported build never comes back locked");
             expectEquals(u.getCurrentItem(), 3);
 
             file.deleteFile();
-            Fake gone; LiveState v; v.setCallbacks(gone.callbacks());
+            Fake gone; LiveState v { mu_test::kLimits.layers }; v.setCallbacks(gone.callbacks());
             v.restoreFrom(state);
             expectEquals(v.getPerformance().count(), 0, "a performance file that is gone restores nothing");
             expect(! v.isPerformanceMode());
 
             juce::ValueTree empty("MuTantState"); empty.setProperty("performancePath", "x", nullptr);
-            LiveState w; w.saveTo(empty);
+            LiveState w { mu_test::kLimits.layers }; w.saveTo(empty);
             expect(! empty.hasProperty("performancePath"), "no performance: the properties are cleared");
         }
 
         beginTest("layer count and layer colour come through the owner's callbacks, with defaults when none are supplied");
         {
-            LiveState bare;
+            LiveState bare { mu_test::kLimits.layers };
             expectEquals(bare.getLayerCount(), 1, "no callback: one layer");
             expectEquals(bare.getLayerColourIndex(3), 3, "no callback: the palette in order");
             expectEquals(bare.getLayerColourIndex(11), 3, "no callback: wraps at 8");
@@ -382,7 +383,7 @@ public:
             Fake f; f.layers = 5;
             auto cb = f.callbacks();
             cb.layerColourIndex = [](int layer) { return 7 - layer; };
-            LiveState s; s.setCallbacks(cb);
+            LiveState s { mu_test::kLimits.layers }; s.setCallbacks(cb);
             expectEquals(s.getLayerCount(), 5);
             expectEquals(s.getLayerColourIndex(0), 7);
             expectEquals(s.getLayerColourIndex(2), 5);
@@ -407,7 +408,7 @@ public:
 
         beginTest("a clip launch while playing queues, the commit makes it playing and records it with the layer");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b0111);
             expect(s.getClipMask(0) == 0b0111 && s.getClipMask(1) == 0);
             expect(s.perform(launch(0, 1)));
@@ -425,7 +426,7 @@ public:
 
         beginTest("a stopped transport applies the clip at once: playing, nothing queued");
         {
-            Fake f; f.stopped = true; LiveState s; ready(f, s);
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(2, 0b1000);
             expect(s.perform(launch(2, 3)));
             expectEquals(s.getPlayingClip(2), 3);
@@ -435,7 +436,7 @@ public:
 
         beginTest("an empty pad, a bad index, a missing layer and a refused launch change nothing; with the mode off only a launch is allowed");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b0010);
             expect(! s.perform(launch(0, 0)), "empty pad");
             expect(! s.perform(launch(0, 8)) && ! s.perform(launch(0, -1)), "clip out of range");
@@ -454,7 +455,7 @@ public:
 
         beginTest("the playing pad mutes and unmutes; with another clip queued the first press cancels the queue");
         {
-            Fake f; f.stopped = true; LiveState s; ready(f, s);
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b0110);
             s.perform(launch(0, 1));
             expectEquals(s.getPlayingClip(0), 1);
@@ -480,7 +481,7 @@ public:
 
         beginTest("a layer-preset load staged over a queued clip supersedes it; so does a cancel");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b0011);
             s.perform(launch(0, 0)); f.slotCommit(s, 0);
             s.perform(launch(0, 1));
@@ -502,7 +503,7 @@ public:
 
         beginTest("a non-clip layer-preset stage, an added or reset layer forget that layer's clips only");
         {
-            Fake f; f.stopped = true; LiveState s; ready(f, s);
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b11); s.setClipMask(1, 0b11);
             s.perform(launch(0, 1)); s.perform(launch(1, 0));
             s.clearLayerClips(0);
@@ -513,7 +514,7 @@ public:
 
         beginTest("a full preset forgets every clip: on its commit, when applied at once, not while only staged");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b11); s.setClipMask(1, 0b11);
             s.perform(launch(0, 1)); f.slotCommit(s, 0);
             s.perform(launch(1, 0)); f.slotCommit(s, 1);
@@ -542,7 +543,7 @@ public:
 
         beginTest("a staged full preset cancelled from outside the live state leaves the clips alone");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b11);
             s.perform(launch(0, 1)); f.slotCommit(s, 0);
             f.foreignStage();                       // the browser stages a full preset
@@ -556,7 +557,7 @@ public:
 
         beginTest("a full preset landing, or a restored session, shows the clips the layers saved as playing");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b101);
             s.perform(launch(0, 0)); f.slotCommit(s, 0);
             f.saved[0] = 2;                         // the new layers carry clip 2 as playing
@@ -580,7 +581,7 @@ public:
 
         beginTest("a mute changed outside the pad refreshes the lamps with no other event");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             CountingListener l; s.addListener(&l);
             const auto rev = s.getRevision();
             f.muted[0] = true;                      // the strip, host automation or MIDI learn flipped it
@@ -593,7 +594,7 @@ public:
 
         beginTest("a performance item cancelled by the performer does not read as a full preset landing");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b11);
             s.perform(launch(0, 1)); f.slotCommit(s, 0);
             s.perform(act(ControlActionType::PerformanceItem, 0, 1));   // queues item 1 (stages a full preset)
@@ -604,7 +605,7 @@ public:
 
         beginTest("remapLayers: playing clips and masks follow their layer, a moved layer's queue is dropped");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             for (int i = 0; i < 4; ++i) s.setClipMask(i, (uint8_t) (0b1111 << i));
             s.perform(launch(1, 4)); f.slotCommit(s, 1);
             s.perform(launch(2, 5)); f.slotCommit(s, 2);
@@ -623,7 +624,7 @@ public:
             expectEquals(s.getPlayingClip(3), -1, "the vacated top layer starts clean");
             expectEquals((int) s.getClipMask(3), 0);
 
-            LiveState t; Fake g; ready(g, t);
+            LiveState t { mu_test::kLimits.layers }; Fake g; ready(g, t);
             t.setClipMask(0, 0b01); t.setClipMask(2, 0b10);
             t.perform(launch(0, 0)); g.slotCommit(t, 0);
             t.perform(launch(2, 1)); g.slotCommit(t, 2);
@@ -636,7 +637,7 @@ public:
 
         beginTest("clip names: published per clip, notify only on a change, follow their layer through a remap");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             struct Count : LiveView::Listener
             {
                 int n = 0;
@@ -650,9 +651,9 @@ public:
             expectEquals(count.n, 1);
             s.setClipName(0, 3, "Intro");
             expectEquals(count.n, 1, "the same name is not a change");
-            s.setClipName(mu_limits::kMaxLayers + 1, 0, "x"); s.setClipName(0, 8, "x"); s.setClipName(0, -1, "x");   // a layer past the build's capacity
+            s.setClipName(mu_test::kLimits.layers + 1, 0, "x"); s.setClipName(0, 8, "x"); s.setClipName(0, -1, "x");   // a layer past the build's capacity
             expectEquals(count.n, 1, "out of range is ignored");
-            expectEquals(s.getClipName(mu_limits::kMaxLayers + 1, 0), juce::String());
+            expectEquals(s.getClipName(mu_test::kLimits.layers + 1, 0), juce::String());
             expectEquals(s.getClipName(0, 8), juce::String());
 
             s.remapLayers([](int i) { return i == 0 ? 2 : (i == 2 ? 0 : i); });
@@ -663,7 +664,7 @@ public:
 
         beginTest("clearing a clip: the playing one stops being playing, a queued one has its launch cancelled");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b111);
             s.perform(launch(0, 0)); f.slotCommit(s, 0);
             s.perform(launch(0, 2));
@@ -679,7 +680,7 @@ public:
 
         beginTest("ClipNext and ClipPrev step the selected layer through the stored clips, wrapping, never muting");
         {
-            Fake f; LiveState s; ready(f, s, 1);    // layer 2 selected
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s, 1);    // layer 2 selected
             s.setClipMask(1, 0b10100101);           // clips 0 2 5 7
             expect(s.perform(act(ControlActionType::ClipNext)));
             expectEquals(s.getQueuedClip(1), 0, "from nothing, Next lands on the first stored clip");
@@ -710,7 +711,7 @@ public:
 
         beginTest("ClipNext and ClipPrev with no other stored clip refuse");
         {
-            Fake f; f.stopped = true; LiveState s; ready(f, s);
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0);
             expect(! s.perform(act(ControlActionType::ClipNext)), "nothing stored");
             s.setClipMask(0, 0b100);
@@ -722,7 +723,7 @@ public:
 
         beginTest("a restored session forgets the clip state; masks and notifications");
         {
-            Fake f; f.stopped = true; LiveState s; ready(f, s);
+            Fake f; f.stopped = true; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             s.setClipMask(0, 0b1);
             s.perform(launch(0, 0));
             CountingListener l; s.addListener(&l);
@@ -740,7 +741,7 @@ public:
 
         beginTest("without the owner's clip callbacks the actions are refused and the getters are safe");
         {
-            LiveState s;
+            LiveState s { mu_test::kLimits.layers };
             expectEquals(s.getPlayingClip(-1), -1);
             expectEquals(s.getPlayingClip(99), -1);
             expectEquals(s.getQueuedClip(99), -1);
@@ -754,7 +755,7 @@ public:
 
         beginTest("AppPrev and AppNext are owned by the live state and refused, with the mode on or off");
         {
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             expect(LiveState::handles(ControlActionType::AppPrev) && LiveState::handles(ControlActionType::AppNext));
             CountingListener l; s.addListener(&l);
             expect(! s.perform(act(ControlActionType::AppPrev)), "mode on: no hub to switch to");
@@ -772,7 +773,7 @@ public:
 
         beginTest("PagePrev and PageNext move the selection one page at the same position, never wrap, and need the mode and a paged product");
         {
-            Fake f; f.layers = 16; LiveState s; ready(f, s, 2);
+            Fake f; f.layers = 16; LiveState s { mu_test::kLimits.layers }; ready(f, s, 2);
             bool paged = true;
             auto cb = f.callbacks();
             cb.hasLayerPages = [&paged] { return paged; };
@@ -805,7 +806,7 @@ public:
 
         beginTest("a partial last page clamps the target to the last layer");
         {
-            Fake f; f.layers = 10; LiveState s; ready(f, s, 5);
+            Fake f; f.layers = 10; LiveState s { mu_test::kLimits.layers }; ready(f, s, 5);
             auto cb = f.callbacks();
             cb.hasLayerPages = [] { return true; };
             s.setCallbacks(cb);
@@ -815,10 +816,10 @@ public:
 
         beginTest("the transport state comes through the owner's callbacks; a change outside the pad refreshes the lamps");
         {
-            LiveState bare;
+            LiveState bare { mu_test::kLimits.layers };
             expect(! bare.isTransportPlaying() && ! bare.isTransportOwnedOutside(), "no callbacks: stopped, owned by nobody");
 
-            Fake f; LiveState s; ready(f, s);
+            Fake f; LiveState s { mu_test::kLimits.layers }; ready(f, s);
             bool playing = false, outside = false;
             auto cb = f.callbacks();
             cb.transportPlaying = [&] { return playing; };

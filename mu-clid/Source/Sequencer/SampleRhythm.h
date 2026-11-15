@@ -11,6 +11,7 @@
 #include "Sequencer/RenderContext.h"         // mu-core: the render contract's per-call context
 #include "MuLimits.h"
 
+#include <juce_audio_basics/juce_audio_basics.h>   // NormalisableRange
 #include <array>
 #include <atomic>
 #include <memory>
@@ -118,17 +119,28 @@ struct SampleRhythm : Rhythm
 private:
     // The modulation pass's phases (audio thread; seed, strip and snapshot run under modLock where noted).
     struct StripMod { float pan, effect, delay, reverb; };   // modulated mixer-strip values
-    void     seedModulation(const VoiceParams& modParams, const MixerEngine::ChannelState& strip);
+    void     fillLaneBase(const VoiceParams& modParams, const MixerEngine::ChannelState& strip);
     StripMod applyStripModulation(MixerEngine::ChannelState& strip);
     void     publishModSnapshot(const VoiceParams& modParams, const StripMod& stripMod);
     void     writeBackModulation(VoiceParams& modParams);
 
     // The matrix's working values, one per destination id, built in the constructor so the audio thread
-    // never inserts (keys are string literals, so the views stay valid); modSlot reaches each by its
-    // ModDest::kTable index without hashing.
+    // never inserts (keys are string literals, so the views stay valid).
     std::unordered_map<std::string_view, float> modParamValues;
-    std::array<float*, ModDest::kTableSize>     modSlot {};
-    float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
+
+    // The modulation lane (mu_mod::resolveLaneSeeded): one entry per live ModDest::kTable row, in table order. laneBase is each
+    // destination's current value in its own units (from the rhythm's fields), laneRange its knob range (the step-count
+    // dependent Euclid ranges are set every block), laneOut the modulated value in the same units.
+    // laneOfDest maps a kTable index to its lane entry (-1: a reserved row).
+    int                                                         laneCount = 0;
+    std::array<const char*, ModDest::kTableSize>                laneIds {};
+    std::array<int, ModDest::kTableSize>                        laneOfDest {};
+    std::array<float, ModDest::kTableSize>                      laneBase {};
+    std::array<float, ModDest::kTableSize>                      laneOut {};
+    std::array<juce::NormalisableRange<float>, ModDest::kTableSize> laneRange {};
+    float&                              base(int destIndex) noexcept  { return laneBase[(size_t) laneOfDest[(size_t) destIndex]]; }
+    float                               out(int destIndex) const noexcept { return laneOut[(size_t) laneOfDest[(size_t) destIndex]]; }
+    juce::NormalisableRange<float>&     range(int destIndex) noexcept { return laneRange[(size_t) laneOfDest[(size_t) destIndex]]; }
 
 public:
     // The rhythm's own step cursor: it decides the rhythm's hits from the host's step clock.

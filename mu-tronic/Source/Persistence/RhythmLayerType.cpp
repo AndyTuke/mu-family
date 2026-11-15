@@ -43,7 +43,7 @@ namespace
 
         // ── RhythmHost ───────────────────────────────────────────────────────
         juce::AudioProcessorValueTreeState& getRhythmParameters() noexcept override { return proc.apvts; }
-        int getRhythmCount() const noexcept override { return mu_limits::kMaxLayers; }
+        int getRhythmCount() const noexcept override { return proc.getLimits().layers; }
 
         mu_clid::Rhythm& getRhythmLayer(int layer) noexcept override
         {

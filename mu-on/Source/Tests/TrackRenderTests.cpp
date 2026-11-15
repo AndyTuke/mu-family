@@ -4,6 +4,7 @@
 // the RumbleEngine's own tail handling (cleared by reset, skipped once a silent feed has let it die away).
 // Formerly GrooveVoicesTests: the per-slot engine owner is gone, each Track holds its one engine.
 
+#include "Plugin/MuOnLimits.h"
 #include "Plugin/PluginProcessor.h"
 #include "Tests/ProcessorSeamHelpers.h"
 #include "Tests/AllocationProbe.h"   // mu-core: heap activity inside a scope
@@ -54,7 +55,7 @@ namespace
         c.callBeats = (double) n * c.beatsPerSample;
         c.playing = 1;
         c.peers = peers;
-        c.numPeers = peers != nullptr ? mu_limits::kMaxLayers : 0;
+        c.numPeers = peers != nullptr ? mu_on::kLimits.layers : 0;
         return c;
     }
 }
@@ -112,7 +113,7 @@ public:
 
             juce::AudioBuffer<float> source(2, prepared), out(2, prepared);
             fillBurst(source, prepared);
-            std::array<mu_core::PeerTap, mu_limits::kMaxLayers> peers {};
+            std::array<mu_core::PeerTap, mu_on::kLimits.layers> peers {};
             peers[0] = { { source.getReadPointer(0), source.getReadPointer(1) }, 1, 0 };
 
             float peak = 0.0f;

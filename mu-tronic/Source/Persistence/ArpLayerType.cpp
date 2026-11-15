@@ -53,18 +53,13 @@ namespace
         std::unique_ptr<mu_toni::Arp> standIn;   // see getArp
     };
 
-    // mu-Toni's Arp content with its host adapter and modulation destinations: the one content instance the editor
-    // keeps for every Arp slot. The adapter is the first base so it exists before the content is built over it.
+    // mu-Toni's Arp content with its host adapter: the one content instance the editor keeps for every Arp slot (its modulation
+    // destinations come from the registry: the type publishes its table). The adapter is the first base so it exists before the content is built over it.
     class ArpSlotContent : private ArpSlotHost, public mu_toni::ArpContent
     {
     public:
         explicit ArpSlotContent(ProcessorBase& p)
             : ArpSlotHost(p), mu_toni::ArpContent(p, static_cast<ArpSlotHost&>(*this)) {}
-
-        const ModDestProvider* getModDestProvider() const noexcept override { return &destinations; }
-
-    private:
-        ModDestProvider destinations = mu_toni::makeModDestProvider();
     };
 
     std::unique_ptr<LayerContent> createArpContent(ProcessorBase& host, int slot)
@@ -89,6 +84,8 @@ mu_core::LayerTypeInfo arpLayerType()
     info.appColourId = (int) MuLookAndFeel::appBlue;   // the main area is painted in mu-Toni's blue
     info.typeTag = "\xCE\xBC" "-Toni";   // UTF-8: the product name with the real mu
     info.takesNotes = true;   // the arpeggiator plays from the keys it is given
+    info.modTargets = mu_toni::kModDestTable;   // published through the registry
+    info.numModTargets = mu_toni::kNumModDests;
    #if MU_TRONIC_WITH_UI
     info.createContent = &createArpContent;
     info.createMiniVisual = &createArpMiniVisual;

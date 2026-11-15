@@ -36,6 +36,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include "TestLimits.h"
 
 namespace mu_golden
 {
@@ -296,7 +297,7 @@ namespace mu_golden
         cap.lines.emplace_back(prefix + ".midi.hash", hex64(midiOut.h));
         cap.lines.emplace_back(prefix + ".end.masterPeak", hex32(proc.mixerEngine.masterPeakL.load()) + " "
                                                                + hex32(proc.mixerEngine.masterPeakR.load()));
-        for (int i = 0; i < sc.numStems && i < MixerEngine::MaxChannels; ++i)
+        for (int i = 0; i < sc.numStems && i < mu_test::kLimits.layers; ++i)
         {
             cap.lines.emplace_back(prefix + ".end.ch" + juce::String(i) + "Peak",
                                    hex32(proc.mixerEngine.channelPeaksL[i].load()) + " "

@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuTheme.h"
-#include "MuLimits.h"   // mu_limits::kMaxBuses: the mixer's Buses page
+#include "MuLimits.h"   // the mixer's Buses page
 #include <cmath>
 #include <vector>
 
@@ -200,6 +200,7 @@ public:
         modLabelG               = 0x100000e6,  // cyan-teal
         modLabelH               = 0x100000e7,  // grey
         indicatorLockTint       = 0x100000e8,  // red parameter-lock LED and ghost line
+        indicatorAbsoluteTint   = 0x100000e9,  // amber ring of a knob holding an absolute value (not an offset)
     };
 
     MuLookAndFeel();
@@ -362,6 +363,8 @@ public:
 
     // Static palette helpers
     static juce::Colour colour(ColourIds id) noexcept;
+    // A slider property: set, the knob is drawn in its own fill colour even inside an app-coloured page (an Absolute override's tint).
+    static inline const juce::Identifier kKnobOwnTint { "muKnobOwnTint" };
 
     // Fixed 8-colour voice palette (Red / Cyan / Orange / Magenta / Lime / Rose / Silver /
     // Blue), index = the voice's colour index. Every entry is a Launchpad X palette colour, so
@@ -519,11 +522,9 @@ public:
     // insert column beside it, a divider after each unit, then the Master. The strip width is whatever the
     // page leaves after the units' insert columns; it must stay at least one channel strip wide, which holds
     // for three buses (138) and not for four, by design: a fourth needs a layout ruling, not squeezed strips.
-    static constexpr int kMixerNumBuses    = mu_limits::kMaxBuses;
-    static constexpr int kMixerBusStripW   = kMixerNumBuses > 0
-        ? (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerNumBuses * kMixerDivW) / kMixerNumBuses - kMixerInsertPanelW
-        : 0;
-    static_assert(kMixerNumBuses == 0 || kMixerBusStripW >= kMixerChanW,
+    static constexpr int kMixerMaxBuses    = 3;   // the most buses the page lays out (MixerOverlay asserts a mixer has no more)
+    static constexpr int kMixerBusStripW   = (kMixerOverlayW - kMixerLabelPanelW - kMixerMasterTotalW - kMixerMaxBuses * kMixerDivW) / kMixerMaxBuses - kMixerInsertPanelW;
+    static_assert(kMixerBusStripW >= kMixerChanW,
                   "the Buses page cannot fit this many buses at the strip width: it needs a layout ruling");
 
     // ── Canonical knob sizes ──────────────────────────────────────────────

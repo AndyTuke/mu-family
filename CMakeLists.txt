@@ -33,7 +33,7 @@ project(mu-family VERSION ${MUFAMILY_VERSION_BASE}.0)
 #   mu-toni-midi/        mu-Toni MIDI: the arpeggiator as a MIDI effect
 #   mu-on/               909-style groove sequencer
 #   mu-tilate/           loop slicer (plugin target, layer library, tests)
-#   mu-tronic/           performance unit of 16 layer slots (Standalone only, pay what you want)
+#   mu-tronic/           performance unit of 16 layer slots (Standalone only, £30 licence)
 #   mu-host/             one mu instrument channel as a plug-in (VST3 + CLAP), on the mu-Tronic shell
 #   tools/               shared dev tools (license keygen etc.)
 #   tests/               cross-plugin listening-test pipeline (analyse.py, runners)
@@ -176,8 +176,9 @@ add_subdirectory(mu-toni)     # generative arpeggiator mono-synth, freeware (Sta
 add_subdirectory(mu-toni-midi) # mu-Toni MIDI: the arpeggiator as a MIDI effect (VST3 + CLAP); compiles mu-toni's arp rows, needs mu-clid's increment_build_number target
 add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare (Standalone + VST3 + CLAP)
 add_subdirectory(mu-tilate)   # loop slicer, built in stages: layer library + tests (docs/mu-tilate/design-buildplan.md)
-add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, pay what you want); after the products whose layers it will host
+add_subdirectory(mu-tronic)   # performance unit: 16 layer slots (Standalone only, £30 licence); after the products whose layers it will host
 add_subdirectory(mu-host)     # one mu instrument channel as a plug-in (VST3 + CLAP): the mu-Tronic shell with one slot; after mu-tronic, whose sources it builds on
+add_subdirectory(mu-core/Bench) # mu-core-bench-*: mixer timing for the runtime-counts work (on demand, not in ALL); after the products whose library variants it reuses
 
 # The status-bar hard rule, checked on each product's real editor (on demand: cmake --build build --target <product>-ui-audit).
 include(cmake/UiAudit.cmake)

@@ -15,23 +15,23 @@ namespace
     constexpr int kMidiOutEvents = 64;
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout(const mu_limits::ProcessorLimits& limits)
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     // ── One mixer channel strip per slot (all sixteen) — the shared `ch{N}_` binding the MixerChannel and
     //    MixerOverlay use: level / pan / mute / solo, FX sends, sidechain. Synced by ProcessorBase::syncGlobalFxParam.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < limits.layers; ++i)
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = "Slot " + juce::String(i + 1) + " Ch ";
         mu_mixfx::ChannelStripOptions strip;
         strip.midiIn = true;   // each slot's layer has its own MIDI In channel (Omni or 1-16)
-        mu_mixfx::addChannelStripParams(layout, c, n, strip);
+        mu_mixfx::addChannelStripParams(layout, c, n, strip, limits);
     }
 
-    // ── The group buses (mu_limits::kMaxBuses, defined for this target): bus{B}_ strips and their inserts.
-    mu_mixfx::addBusParams(layout);
+    // ── The group buses (kLimits.buses): bus{B}_ strips and their inserts.
+    mu_mixfx::addBusParams(layout, {}, limits);
 
     // ── Every registered type's own rows, for every slot. A type's table is added once per prefix (the five mu-On
     //    engines will share t{N}_), so each prefix exists on all sixteen slots and the type only selects the live one.
@@ -42,8 +42,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     {
         const auto& info = types.at(t);
         if (info.addLayerParams == nullptr || ! declaredPrefixes.insert(info.paramPrefixLetter).second) continue;
-        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-            info.addLayerParams(layout, i);
+        for (int i = 0; i < limits.layers; ++i)
+            info.addLayerParams(layout, i, limits.layers);
     }
     // ── Rows a type shares between its slots (the Pattern's tonal centre), once per type.
     for (int t = 0; t < types.size(); ++t)
@@ -51,7 +51,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
             info.addGlobalParams(layout);
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
-    mu_mixfx::addGlobalFxParams(layout, 2);   // swaps land on the bar until a looping type is registered
+    mu_mixfx::addGlobalFxParams(layout, 2, limits);   // swaps land on the bar until a looping type is registered
 
     return layout;
 }
@@ -60,8 +60,9 @@ PluginProcessor::PluginProcessor(const ProcessorIdentity& identity)
     : ProcessorBase(BusesProperties()
                         .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
                         .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
-                    createParameterLayout(),
-                    juce::Identifier(identity.stateType))
+                    createParameterLayout(identity.limits),
+                    juce::Identifier(identity.stateType),
+                    identity.limits)
 {
     // The audio thread reads layers only through the published view, so a type change mutes nothing.
     setLayerAccess(mu_core::LayerAccess::Published);
@@ -72,14 +73,14 @@ PluginProcessor::PluginProcessor(const ProcessorIdentity& identity)
 
     // Every slot holds a layer for the processor's lifetime (Empty until the user chooses a type); the live
     // count is the capacity, so the first view lists all sixteen.
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < getLimits().layers; ++i)
     {
         auto layer = createLayer(i);
         layer->colourIndex = i % mu_limits::kLayersPerPage;   // distinct within a page (the palette has as many colours as a page has slots)
         layer->bindParams(apvts, i);
         layers[(size_t) i] = std::move(layer);   // layer-ok: constructor, nothing renders before publishLayers
     }
-    publishLayers(mu_limits::kMaxLayers);
+    publishLayers(getLimits().layers);
 
     initAppSettings(identity.appName);   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
@@ -177,7 +178,7 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 int PluginProcessor::getNumActiveLayers() const
 {
     int n = 0;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+    for (int i = 0; i < getLimits().layers; ++i)
         if (getLayerTypeId(i) != mu_core::LayerTypeId::Empty) ++n;
     return n;
 }

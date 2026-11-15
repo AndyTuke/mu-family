@@ -85,8 +85,8 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
         if (hasOutputBus())
         {
             // A product with group buses stores the choice in "bus" (0 = Main, 1.. = a bus); the others in "outBus".
-            const char* outId = mu_limits::kMaxBuses > 0 ? "bus" : "outBus";
-            outBusBox.setSelectedId((mu_limits::kMaxBuses > 0 ? state.busAssign : state.outputBus) + 1, juce::dontSendNotification);
+            const char* outId = limits_.buses > 0 ? "bus" : "outBus";
+            outBusBox.setSelectedId((limits_.buses > 0 ? state.busAssign : state.outputBus) + 1, juce::dontSendNotification);
             outBusBox.onChange = [proc, prefix, outId, this] {
                 const int id = outBusBox.getSelectedId();   // 1 = Main, then the buses (or Out 1..8)
                 if (auto* p = proc->apvts.getParameter(prefix + outId))
@@ -113,10 +113,10 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
         sendReverb.onValueChanged = [&state](double v) { state.sendReverb.store ((float)v, std::memory_order_relaxed); };
         if (hasOutputBus())
         {
-            outBusBox.setSelectedId((mu_limits::kMaxBuses > 0 ? state.busAssign : state.outputBus) + 1, juce::dontSendNotification);
+            outBusBox.setSelectedId((limits_.buses > 0 ? state.busAssign : state.outputBus) + 1, juce::dontSendNotification);
             outBusBox.onChange = [&state, this] {
                 const int v = outBusBox.getSelectedId() - 1;
-                if (mu_limits::kMaxBuses > 0) state.busAssign.store(juce::jlimit(0, mu_limits::kMaxBuses, v), std::memory_order_relaxed);
+                if (limits_.buses > 0) state.busAssign.store(juce::jlimit(0, limits_.buses, v), std::memory_order_relaxed);
                 else                          state.outputBus.store(juce::jlimit(0, 8, v), std::memory_order_relaxed);
                 if (onStatusUpdate) onStatusUpdate(channelName + " Out", outBusBox.getText(), channelColour);
             };
@@ -234,7 +234,7 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
                          : channelType == Type::Bus     ? StripKind::Bus
                                                         : StripKind::Return;
     // Which sources this strip type may take is decided once, in SidechainRemap.h, for the engine and the UI alike.
-    auto legal = [&](int source) { return mu_mix::isLegalSidechainSource(kind, ownIndex, source, MixerEngine::MaxChannels, mu_limits::kMaxBuses); };
+    auto legal = [&](int source) { return mu_mix::isLegalSidechainSource(kind, ownIndex, source, limits_.layers, limits_.buses); };
 
     const int prevId = scSourceBox.getSelectedId();
     scSourceBox.clear(juce::dontSendNotification);
@@ -247,14 +247,14 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
                                                       : names[i];
         scSourceBox.addItem(label, i + 2);  // ID = channel index + 2
     }
-    // External DAW sidechain bus — ID = MaxChannels + 2 (maps to apvts = kMaxLayers + 1, engine = kExtSidechainSrc).
-    if (mu_limits::kExternalSidechain)
-        scSourceBox.addItem("Ext In", MixerEngine::MaxChannels + 2);
-    // Group buses follow the external input — ID = MaxChannels + 3 + b (apvts = kMaxLayers + 2 + b, engine = kExtSidechainSrc + 1 + b).
-    for (int b = 0; b < mu_limits::kMaxBuses; ++b)
-        if (legal(MixerEngine::busSidechainSource(b)))
+    // External DAW sidechain bus — ID = layers + 2 (maps to apvts = layers + 1, engine = extSidechainSrc()).
+    if (limits_.externalSidechain)
+        scSourceBox.addItem("Ext In", limits_.layers + 2);
+    // Group buses follow the external input — ID = layers + 3 + b (apvts = layers + 2 + b, engine = extSidechainSrc() + 1 + b).
+    for (int b = 0; b < limits_.buses; ++b)
+        if (legal(mu_mix::busSource(b, limits_.layers)))
             scSourceBox.addItem(b < busNames.size() && busNames[b].isNotEmpty() ? busNames[b] : busName(b),
-                                MixerEngine::MaxChannels + 3 + b);
+                                limits_.layers + 3 + b);
     // Restore previous selection if still valid, else default to none
     if (prevId > 1 && scSourceBox.indexOfItemId(prevId) >= 0)
         scSourceBox.setSelectedId(prevId, juce::dontSendNotification);
@@ -305,9 +305,9 @@ void MixerChannel::loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
     }
     if (hasOutputBus())
     {
-        const bool hasBuses = mu_limits::kMaxBuses > 0;
+        const bool hasBuses = limits_.buses > 0;
         if (auto* p = apvts.getRawParameterValue(prefix + (hasBuses ? "bus" : "outBus")))
-            outBusBox.setSelectedId(juce::jlimit(0, hasBuses ? mu_limits::kMaxBuses : 8, juce::roundToInt((float) *p)) + 1,
+            outBusBox.setSelectedId(juce::jlimit(0, hasBuses ? limits_.buses : 8, juce::roundToInt((float) *p)) + 1,
                                     juce::dontSendNotification);
     }
     if (hasSidechainControls())

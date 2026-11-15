@@ -88,12 +88,12 @@ void FxParamSync::syncGlobal(const juce::String& id, float v)
     int stripIdx = -1;
     if (const char* suffix = channelStripSuffix(id, stripIdx); suffix != nullptr)   // ch{N}_{param}
     {
-        if (stripIdx < MixerEngine::MaxChannels)
+        if (stripIdx < mixerEngine.numChannels)
             syncChannelStripParam(stripIdx, suffix, v);   // suffix into id buffer, no alloc
         return;
     }
 
-    if constexpr (MixerEngine::kNumBuses > 0)
+    if (mixerEngine.numBuses > 0)
         if (id.startsWith("bus"))                                           // bus{B}_{param}, bus{B}_i{I}_{param}
         {
             syncBusParam(id, v);
@@ -135,7 +135,7 @@ void FxParamSync::syncChannelStripParam(int channel, const char* param, float v)
     else if (is("scAtk"))   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel"))   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
     else if (is("outBus"))  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
-    else if (is("bus"))     ch.busAssign.store(juce::jlimit(0, MixerEngine::kNumBuses, juce::roundToInt(v)), std::memory_order_relaxed);
+    else if (is("bus"))     ch.busAssign.store(juce::jlimit(0, mixerEngine.numBuses, juce::roundToInt(v)), std::memory_order_relaxed);
 }
 
 // bus{B}_{suffix}: the strip's own suffixes, or i{I}_{drvChar|insP1..4} for an insert. Pointer arithmetic on the
@@ -145,14 +145,14 @@ void FxParamSync::syncBusParam(const juce::String& id, float v)
     const char* s = id.toRawUTF8();
     if (s[3] < '0' || s[3] > '9') return;
     const int b = s[3] - '0';
-    if (b >= MixerEngine::kNumBuses || s[4] != '_') return;
+    if (b >= mixerEngine.numBuses || s[4] != '_') return;
     const char* rest = s + 5;
     auto& bus = mixerEngine.buses[(size_t) b];
 
     if (rest[0] == 'i' && rest[1] >= '0' && rest[1] <= '9' && rest[2] == '_')   // i{I}_{param}
     {
         const int i = rest[1] - '0';
-        if (i >= MixerEngine::kBusInserts) return;
+        if (i >= mixerEngine.numBusInserts) return;
         auto& ins = bus.insert[i];
         const char* param = rest + 3;
         auto is = [param](const char* t) { return std::strcmp(param, t) == 0; };
@@ -173,7 +173,7 @@ void FxParamSync::syncBusParam(const juce::String& id, float v)
     else if (is("sendEff")) bus.sendEffect.store(v, std::memory_order_relaxed);
     else if (is("sendDly")) bus.sendDelay.store(v, std::memory_order_relaxed);
     else if (is("sendRev")) bus.sendReverb.store(v, std::memory_order_relaxed);
-    else if (is("scSrc"))   bus.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, juce::roundToInt(v)) - 1, std::memory_order_relaxed);
+    else if (is("scSrc"))   bus.sidechainSource.store(juce::jlimit(0, mu_mixfx::scSrcMax(mixerEngine.limits()), juce::roundToInt(v)) - 1, std::memory_order_relaxed);
     else if (is("scAmt"))   bus.sidechainAmount.store(v, std::memory_order_relaxed);
     else if (is("scAtk"))   bus.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel"))   bus.sidechainReleaseMs.store(v, std::memory_order_relaxed);
@@ -187,7 +187,7 @@ void FxParamSync::syncReturnStripParam(int retIndex, const char* rest, float v)
     else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);
     else if (is("mute"))  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
     else if (is("solo"))  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_mixfx::kScSrcMax, (int) v) - 1, std::memory_order_relaxed);
+    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, mu_mixfx::scSrcMax(mixerEngine.limits()), (int) v) - 1, std::memory_order_relaxed);
     else if (is("scAmt")) ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
     else if (is("scAtk")) ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
     else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);

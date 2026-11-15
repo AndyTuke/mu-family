@@ -1,5 +1,8 @@
 #pragma once
 
+#include "BuildNumber.h"   // MU_VERSION_STRING
+
+#include "Plugin/MuClidLimits.h"
 #include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
@@ -51,6 +54,7 @@ public:
 
     const juce::String getName() const override;
     juce::String getProductSlug() const override { return "mu-clid"; }   // key in latest.json
+    juce::String getVersionString() const override { return MU_VERSION_STRING; }
     // True for both DAW and standalone:
     //   - Standalone: MIDI clock sync.
     //   - DAW (VST3/CLAP): program-change → preset hot-swap.
@@ -108,7 +112,7 @@ public:
     void    updatePattern (int index)      { updateRhythmPattern(index); }
 
     // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
-    mu_core::SampleLibrary samples { *this };
+    mu_core::SampleLibrary samples { *this, getLimits().layers };
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
@@ -182,7 +186,7 @@ public:
     // Rebuilds slot `index`'s pattern in the rhythm's cursor (message thread).
     void updateRhythmPattern(int index)
     {
-        if (index >= 0 && index < mu_limits::kMaxLayers)
+        if (index >= 0 && index < mu_clid::kLimits.layers)
             sampleRhythm(index).cursor.updatePattern(sampleRhythm(index), kStepCap);
     }
     // Where slot r's pattern last started a pass, and the step counter's run id (audio thread: the swap stager
@@ -252,7 +256,7 @@ public:
     // A struct copy (see SampleRhythm::modulatedEuclidOverrides); empty for a slot that is not live.
     EuclidOverrides getModulatedEuclidOverrides(int rhythmIndex) const noexcept
     {
-        if (rhythmIndex < 0 || rhythmIndex >= mu_limits::kMaxLayers
+        if (rhythmIndex < 0 || rhythmIndex >= mu_clid::kLimits.layers
                           || rhythmIndex >= getNumRhythms())
             return {};
         return sampleRhythm(rhythmIndex).modulatedEuclidOverrides();
@@ -363,7 +367,7 @@ private:
     // The block's hits: the host clock's frame, each live rhythm's cursor walk, gathered as a BlockResult;
     // `steps` gets each rhythm's step, accent step and length.
     struct CursorSteps { int step = -1, accentStep = 0, length = 0; };
-    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, mu_limits::kMaxLayers>& steps);
+    BlockResult advanceCursors(int numRhythms, double beatPos, std::array<CursorSteps, mu_clid::kLimits.layers>& steps);
     // ── The render: the shared layer driver ──────────────────────────────────────────────────────────
     // The host's buses, the block's transport, then the shared driver (ProcessorBase::renderAndMix): the
     // rhythms render themselves (SampleRhythm::render) and the mixer runs, in chunks of the prepared size.
@@ -408,12 +412,12 @@ private:
     void applyPendingRhythmParams(int ri);        // message thread: one rhythm
     void dropPendingRhythmParams(int ri) noexcept;
 
-    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, mu_limits::kMaxLayers> pendingDirty {};
-    std::array<std::atomic<bool>, mu_limits::kMaxLayers> rhythmHasPending {};
+    std::array<std::array<std::atomic<bool>, kRhythmParamCount>, mu_clid::kLimits.layers> pendingDirty {};
+    std::array<std::atomic<bool>, mu_clid::kLimits.layers> rhythmHasPending {};
 
     // Per (rhythm, kRhythmParamDefs entry), the parameter's raw value (null if it has none); resolved
     // once in the constructor so the drain does no lookup by id.
-    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, mu_limits::kMaxLayers> rawParams {};
+    std::array<std::array<std::atomic<float>*, kRhythmParamCount>, mu_clid::kLimits.layers> rawParams {};
 
     // Suffix to index in kRhythmParamDefs, sorted by suffix, for the listener's lookup by binary
     // search (no String, no allocation). Built in the constructor and never changed.

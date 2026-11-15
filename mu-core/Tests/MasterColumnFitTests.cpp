@@ -2,6 +2,7 @@
 #include "UI/MasterInsertPanel.h"
 
 #include <vector>
+#include "TestLimits.h"
 
 // Fit and behaviour of the mu-link master column (design-ui mu-link section 3): the callback-driven
 // Master strip (80 px) beside the shared MasterInsertPanel (136 px), 216 x 622 together.
@@ -37,7 +38,7 @@ struct MasterColumnFitTests : juce::UnitTest
         const int h = mu_ui::s(kColumnH);
 
         // The strip alone: 80 px, callback-driven, no insert panel, no pan, mute or solo.
-        MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white);
+        MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white, mu_test::kLimits);
         master.useCallbackMaster();
         master.setFaderTop(MixerChannel::clientFaderTop());
         master.setBounds(0, 0, mu_ui::s(LF::kMixerMasterW), h);
@@ -97,11 +98,11 @@ struct MasterColumnFitTests : juce::UnitTest
         beginTest("master fader top lines up with the Client faders");
         {
             using LF = MuLookAndFeel;
-            MixerChannel client(MixerChannel::Type::Client, "App", juce::Colours::red);
+            MixerChannel client(MixerChannel::Type::Client, "App", juce::Colours::red, mu_test::kLimits);
             const int stripW = (LF::kWindowWidth - 2 * LF::kScrewedPanelInset - LF::kMixerMasterTotalW - LF::kMixerDivW
                                 - 7 * LF::kMixerChanGap) / 8;
             client.setBounds(0, 0, mu_ui::s(stripW), mu_ui::s(kColumnH));
-            MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white);
+            MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white, mu_test::kLimits);
             master.useCallbackMaster();
             master.setFaderTop(MixerChannel::clientFaderTop());
             master.setBounds(0, 0, mu_ui::s(LF::kMixerMasterW), mu_ui::s(kColumnH));
@@ -117,7 +118,7 @@ struct MasterColumnFitTests : juce::UnitTest
 
         beginTest("master level calls back on the fader only, never from the setter");
         {
-            MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white);
+            MixerChannel master(MixerChannel::Type::Master, "Master", juce::Colours::white, mu_test::kLimits);
             master.useCallbackMaster();
             int calls = 0;
             float last = -1.0f;

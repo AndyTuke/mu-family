@@ -104,10 +104,11 @@ target_compile_definitions(mu-tant
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
+# The one compiled mu-core library (mu-core/CMakeLists.txt); this product's counts are its kLimits constant.
 target_link_libraries(mu-tant
     PRIVATE
         mu-tant-layer
-        mu-core
+        mu-core-lib
         mu-tant-resources
         juce::juce_audio_utils
         juce::juce_dsp
@@ -328,3 +329,6 @@ target_link_libraries(mu-tant-wavetable-gen PRIVATE
     juce::juce_recommended_warning_flags)
 target_compile_definitions(mu-tant-wavetable-gen PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 set_target_properties(mu-tant-wavetable-gen PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# The JUCE modules come from the one shared mu-juce library.
+mu_use_shared_juce()
