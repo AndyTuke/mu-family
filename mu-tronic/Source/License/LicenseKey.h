@@ -15,6 +15,7 @@ namespace mu_tronic
 
     // Suggested amount (GBP) the support prompt quotes; matches the Lemon Squeezy product.
     inline constexpr int kSuggestedPrice = 30;
+    static_assert(kSuggestedPrice == 30, "mu-Tronic is the one 30 GBP product; the others are 20 GBP");
 
     // License file the user drops into the content dir (getContentDir()).
     inline constexpr const char* kLicenseFilename  = "mutronic.lic";
