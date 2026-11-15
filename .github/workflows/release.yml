@@ -59,6 +59,7 @@ jobs:
           cmake --build build --config Release --parallel 4 --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-clid-midi_VST3 mu-clid-midi_CLAP
+          mu-toni-midi_VST3 mu-toni-midi_CLAP
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
@@ -101,6 +102,12 @@ jobs:
           Copy-Item "$r\mu-clid-midi\mu-clid-midi_artefacts\Release\CLAP\mu-Clid MIDI.clap" "staging\mu-Clid MIDI\"
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid MIDI\"
           Compress-Archive -Path "staging\mu-Clid MIDI\*" -DestinationPath dist\mu-Clid-MIDI-Windows.zip
+          # mu-Toni MIDI (VST3 + CLAP)
+          New-Item -ItemType Directory -Path "staging\mu-Toni MIDI" -Force | Out-Null
+          Copy-Item "$r\mu-toni-midi\mu-toni-midi_artefacts\Release\VST3\mu-Toni MIDI.vst3" "staging\mu-Toni MIDI\" -Recurse
+          Copy-Item "$r\mu-toni-midi\mu-toni-midi_artefacts\Release\CLAP\mu-Toni MIDI.clap" "staging\mu-Toni MIDI\"
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Toni MIDI\"
+          Compress-Archive -Path "staging\mu-Toni MIDI\*" -DestinationPath dist\mu-Toni-MIDI-Windows.zip
           # mu-Tant (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-Tant -Force | Out-Null
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" staging\mu-Tant\ -Recurse

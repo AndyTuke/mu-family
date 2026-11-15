@@ -1,10 +1,10 @@
-# deploy-vst3.ps1 - copy the Release VST3 bundles into the system VST3 folder (owner rule, 2026-10-31).
+# deploy-vst3.ps1 - copy the Release VST3 bundles into the TDP subfolder of the system VST3 folder (owner rule, 2026-10-31; subfolder 2026-11-15).
 # Run after every Release build. Only Release builds are deployed; Debug never is.
 #   pwsh tests/scripts/deploy-vst3.ps1
 # Exit 0 when every bundle copied, 1 when a copy failed (usually a DAW holding the plugin open).
 
 param(
-    [string]$Dest = 'C:\Program Files\Common Files\VST3'
+    [string]$Dest = 'C:\Program Files\Common Files\VST3\TDP'
 )
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
@@ -12,7 +12,7 @@ $bundles = Get-ChildItem (Join-Path $root 'build') -Directory -Recurse -Filter '
     Where-Object { $_.FullName -match '\\Release\\VST3\\[^\\]+\.vst3$' }
 
 if (-not $bundles) { Write-Host 'deploy-vst3: no Release VST3 bundles found (build Release first)'; exit 1 }
-if (-not (Test-Path $Dest)) { Write-Host "deploy-vst3: $Dest does not exist"; exit 1 }
+if (-not (Test-Path $Dest)) { New-Item -ItemType Directory -Force $Dest | Out-Null }
 
 $failed = 0
 foreach ($b in $bundles) {
