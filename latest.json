@@ -42,6 +42,16 @@
       "version": "v1.2.1489",
       "build": 1489,
       "download": "https://transwarp.me/download"
+    },
+    "mu-toni-midi": {
+      "version": "v1.2.1489",
+      "build": 1489,
+      "download": "https://transwarp.me/download"
+    },
+    "mu-host": {
+      "version": "v1.2.1489",
+      "build": 1489,
+      "download": "https://transwarp.me/download"
     }
   }
 }
