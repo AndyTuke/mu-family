@@ -1,5 +1,5 @@
 # Serves the site/ folder at http://localhost:8080 for local preview.
-# Read-only: does not touch git or Netlify. Stop with Ctrl+C.
+# Read-only: does not touch git or the live site. Stop with Ctrl+C.
 # Usage: pwsh tests/scripts/serve-site.ps1 [-Port 8080]
 param([int]$Port = 8080)
 

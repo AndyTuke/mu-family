@@ -57,7 +57,7 @@ mu-toni/        μ-Toni source — generative arpeggiator mono-synth
 mu-tronic/      μ-Tronic source — 16-slot performance unit (Standalone only)
 mu-control/     Hardware controller drivers and surface model (depends on mu-core)
 docs/           Design documents
-site/           Marketing website (deployed to transwarp.me via Netlify)
+site/           Marketing website (published to transwarp.me on GitHub Pages by the publish-site workflow)
 tests/          Cross-plugin listening-test pipeline
 tools/          License signing tool (MuLicenseTool)
 cmake/          Shared CMake scripts
