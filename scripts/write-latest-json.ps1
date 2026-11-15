@@ -7,7 +7,7 @@
   so a product that did not ship does not claim the new build. Schema: docs/design-plugin-family.md, "Update check".
 #>
 param(
-    [string[]]$Products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic'),
+    [string[]]$Products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic', 'mu-toni-midi', 'mu-host'),
     [string]$Root = (Split-Path -Parent $PSScriptRoot)
 )
 $ErrorActionPreference = 'Stop'
@@ -26,7 +26,7 @@ if (Test-Path $outFile) {
 }
 
 $entries = [ordered]@{}
-foreach ($slug in 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic') {
+foreach ($slug in 'mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on', 'mu-tilate', 'mu-link', 'mu-tronic', 'mu-toni-midi', 'mu-host') {
     if ($Products -contains $slug) {
         $base = if ($preSlugs -contains $slug) { $pre } else { $live }
         $entries[$slug] = [ordered]@{
