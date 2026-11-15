@@ -32,7 +32,7 @@ Version: v1.1.972
 - This repo commits to `main` directly (repo convention). Stage the relevant files, commit with the message above, then `git push`.
 - Use a single-quoted heredoc for the multi-line message so `$` and backticks aren't expanded.
 - **Never** use `--no-verify` or skip signing unless the owner explicitly asks. If a hook fails, fix the cause.
-- A site-only change auto-deploys via Netlify; no CI runs on push (workflows are dispatch-only — never trigger them as a side-effect).
+- A site change goes live only when `publish-site.yml` is dispatched (GitHub Pages); no CI runs on push (workflows are dispatch-only — never trigger them as a side-effect).
 
 ## After
 

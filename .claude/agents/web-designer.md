@@ -24,7 +24,7 @@ The web host limits how much deploy work we can use. So:
 1. Edit and commit site changes **locally only**. Do **not** `git push` after each change.
 2. Keep a running list of unpublished site changes in your report (what changed, which pages).
 3. Publish only when the owner or the main conversation says to, as **one batched push** that includes every pending site change. Before pushing, check the whole site: links, no stale pricing or demo wording (`grep -rn -i "£25\|demo\|proprietary" site/`), pages load without console errors if you can check, and a quick look at mobile width.
-4. A push to the repo's main branch may trigger a host deploy for code-only commits too. If the host has no "skip unless `site/` changed" rule, say so and ask the owner to add an ignore rule (a `netlify.toml` build `ignore` command) rather than relying on pushing less.
+4. Hosting is GitHub Pages (from 2026-11): pushing to `main` deploys nothing. Publishing is `gh workflow run publish-site.yml --ref main`, which copies `site/` to the `gh-pages` branch (dispatch-only workflow). Prices come from `site/prices.json` (`scripts/write-prices-json.ps1`); keep the HTML price text as the no-JS fallback.
 
 ## Local preview (owner, 2026-10-14)
 
