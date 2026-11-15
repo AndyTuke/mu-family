@@ -117,6 +117,9 @@ public:
     juce::AudioProcessorValueTreeState& getTrackParameters() noexcept override { return apvts; }
     int          getTrackCount() const override                 { return getNumLayers(); }
     int          getTrackCapacity() const override              { return getMaxLayers(); }
+
+    // The About screen shows this; mu-On is a pre-release product, so the pre-release base.
+    juce::String getVersionString() const override              { return MU_VERSION_STRING_PRE; }
     juce::String getTrackName(int layer) const override         { return getLayerName(layer); }
     int          getTrackColourIndex(int layer) const override  { return getLayerColourIndex(layer); }
     bool         isTrackTransportPlaying() const noexcept override { return isInternalPlaying(); }
