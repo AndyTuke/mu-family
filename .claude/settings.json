@@ -15,10 +15,6 @@
       "PowerShell(git push -f *)",
       "PowerShell(git reset --hard*)",
       "PowerShell(git commit*--no-verify*)"
-    ],
-    "ask": [
-      "Bash(gh workflow run*)",
-      "PowerShell(gh workflow run*)"
     ]
   },
   "hooks": {
