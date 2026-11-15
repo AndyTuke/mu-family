@@ -43,6 +43,28 @@ struct TransportBarTests : juce::UnitTest
         expect(! slow->getBounds().isEmpty() && fast->getBounds().getRight() <= shown.getWidth(), "nudge inside the bar");
         const auto shownRight = fast->getBounds().getRight();
 
+        beginTest("BPM field shows 127.5 without clipping and the bar fits at Medium and Large");
+        for (const float sc : { mu_core::ShellBackend::kUiScaleMedium, mu_core::ShellBackend::kUiScaleLarge })
+        {
+            mu_ui::scale = sc;
+            TransportBar bar(proc);
+            bar.setBounds(0, 0, mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kTransportBarH));
+            NudgeInput* bpm = nullptr;
+            for (auto* c : bar.getChildren())
+                if (auto* n = dynamic_cast<NudgeInput*>(c)) { bpm = n; break; }
+            expect(bpm != nullptr, "BPM field exists");
+            if (bpm == nullptr) continue;
+            bpm->setValueD(127.5);
+            expect(bpm->valueFits(), "127.5 fits the BPM field at scale " + juce::String(sc));
+            bpm->setValueD(299.9);
+            expect(bpm->valueFits(), "299.9 fits the BPM field at scale " + juce::String(sc));
+            auto* nudge = findButton(bar, "+");
+            expect(nudge != nullptr && nudge->getBounds().getRight() < bar.getWidth() / 2, "transport pane stays in the left half at scale " + juce::String(sc));
+            auto* clock = findButton(bar, "Tap");
+            expect(clock != nullptr && clock->getBounds().getX() >= bpm->getBounds().getRight(), "Clock lamp slot sits beside the BPM field at scale " + juce::String(sc));
+        }
+        mu_ui::scale = 1.0f;
+
         beginTest("hidden: Tap and Nudge are not visible, the lamp slot stays");
         TransportBar hidden(proc);
         hidden.setShowTapAndNudge(false);

@@ -69,6 +69,24 @@ void NudgeInput::resized()
     }
 }
 
+// Width the inline label takes: its text plus a little air each side, never less than a minimum.
+int NudgeInput::inlineLabelWidth() const
+{
+    using mu_ui::s;
+    using mu_ui::sf;
+    const auto lblFont = MuLookAndFeel::uiFont(sf(9.0f));
+    return juce::jmax(s(14), (int) std::ceil(juce::GlyphArrangement::getStringWidth(lblFont, label)) + s(10));
+}
+
+bool NudgeInput::valueFits() const
+{
+    using mu_ui::sf;
+    const int labelW = (labelInline && ! label.isEmpty() && ! showStepBtns) ? inlineLabelWidth() : 0;
+    const int availW = displayBounds.getWidth() - labelW;
+    const auto valFont = MuLookAndFeel::uiFont(sf(13.0f));
+    return (int) std::ceil(juce::GlyphArrangement::getStringWidth(valFont, valueText())) <= availW;
+}
+
 void NudgeInput::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
@@ -85,8 +103,7 @@ void NudgeInput::paint(juce::Graphics& g)
     {
         // Label on the left, value on the right — both inside the display area. The label gets the width its text needs plus a
         // little air each side (so it is indented from the edge and a long word such as "Beats" is not cut off).
-        const auto lblFont = MuLookAndFeel::uiFont(sf(9.0f));
-        const int inlineLblW = juce::jmax(s(14), (int) std::ceil(juce::GlyphArrangement::getStringWidth(lblFont, label)) + s(10));
+        const int inlineLblW = inlineLabelWidth();
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
         g.setColour(MuLookAndFeel::colour(Id::labelText));

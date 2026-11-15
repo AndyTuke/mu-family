@@ -34,6 +34,8 @@ public:
     // Show a leading + on positive values (an offset: +25).
     void   setShowSign(bool show)   { showSign = show; repaint(); }
     juce::String valueText() const;   // what the display shows (also the text editor's start text)
+    // True when the current value text fits the area it is drawn in at the current UI scale (inline label included).
+    bool valueFits() const;
     void   setFineStep(double fine) { fineStep = fine; }
     // When false: hides step-size (1/5/10) buttons; if the label string is non-empty,
     // it is drawn in the space below the value display instead.
@@ -49,6 +51,7 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
+    int inlineLabelWidth() const;
     juce::String label;
     double minVal, maxVal, value;
     int    decimals  = 0;
