@@ -76,6 +76,29 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 - Owner intention (2026-10-07, looking at mu-Clid and mu-Tant side by side). Currently parked **On Hold** as backlog #1172 — the owner will schedule it; do not attempt it before then.
 - Fits with the one-framework idea above: a shared sizing contract lives in `MuLookAndFeel` / the editor shell (no per-product layout constants), and each product supplies only its main-panel content.
 
+### 🟢 Bar-aligned inserts (cross-product)
+
+Let time-based inserts lock to the bar, not just to the tempo. Today Stutter, Tremolo, Auto Pan and Tape Delay take a tempo-synced rate but start wherever their own phase happens to be. The idea: each product's engine feeds the inserts a transport position and a play flag, so a sync'd rate restarts on the bar line and a stutter or pan sweep lines up with the music.
+
+- One shared feed in `mu-core` (a small transport-position struct the insert chain receives each block), filled by each product's engine from the clock it already has; no per-product copy of the logic.
+- Touches every product that hosts inserts, so it is a cross-product change; do it once, in the shared insert chain.
+- Nothing scheduled. The current tempo-only behaviour is the ruling in [design-fx.md](design-fx.md) (five more inserts, ruled 2026-11-16).
+
+### 🟢 Comb pitch tracking
+
+Let the Comb insert follow the played note instead of having Freq tuned by hand, so the comb resonance sits on the note (Karplus-Strong-style pitched comb).
+
+- Needs the note frequency in `VoiceParams` (or the shared per-voice parameter block) so the insert can read it each block.
+- Works per voice only where the product has a note; for sample and drum products Freq stays manual.
+- Nothing scheduled. Current behaviour (manual Freq) is the Comb ruling in [design-fx.md](design-fx.md).
+
+### 🟢 Formant vowel letter readout
+
+Show the vowel as a letter (A E I O U) on the Formant insert's Vowel knob, so the position reads as a vowel rather than a bare number.
+
+- Needs a small shared UI addition (a text readout for a knob's value, in the shared component library, no one-off drawing). `ux-steward` (Sid) to rule on how it looks and where it sits.
+- Nothing scheduled. Current behaviour (numeric Vowel value, reported to the status bar) is the Formant ruling in [design-fx.md](design-fx.md).
+
 ---
 
 ### 🟢 mu-On sequencer: what other machines offer (researched 2026-11-08)
