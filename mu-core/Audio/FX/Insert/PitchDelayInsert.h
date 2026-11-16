@@ -1,7 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
-#include "InsertDelayLine.h"
+#include "Audio/FX/Algorithms/ModDelayLine.h"
 #include <cmath>
 #include <vector>
 
@@ -128,7 +128,7 @@ private:
 
     double sr = 44100.0;
     int    winSamples = 2048;
-    InsertDelayLine line[2];
+    mu_audio::ModDelayLine line[2];
     Shifter shifter[2];
     float  timeSmoothed = 0.0f;
     bool   started = false;

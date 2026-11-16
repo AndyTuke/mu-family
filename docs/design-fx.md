@@ -121,7 +121,80 @@ Distortion and filter effect files (`SoftClipEffect`, `HardClipEffect`, `Foldbac
 registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated — these
 algorithms live in `InsertProcessor` for the voice insert slot instead.
 
-`Source/FX/Effects/FlangerEffect.h` — registered and active in the Effect slot.
-`Source/FX/Effects/PhaserEffect.h` — registered and active in the Effect slot.
-`Source/FX/Effects/ChorusEffect.h` — registered and active in the Effect slot.
+Chorus, Flanger and Phaser are registered and active in the Effect slot (today `mu-core/Audio/FX/Send/{Chorus,Flanger,Phaser}Effect.h`; they move into `FX/Algorithms/` as `<Name>Fx` under the merge plan below).
 Echo has no algorithm class: the Effect slot's Echo index runs its embedded `DelaySlot` (the old `EchoEffect.h` was removed as dead code).
+
+## One algorithm, two roles: Chorus, Flanger, Phaser merge (ruled 2026-11-16)
+
+**Why.** Each of the three exists twice (`Send/<Name>Effect.h`, `Insert/<Name>Insert.h`) with its own LFO, delay line and smoothing code. Andy's decisions: one folder `FX/Algorithms/`, one class per effect marked insert / send / both, one shared DSP core per effect with thin adapters; the insert has four knobs, so the send parameters that do not fit are fixed in insert mode while the send keeps all of them; the richer send sound wins; no preset migration (saved presets may sound different; the insert APVTS and param ids do not change, so they still load).
+
+**Facts the plan rests on (read from the code).**
+- Every Effect-slot algorithm runs at factor 1: `EffectSlot::prepare` builds `OversampledProcessor(1)` and every `FXAlgorithmDef.oversamplingFactor` is 1. So "send is oversampled" is not true today; `processInner` runs at the host rate. The cores must still take their rate from `prepare(sr)` and size lines from it, so a later factor > 1 works unchanged (the send adapter hands over the rate `prepareInner` receives).
+- `EffectSlot` sets send mode on all algorithms, so the send's internal dry path (`dry * in`, and the flanger's delayed dry tap) is never used. The send is always wet-only into the return bus, where the dry signal is undelayed. A flanger insert with an undelayed dry therefore has the same topology as the send in the bus.
+- Phaser: the two all-pass sections and the sweep (200 Hz..4 kHz, log) are the same filter; Chorus and Flanger differ in structure, listed below.
+- Old inserts have no smoothing on rate / depth / centre; the send smooths everything for 15 ms. The core smooths every continuous value for 15 ms; the adapters own only the mix (the insert snaps on first use, see `started` today).
+
+### Folder, files, names (design-naming.md "Algorithm files")
+```
+mu-core/Audio/FX/
+  Algorithms/   FxUse.h  ChorusCore.h ChorusFx.h  FlangerCore.h FlangerFx.h  PhaserCore.h PhaserFx.h
+                ModDelayLine.h            (was Insert/InsertDelayLine.h)
+                <every other insert algorithm, moved unchanged in the last step: EqInsert.h ... TremoloInsert.h, InsertAlgorithmBase.h, EffectAlgorithmBase.h>
+  Engines/      SpringReverb.h  TapeSpringEcho.h   (were at the FX root; engines wrapped by an algorithm)
+  Slots/        unchanged (EffectSlot, DelaySlot, ReverbSlot, FXChain, FXSlotBase, FXAlgorithmDef, OversampledProcessor)
+```
+`Send/` and `Insert/` disappear. Classes live in namespace `mu_audio` (the area namespace for audio in mu-core; the old global names are left alone). Class `ChorusFx` etc. = the algorithm used by the slots; `ChorusCore` etc. = the DSP, nothing else. Insert-only algorithms keep their `...Insert` names (renamed to `...Fx` only when touched for another reason, never in a bulk rename).
+
+### The flag
+`Algorithms/FxUse.h`:
+```cpp
+namespace mu_audio {
+enum class FxUse : unsigned { Insert = 1, Send = 2, Both = 3 };
+constexpr bool supports(FxUse have, FxUse want) noexcept { return (static_cast<unsigned>(have) & static_cast<unsigned>(want)) == static_cast<unsigned>(want); }
+}
+```
+Each algorithm class carries `static constexpr mu_audio::FxUse kUse = FxUse::Both;` (insert-only classes: `Insert`). It is the only place the role is stated. The registries read it at the two registration points, at compile time: `EffectSlot.cpp` builds its array with a helper `makeSend<A>()` and `InsertProcessor.cpp` fills `dispatch[]` with `makeInsert<A>()`; each helper has `static_assert(supports(A::kUse, FxUse::Send))` / `(..., FxUse::Insert)`. `FXAlgorithmDef` gets no new field (it would need the class header and form an include cycle). A unit test (below) additionally checks that `effectAlgorithms()[0..2]` and `dispatch[17..19]` are the same three classes.
+
+### Class shapes
+- `XCore` (one per effect, header-only, no juce::AudioBuffer, no VoiceParams, no atomics, no strings):
+  - `struct Params { ... }` the plain-number parameters in real units (Hz, 0..1 fractions, ms).
+  - `void prepare(double sampleRate)` (allocates; guards `sr > 0`), `void reset()` (silences state, marks "snap next params"), `void setParams(const Params&)` (sets smoothing targets; the first call after reset snaps), and `void tick(float inL, float inR, float& wetL, float& wetR)` (one stereo frame; advances smoothers and the LFO; **returns the wet signal only**, never blends dry). A mono caller passes `inR = inL` and ignores `wetR`; cost is a few flops.
+  - No allocation outside `prepare`; no virtual calls.
+- `XFx final : public EffectAlgorithmBase, public InsertAlgorithmBase`, one per effect, members: `XCore core;` the send front end (relaxed `std::atomic<float>` for the UI/host-written params, same as today) and the insert front end (reads `insertSlot(p, 0..3)`). Overrides: `getDef()` returns `FXAlgorithmRegistry::effectAlgorithms()[i]` by reference (no member copy of the def, which also stops each insert instance copying a string vector), `prepareInner(sr, n)` and `prepare(sr, n)` both call `core.prepare`, one `reset()` overriding both bases, `setParam` (send), `processInner(block)` (send) and `process(buf, ns, nCh, p, grOut)` (insert). The adapters are only these overrides: map real params to `Core::Params`, loop the samples calling `tick`, blend, write. An object serves one role in practice (EffectSlot owns one, InsertProcessor another); the other role's front end is dead weight of a few bytes.
+- Blending (adapters, not the core): send: `out = wet` (wet-only; the dry is on the bus). If a future caller clears send mode the adapter blends `out = in*(1-mix) + wet*mix` with the old `mix` param. Insert: `out = in*(1-m) + wet*m` with `m` the Mix knob smoothed 20 ms; Phaser insert uses the notch blend `out = in*(1-m) + 0.5*(in + wet)*m` (adding the dry to the all-passed signal is what makes the notches; on the send bus the main mix does that). Mix 0 leaves the insert bit-exact untouched (a test requires it).
+- Delay: both modulated-delay cores use `ModDelayLine` (the cubic Hermite line, with taps read before the push). One line per channel; Chorus reads all its voices as taps of that one line (the old send kept four identical lines per channel; the content was the same, the memory was 4x). Line length is `ceil(0.07 * sr) + 8` for Chorus (30 ms centre + 20 ms swing x 1.5 spread = 60 ms worst case) and `ceil(0.012 * sr) + 8` for Flanger.
+- Sample rate: cores only use the `sr` they were prepared with. The send adapter calls `prepare` with the rate `prepareInner` receives (the oversampled rate when a factor is ever > 1); the insert adapter with the host/voice rate. No core knows about oversampling; since both roles run at factor 1 today nothing else changes.
+
+### Per effect: core parameters, send map, insert map, fixed values
+Send params and ids are unchanged (`FXAlgorithmRegistry`). Insert slot ranges and ids 17 / 18 / 19 are unchanged (`InsertSlotConfig.h`); only what they drive changes.
+
+**Chorus** (`insertAlgo` 17). `ChorusCore::Params`: `rateHz`, `depth` 0..1, `centreMs`, `swingMs` (swing at depth 1), `voices` 2..4, `spread` 0..1. Core: voice `v` has LFO phase offset `v/4`, rate detune `1 + (t-0.5)*0.03` with `t = v/(voices-1)`, left delay `centre + lfo*depth*swing`, right delay with `swing` multiplied by `1 + spread*0.5` on odd voices, floor 2 samples, output summed and scaled `1/voices` (all as `ChorusEffect` today).
+- Send: rate = Rate, depth = Depth/100, voices = round(Voices) clamped 2..4, spread = Spread/100, `centreMs = 30`, `swingMs = 20`, `mix` kept for the unused non-send path.
+- Insert: Slot 0 Rate 0.05..8 Hz log -> `rateHz`; Slot 1 Depth 0..100 % -> `depth`; Slot 2 Delay 5..30 ms -> `centreMs` with `swingMs = 0.4 * centreMs` (the swing share the insert has today); Slot 3 Mix 0..100 %. **Fixed hidden: `voices = 3`, `spread = 0.5`.** Three voices because the old insert was one voice with a quarter-turn stereo offset and three is the first count that sounds like an ensemble chorus; spread 0.5 is the send default and replaces the old R quarter-phase as the stereo widener. The insert loses nothing it exposed and gains thickness.
+
+**Flanger** (`insertAlgo` 18). `FlangerCore::Params`: `rateHz`, `depth` 0..1, `feedback` -0.95..0.95, `stereoOffset` (turns of LFO). Core: write `in + tanh(feedState * feedback)` into the line, wet = line read at `5.25 ms * (1 + depth * sin)` (floor 1 sample; the wet delay sweeps 0..10.5 ms and so crosses the undelayed dry), `feedState = wet`. The tanh is new in the send (the insert had it); it is linear at small signal so the send barely changes and 0.95 cannot run away.
+- Send: Rate 0.01..20 Hz, Depth/100, `feedback = Feedback/100 * 0.95`, `stereoOffset = 0` (as today).
+- Insert: Slot 0 Rate 0.05..5 Hz log -> `rateHz`; Slot 1 Depth; Slot 2 Feedback -95..95 % -> `feedback = pct*0.01`; Slot 3 Mix. **Fixed hidden: `stereoOffset = 0.25`** (right LFO a quarter turn behind, as the insert has today); centre 5.25 ms is a constant of the core. The default row `{0.3 Hz, 70 %, 50 %, 50 %}` stays; the sound at those values changes (wider 0..8.9 ms sweep, deliberate).
+
+**Phaser** (`insertAlgo` 19). `PhaserCore::Params`: `rateHz`, `depth` 0..1, `stages` (even, 2..12), `feedback` 0..1, `stereoOffset`. Core: `freq = 200 Hz * exp(lfoNorm * ln 20)`, `lfoNorm = 0.5 + 0.5*sin*depth` (equal to the insert's centre / octave-span form; the two are the same sweep), clamp `[20, 0.45 sr]`, all-pass `a = (t-1)/(t+1)`, `t = tan(pi f/sr)`, chain input `in + tanh(fbState * feedback * 0.99)`, `fbState` = chain output, wet = chain output.
+- Send: Rate 0.1..8, Depth/100, Stages rounded to even 2..12, Feedback/100, `stereoOffset = 0`.
+- Insert: Slot 0 Rate 0.05..5 Hz log; Slot 1 Depth; Slot 2 Feedback 0..90 % -> `feedback = pct*0.01`; Slot 3 Mix (notch blend). **Fixed hidden: `stages = 6`, `stereoOffset = 0.25`.**
+
+### Mod targets and APVTS
+Nothing changes: send FX params keep their APVTS ids and mod rows, insert params stay the generic `insertParam[0..3]` with the same ids and the table in `InsertSlotConfig.h` (`kInsertSyncSlot` stays -1 for all three). No new continuous parameter is added, so no new mod-target row is required; the fixed values are not parameters. `mu_mod::checks` and `check-mod-targets.ps1` must stay green.
+
+### Tests
+Port (include and type names only): `AuditMinorsTests.cpp` (`ChorusEffect`/`PhaserEffect` smoothing and zero-delay tests, lines ~153-215), `MixerBlockValueTests.cpp` (line ~1085 `ChorusInsert a17; FlangerInsert a18; PhaserInsert a19` and its includes), `InsertDSPSmokeTests.cpp`, `StereoParityTests.cpp`, `SpectralBehaviourTests.cpp` (only if they include the moved headers; the other `InsertDelayLine` / `FX/Insert` includers just change the path). `NewInsertTests.cpp`, `FxAlgoSwitchTests.cpp` and both `SendFXSmokeTests.cpp` go through `InsertProcessor` / `EffectSlot` and need no change; they are the regression net (Mix 0 untouched, finite at corners, algorithm switch mapping, 30 ms + 20 ms chorus read bound). New `Tests/FxMergeTests.cpp` (added to `Tests/CMakeLists.txt`): (1) role flags: `ChorusFx/FlangerFx/PhaserFx::kUse == Both`, and the three registry rows / dispatch slots instantiate those classes; (2) core equivalence: for each effect, the insert path at Mix 100 % (Phaser: derived from the notch blend) and the send path with the mapped parameters produce the same wet within 1e-6 on a noise input; (3) chorus insert uses 3 voices with spread 0.5 (a regression guard on the hidden values); (4) finite and bounded at 44.1 / 96 / 192 kHz and block sizes 1..2048 for both roles including mono (`nCh = 1`); (5) reset: output after `reset()` equals a fresh object bit for bit. Goldens stay stale on purpose until the sounds settle.
+
+### Build steps (each one builds and runs the tests on its own)
+1. **Engines move.** `git mv` `FX/SpringReverb.h`, `FX/TapeSpringEcho.h` to `FX/Engines/`; fix includes in `Insert/TapeSpringInsert.h`, `TapeSpringEcho.h` (-> `Engines/SpringReverb.h`), `Tests/SpringReverbTests.cpp`, `Tests/TapeSpringEchoTests.cpp`, the comment paths in `Tests/CMakeLists.txt`. Pure move.
+2. **Flag and shared line.** Add `Algorithms/FxUse.h`; `git mv Insert/InsertDelayLine.h Algorithms/ModDelayLine.h` and rename the class `ModDelayLine` (in namespace `mu_audio`); update `Insert/PitchDelayInsert.h`, `ChorusInsert.h`, `FlangerInsert.h` and the other `InsertDelayLine` includers (`InsertProcessor.h`, `mu-link/Source/Server/ServerEngine.h` and tests: grep first). No behaviour change.
+3. **Chorus.** Add `ChorusCore.h`, `ChorusFx.h`; add `makeSend` / `makeInsert` helpers (in `FxUse.h`'s neighbour `Algorithms/FxFactory.h`) and use them for slot 0 in `EffectSlot.cpp` and `dispatch[17]` in `InsertProcessor.cpp`; delete `Send/ChorusEffect.h`, `Insert/ChorusInsert.h`; port tests; add the Chorus cases of `FxMergeTests.cpp`.
+4. **Flanger.** Same for `FlangerCore.h`, `FlangerFx.h`, slot 1, `dispatch[18]`, delete `FlangerEffect.h`, `FlangerInsert.h`.
+5. **Phaser.** Same for slot 2, `dispatch[19]`.
+6. **Move the rest.** `git mv` the remaining `Insert/*.h` (including `InsertAlgorithmBase.h`, `NoneInsert.h`) and `Send/EffectAlgorithmBase.h` into `Algorithms/`, add `kUse = FxUse::Insert` to each insert-only class, fix includes (`InsertProcessor.*`, `EffectSlot.h`, tests); `Send/` and `Insert/` are now empty and gone. Mechanical, and may be done later or by itself; steps 1-5 do not depend on it.
+7. **Docs.** Update `docs/design-plugin-family.md` paths if it names `FX/Send` or `FX/Insert`, `tests.md` (new `FxMergeTests`), the manuals only if the insert Chorus/Flanger/Phaser descriptions change (Frank decides; the default-row sounds changed).
+
+Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
+
+**Do not:** make the core blend dry and wet (the phaser insert and send need different blends); give `FXAlgorithmDef` a role field (include cycle); keep the old per-voice delay lines in the core; add the insert's missing send parameters as new insert knobs (four slots is the contract); rename the insert-only classes in bulk.

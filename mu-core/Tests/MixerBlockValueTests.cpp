@@ -32,9 +32,9 @@
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/TapeSpringInsert.h"
-#include "Audio/FX/Insert/ChorusInsert.h"
-#include "Audio/FX/Insert/FlangerInsert.h"
-#include "Audio/FX/Insert/PhaserInsert.h"
+#include "Audio/FX/Algorithms/ChorusFx.h"
+#include "Audio/FX/Algorithms/FlangerFx.h"
+#include "Audio/FX/Algorithms/PhaserFx.h"
 #include "Audio/FX/Insert/PitchDelayInsert.h"
 #include "Audio/FX/Insert/TremoloInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
@@ -1082,7 +1082,7 @@ struct InsertLatencyTests : juce::UnitTest
             OverdriveInsert a14;
             TapeDelayInsert a15;
             TapeSpringInsert a16;
-            ChorusInsert a17; FlangerInsert a18; PhaserInsert a19; PitchDelayInsert a20; TremoloInsert a21;
+            mu_audio::ChorusFx a17; mu_audio::FlangerFx a18; mu_audio::PhaserFx a19; PitchDelayInsert a20; TremoloInsert a21;
             checkAlgorithm("None", a0);           checkAlgorithm("SoftClip", a1);   checkAlgorithm("HardClip", a2);
             checkAlgorithm("Fold", a3);           checkAlgorithm("Bitcrusher", a4); checkAlgorithm("Clipper", a5);
             checkAlgorithm("EQ", a6);             checkAlgorithm("Compressor/Limiter", a7);

@@ -1,8 +1,8 @@
-// The spring-reverb engine (Audio/FX/SpringReverb.h): finite at every extreme, the tail dies away at about the set Decay,
+// The spring-reverb engine (Audio/FX/Engines/SpringReverb.h): finite at every extreme, the tail dies away at about the set Decay,
 // silence in gives silence out, the same input gives the same output (also after reset), the two outputs differ, and the
 // Drip setting changes the impulse response (the dispersion is doing something).
 
-#include "Audio/FX/SpringReverb.h"
+#include "Audio/FX/Engines/SpringReverb.h"
 
 #include <juce_core/juce_core.h>
 

@@ -12,8 +12,8 @@ set(MU_CORE_TEST_SOURCES
     LoopTempoTests.cpp   # the tempo guess from a loop's length (Analysis/LoopTempo.h)
     LoopLoaderTests.cpp   # loop decode, byte cap, errors and resampling (Audio/LoopLoader)
     VoiceDspTests.cpp   # equal-power pan, the per-voice state-variable filter and the age envelope (Audio/*.h)
-    SpringReverbTests.cpp   # the spring-reverb engine (Audio/FX/SpringReverb.h)
-    TapeSpringEchoTests.cpp   # the tape echo with the spring (Audio/FX/TapeSpringEcho.h)
+    SpringReverbTests.cpp   # the spring-reverb engine (Audio/FX/Engines/SpringReverb.h)
+    TapeSpringEchoTests.cpp   # the tape echo with the spring (Audio/FX/Engines/TapeSpringEcho.h)
     ActivationAndProgramChangeTests.cpp
     SamplePreviewTests.cpp
     EmbeddedSampleTests.cpp   # preset samples: FLAC round trip is sample-identical
@@ -58,6 +58,7 @@ set(MU_CORE_TEST_SOURCES
     AuditMinorsTests.cpp            # Layer reset locks, FX hand-off and sizing, NaN containment, activation worker
     MixerBlockValueTests.cpp
     NewInsertTests.cpp              # chorus, flanger, phaser, pitch delay, tremolo inserts
+    FxMergeTests.cpp                # the shared Chorus / Flanger / Phaser: role flags, adapter vs core, hidden insert values, reset
     StatusRouteTests.cpp            # the status bar hard rule: a layer's content always reports to it
     SupportPromptPolicyTests.cpp
     UpdateCheckPolicyTests.cpp

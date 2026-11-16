@@ -6,8 +6,10 @@
 #include <vector>
 
 // A mono circular delay line read with a 4-point cubic Hermite interpolator (fractional delay, smooth when the delay
-// moves). Shared by the modulated-delay inserts (Chorus, Flanger, Pitch Delay). Allocation happens in prepare() only.
-class InsertDelayLine
+// moves). Shared by the modulated-delay algorithms (Chorus, Flanger, Pitch Delay). Allocation happens in prepare() only.
+namespace mu_audio
+{
+class ModDelayLine
 {
 public:
     // Room for `maxSeconds` of delay plus the interpolator's taps.
@@ -50,3 +52,4 @@ private:
     std::vector<float> buf;
     int size = 0, write = 0;
 };
+}  // namespace mu_audio

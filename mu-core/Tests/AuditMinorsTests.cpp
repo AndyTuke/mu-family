@@ -6,8 +6,8 @@
 #include "Audio/MixerEngine.h"
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/FX/Slots/EffectSlot.h"
-#include "Audio/FX/Send/ChorusEffect.h"
-#include "Audio/FX/Send/PhaserEffect.h"
+#include "Audio/FX/Algorithms/ChorusFx.h"
+#include "Audio/FX/Algorithms/PhaserFx.h"
 
 #include <atomic>
 #include <cmath>
@@ -150,7 +150,7 @@ struct AuditMinorsTests : juce::UnitTest
 
     // Runs one chorus over `blocks` blocks of `fill(i)` input, returns the last block's output.
     template <class Fill>
-    static std::vector<float> runChorus(ChorusEffect& c, int blocks, Fill&& fill)
+    static std::vector<float> runChorus(mu_audio::ChorusFx& c, int blocks, Fill&& fill)
     {
         std::vector<float> out;
         juce::AudioBuffer<float> buf(2, kBlock);
@@ -173,7 +173,7 @@ struct AuditMinorsTests : juce::UnitTest
     {
         beginTest("chorus: a voice that becomes active replays no stale audio");
         {
-            ChorusEffect c;
+            mu_audio::ChorusFx c;
             c.setSendMode(true);
             c.prepareInner(kRate, kBlock);
             c.setParam("mix", 100.0f);
@@ -192,7 +192,7 @@ struct AuditMinorsTests : juce::UnitTest
 
         beginTest("chorus: the voice count rounds to the nearest whole voice");
         {
-            ChorusEffect a, b;
+            mu_audio::ChorusFx a, b;
             for (auto* c : { &a, &b }) { c->setSendMode(true); c->prepareInner(kRate, kBlock); c->setParam("mix", 100.0f); }
             a.setParam("voices", 3.9f);
             b.setParam("voices", 4.0f);
@@ -206,7 +206,7 @@ struct AuditMinorsTests : juce::UnitTest
     {
         beginTest("phaser: the stage count rounds to the nearest even number");
         {
-            PhaserEffect a, b;
+            mu_audio::PhaserFx a, b;
             for (auto* p : { &a, &b }) { p->setSendMode(true); p->prepareInner(kRate, kBlock); p->setParam("mix", 100.0f); }
             a.setParam("stages", 5.9f);
             b.setParam("stages", 6.0f);

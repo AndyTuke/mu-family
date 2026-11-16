@@ -6,9 +6,9 @@ EffectSlot::EffectSlot()
     // Each is small (delay-line vectors, LFO state) — the combined footprint is bounded.
     // All start in send-mode (the slot is wired into the mixer's send/return path).
     // algorithmIndex stays at 0 (Chorus) until setAlgorithm flips it.
-    algorithms[0] = std::make_unique<ChorusEffect>();
-    algorithms[1] = std::make_unique<FlangerEffect>();
-    algorithms[2] = std::make_unique<PhaserEffect>();
+    algorithms[0] = mu_audio::makeSend<mu_audio::ChorusFx>();
+    algorithms[1] = mu_audio::makeSend<mu_audio::FlangerFx>();
+    algorithms[2] = mu_audio::makeSend<mu_audio::PhaserFx>();
     for (auto& a : algorithms)
         a->setSendMode(true);   // slot 3 (Echo) has no algorithm object: kEchoAlgoIndex runs the embedded DelaySlot
 }

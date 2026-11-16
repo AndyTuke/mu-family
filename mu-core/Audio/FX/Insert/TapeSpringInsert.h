@@ -1,11 +1,11 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
-#include "Audio/FX/TapeSpringEcho.h"
+#include "Audio/FX/Engines/TapeSpringEcho.h"
 
 #include <cmath>
 
-// insertAlgo = 16. Tape Spring: a three-head tape echo with a spring reverb (Audio/FX/TapeSpringEcho.h), a twelve-position mode
+// insertAlgo = 16. Tape Spring: a three-head tape echo with a spring reverb (Audio/FX/Engines/TapeSpringEcho.h), a twelve-position mode
 // choosing the heads and the spring, on the four generic insert knobs.
 //   - Mode       1..12: heads 1, 2, 3 singly, heads 2+3, the heads singly with spring, pairs with spring, all three with spring, spring alone.
 //   - Rate       the tape speed: 0 % slow (long repeats) .. 100 % fast (short repeats); turning it bends the repeats' pitch.

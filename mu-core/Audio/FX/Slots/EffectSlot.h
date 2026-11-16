@@ -5,9 +5,10 @@
 #include "OversampledProcessor.h"
 #include "DelaySlot.h"
 #include "Audio/FX/Send/EffectAlgorithmBase.h"
-#include "Audio/FX/Send/ChorusEffect.h"
-#include "Audio/FX/Send/FlangerEffect.h"
-#include "Audio/FX/Send/PhaserEffect.h"
+#include "Audio/FX/Algorithms/FxFactory.h"
+#include "Audio/FX/Algorithms/ChorusFx.h"
+#include "Audio/FX/Algorithms/FlangerFx.h"
+#include "Audio/FX/Algorithms/PhaserFx.h"
 
 #include <array>
 #include <atomic>

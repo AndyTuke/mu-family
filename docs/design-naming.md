@@ -142,6 +142,10 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 | `Backend` | the interface an app implements for the shared chrome (`mu_core::ShellBackend`; `ProcessorBase` and mu-link's `LinkShellBackend` implement it). Not `Surface`: that word is the controller surface of `mu-control` |
 | `Driver` / `Manager` | `mu-control` only: a `<Device>Driver` speaks one device family's wire protocol and nothing else (`LaunchpadXDriver`, behind the `SurfaceDriver` interface); a `Manager` owns the lifetime of a set of drivers and their model (`ControllerManager`). The four parts are `SurfaceDriver`, `SurfaceDescription`, `SurfaceMapping`, `SurfaceModel` |
 | `Chrome` | a processor-free helper that owns the shared window furniture for a host component (`mu_ui::ShellChrome`) |
+| `Fx` | an effect algorithm that can run as a mixer-slot send, as a layer insert, or both: one class per effect in `mu-core/Audio/FX/Algorithms/`, namespace `mu_audio`, deriving from `EffectAlgorithmBase` and/or `InsertAlgorithmBase`, with `static constexpr mu_audio::FxUse kUse`. Insert-only classes keep their `...Insert` name until touched for another reason (ruled 2026-11-16) |
+| `Core` | the plain DSP of an `Fx` (`ChorusCore`): real-unit parameters, `prepare / reset / setParams / tick`, wet signal only, no `VoiceParams`, atomics, strings or buffers. The `Fx` class holds the adapters |
+
+`FX/Engines/` holds reusable engines that an algorithm wraps (`SpringReverb`, `TapeSpringEcho`); it is a folder, not a role suffix, and those classes keep their names. `FX/Send/` and `FX/Insert/` no longer exist after the merge in [design-fx.md](design-fx.md#one-algorithm-two-roles-chorus-flanger-phaser-merge-ruled-2026-11-16); `ModDelayLine` is the shared fractional delay line (was `InsertDelayLine`).
 
 New layer UI is `LayerPanel` / `LayerSidebar` in `mu-core`; a product supplies content (`<Type>Content`) and
 a mini-graphic (`<Type>MiniVisual`), not a copy of the class.

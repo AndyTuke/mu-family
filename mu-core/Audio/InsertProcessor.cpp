@@ -17,9 +17,10 @@
 #include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeDelayInsert.h"
 #include "Audio/FX/Insert/TapeSpringInsert.h"
-#include "Audio/FX/Insert/ChorusInsert.h"
-#include "Audio/FX/Insert/FlangerInsert.h"
-#include "Audio/FX/Insert/PhaserInsert.h"
+#include "Audio/FX/Algorithms/FxFactory.h"
+#include "Audio/FX/Algorithms/ChorusFx.h"
+#include "Audio/FX/Algorithms/FlangerFx.h"
+#include "Audio/FX/Algorithms/PhaserFx.h"
 #include "Audio/FX/Insert/PitchDelayInsert.h"
 #include "Audio/FX/Insert/TremoloInsert.h"
 
@@ -62,9 +63,9 @@ InsertProcessor::InsertProcessor()
     dispatch[14] = add(std::make_unique<OverdriveInsert>());
     dispatch[15] = add(std::make_unique<TapeDelayInsert>());
     dispatch[16] = add(std::make_unique<TapeSpringInsert>());
-    dispatch[17] = add(std::make_unique<ChorusInsert>());
-    dispatch[18] = add(std::make_unique<FlangerInsert>());
-    dispatch[19] = add(std::make_unique<PhaserInsert>());
+    dispatch[17] = add(mu_audio::makeInsert<mu_audio::ChorusFx>());
+    dispatch[18] = add(mu_audio::makeInsert<mu_audio::FlangerFx>());
+    dispatch[19] = add(mu_audio::makeInsert<mu_audio::PhaserFx>());
     dispatch[20] = add(std::make_unique<PitchDelayInsert>());
     dispatch[21] = add(std::make_unique<TremoloInsert>());
 }

@@ -1,7 +1,7 @@
-// The tape-echo-and-spring engine (Audio/FX/TapeSpringEcho.h): the mode table, repeats at one, two and three head spacings, the
+// The tape-echo-and-spring engine (Audio/FX/Engines/TapeSpringEcho.h): the mode table, repeats at one, two and three head spacings, the
 // spring alone in mode 12, Intensity and Echo behaviour, bounded and finite at every extreme, and a rate change glides.
 
-#include "Audio/FX/TapeSpringEcho.h"
+#include "Audio/FX/Engines/TapeSpringEcho.h"
 
 #include <juce_core/juce_core.h>
 
