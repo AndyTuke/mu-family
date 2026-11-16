@@ -1,6 +1,6 @@
 # mu-Tilate: product design
 
-Status: **design complete; first build-PC steps approved by Andy 2026-10-30: (1) lift mu-Clid's sample-library mechanism into mu-core, (2) Signalsmith Stretch prototype (latency hiding, varying-rate drive, CPU/memory, dsp-controller review), (3) wire the CMake target per the checklist; nothing is built** (idea and first wireframe by Andy, 2026-10-29; named mu-Tilate and requirements added 2026-10-30; scaffold and doc set created 2026-10-30). It is listed under Unscheduled ideas in [../design-future.md](../design-future.md); ask before implementing. Documents: [design-ui.md](design-ui.md) (wireframe and panels), [design-engine.md](design-engine.md) (transient detection, tempo matching and time-stretch, tempo analysis, real-time notes), [design-library.md](design-library.md) (sample library, export, factory loops). Product rules: [mu-tilate/CLAUDE.md](../../mu-tilate/CLAUDE.md).
+Status: **design complete; first build-PC steps approved by Andy 2026-10-30: (1) lift mu-Clid's sample-library mechanism into mu-core, (2) Signalsmith Stretch prototype (latency hiding, varying-rate drive, CPU/memory, dsp-steward review), (3) wire the CMake target per the checklist; nothing is built** (idea and first wireframe by Andy, 2026-10-29; named mu-Tilate and requirements added 2026-10-30; scaffold and doc set created 2026-10-30). It is listed under Unscheduled ideas in [../design-future.md](../design-future.md); ask before implementing. Documents: [design-ui.md](design-ui.md) (wireframe and panels), [design-engine.md](design-engine.md) (transient detection, tempo matching and time-stretch, tempo analysis, real-time notes), [design-library.md](design-library.md) (sample library, export, factory loops). Product rules: [mu-tilate/CLAUDE.md](../../mu-tilate/CLAUDE.md).
 
 ## The idea
 
@@ -44,7 +44,7 @@ Per-slice values do not fit one APVTS parameter each (the number of slices varie
 
 ## Shared pieces this suggests (for `mu-core`, not per-product)
 
-**Decided** (Andy's standing rule: shared code always goes in `mu-core` unless there is a very good reason not to): these are built in `mu-core`, not inside mu-Tilate, together with the sample-library mechanics in [design-library.md](design-library.md), the product-independent parts of the transient and tempo detectors, and the Bounce dialog and render path: a **zoomable, scrollable waveform view with region tints and markers**, a **time ruler**, and a **drag-scroll / zoom viewport** helper (the timeline reuses it). A drag-and-drop payload for "slice onto timeline" stays product-side. A coded `ux-controller` ruling is needed on the exact tint tokens when this is scheduled.
+**Decided** (Andy's standing rule: shared code always goes in `mu-core` unless there is a very good reason not to): these are built in `mu-core`, not inside mu-Tilate, together with the sample-library mechanics in [design-library.md](design-library.md), the product-independent parts of the transient and tempo detectors, and the Bounce dialog and render path: a **zoomable, scrollable waveform view with region tints and markers**, a **time ruler**, and a **drag-scroll / zoom viewport** helper (the timeline reuses it). A drag-and-drop payload for "slice onto timeline" stays product-side. A coded `ux-steward` ruling is needed on the exact tint tokens when this is scheduled.
 
 ## Decisions (Andy, 2026-10-30)
 
@@ -90,7 +90,7 @@ The user-visible limits and defaults below are **DECIDED (Andy, 2026-10-30)**; t
 - **Memory:** to be measured in the prototype; budget 0.5 MB per layer for both instances (8 MB for 16 layers), which is small against the 11.52 MB loop buffer.
 - **CPU:** no figure is assumed. The prototype measures it; the **target** is at most 1.5 percent of one core per stretching layer at 48 kHz and 512 frames, so 16 stretching layers stay under about 25 percent, otherwise the cheaper Stretch preset is used. Layers in Off, or in Re-pitch with ratio 1, run neither stretcher nor sinc.
 - **Latency risk (record in the prototype):** Signalsmith Stretch has an input/output latency of tens of ms; a slice cannot start late. The design's Hold section helps: play the hold directly from the sample while the stretcher is primed with `seek` at the slice position, then cross-fade to the stretcher output. Whether the hold is long enough for that is part of the prototype question.
-- **Interpolators:** `Lagrange` is the default. **`WindowedSinc` may not be adopted without a `dsp-controller` review** of its CPU at 8 and 16 layers (its memory size is 200). Choice is made at slice start only (never switched mid-slice), and falls back to Lagrange while pitch is modulated.
+- **Interpolators:** `Lagrange` is the default. **`WindowedSinc` may not be adopted without a `dsp-steward` review** of its CPU at 8 and 16 layers (its memory size is 200). Choice is made at slice start only (never switched mid-slice), and falls back to Lagrange while pitch is modulated.
 
 **6. Timeline and the mirror rule.** Yes, the rule extends. There is **one timeline implementation**: the model (blocks as ValueTree, quantise, hit-test, edit operations, staging at the boundary) in `mu-tilate-layer/Sequencer`, the view and its panels in `mu-tilate-layer/UI`, built on the generic `mu-core` ruler, viewport and waveform. The product's editor and mu-Tronic's content band both host the same components; neither has timeline code of its own. The layer tests run the timeline through the registry host as well as the product host. This is the same shape as mu-On's `StepRow` and `Track`.
 
@@ -101,5 +101,5 @@ None remaining. Loop cap, embedded limits, `Auto` embedding and Stretch latching
 ## To prove in the prototype
 
 - Whether Signalsmith Stretch follows a varying local rate without artefacts (design-engine), and whether the Hold is long enough to hide the stretcher's latency.
-- Real CPU and memory of Stretch and `WindowedSinc` at 8 and 16 layers against the targets in ruling 5 (then `dsp-controller` review).
+- Real CPU and memory of Stretch and `WindowedSinc` at 8 and 16 layers against the targets in ruling 5 (then `dsp-steward` review).
 - The exact JUCE 9 `ThreadPool` priority option name.

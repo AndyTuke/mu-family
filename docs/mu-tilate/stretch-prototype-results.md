@@ -1,8 +1,8 @@
-# Signalsmith Stretch prototype: results (2026-10-31, corrected after the dsp-controller review)
+# Signalsmith Stretch prototype: results (2026-10-31, corrected after the dsp-steward review)
 
 Answers the three open questions in [design-engine.md](design-engine.md#tempo-matching-and-time-stretch) ("How the stretcher is driven"). Code: [tests/prototypes/stretch/](../../tests/prototypes/stretch/README.md) (standalone, not in the product build). Library: Signalsmith Stretch (MIT; the header reports 1.3.2, tag 1.4.0) and Signalsmith Linear 0.6.6 (MIT), vendored under `ThirdParty/`. Release build, 48 kHz, **mono**, synthetic slices (kick, snare, soft pad), 0.5 s each, stretched to 1.25x, 1.6x and 0.8x their length.
 
-**Nothing here was listened to.** The numbers are waveform measurements on synthetic material. They decide what to build, not whether it sounds good; the sound needs Andy's ears on real loops. The `dsp-controller` reviewed this note and the harness (Pass with notes, no Blocker); its corrections are in below.
+**Nothing here was listened to.** The numbers are waveform measurements on synthetic material. They decide what to build, not whether it sounds good; the sound needs Andy's ears on real loops. The `dsp-steward` reviewed this note and the harness (Pass with notes, no Blocker); its corrections are in below.
 
 ## 1. Does a varying local rate (hold, ramp, plateau) protect the attack? No gain from it.
 
@@ -36,7 +36,7 @@ What does cost something is the stretcher itself: across the three ratios the fi
 | **`outputSeek` for 8 voices inline at a slice start, 128 / 256-sample blocks** | **4.0 ms (151 %) / 3.5 ms (65 %)** | **1.0 ms (38 %) at 128** |
 | same with `splitComputation` (default window, 128) | process worst block 0.43 ms (16 %); `outputSeek` 5.4 ms (201 %) | not run |
 
-Mono, 48 kHz, one machine, Release, warm cache. Stereo roughly doubles the work, 96 and 192 kHz scale the windows with the rate, and eight interleaved voices will not stay in cache, so **treat these as a lower bound**. The average is cheap; the **peak is the risk**: a whole hop runs inside whichever block crosses it, and `outputSeek` does a reset plus a pre-roll in one call. Allocation counting covers `operator new` only (not `malloc`); the dsp-controller's read of the vendored headers found no allocation, lock or I/O on this path (the default constructor uses `std::random_device`, so only the seeded constructor may be used).
+Mono, 48 kHz, one machine, Release, warm cache. Stereo roughly doubles the work, 96 and 192 kHz scale the windows with the rate, and eight interleaved voices will not stay in cache, so **treat these as a lower bound**. The average is cheap; the **peak is the risk**: a whole hop runs inside whichever block crosses it, and `outputSeek` does a reset plus a pre-roll in one call. Allocation counting covers `operator new` only (not `malloc`); the dsp-steward's read of the vendored headers found no allocation, lock or I/O on this path (the default constructor uses `std::random_device`, so only the seeded constructor may be used).
 
 ## 4. Window size is a per-material choice
 

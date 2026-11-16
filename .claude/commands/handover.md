@@ -15,7 +15,7 @@ My outgoing file is `handover/laptop-to-build.md` (laptop) or `handover/build-to
    - its `## Status`;
    - every `## Open` item addressed to me (id, title, rows, what it needs);
    - the `## Results` entries answering MY items (`Re <my id>`), with Done / Failed / Partly.
-3. For each result that answers one of my items: act on it (a build PC result with a build number lets the `backlog-administrator` close or update the row; a failure becomes work), then delete the item from MY file's `## Open`, and tell the owner.
+3. For each result that answers one of my items: act on it (a build PC result with a build number lets the `backlog-steward` close or update the row; a failure becomes work), then delete the item from MY file's `## Open`, and tell the owner.
 4. Prune my own `## Results`: delete every `Re <id>` whose id is no longer under `## Open` in the other PC's file (the sender removed it, so it is acknowledged).
 5. Commit only `handover/` (subject `Handover: <laptop|build PC> read <date>`), push, and then start the owner's work. Skip the commit when nothing changed.
 
@@ -28,6 +28,6 @@ My outgoing file is `handover/laptop-to-build.md` (laptop) or `handover/build-to
 
 ## Rules
 
-- The backlog is the record of the work; a handover item holds only the concrete steps and results for the other machine. Backlog changes still go through the `backlog-administrator`.
+- The backlog is the record of the work; a handover item holds only the concrete steps and results for the other machine. Backlog changes still go through the `backlog-steward`.
 - Keep entries short and concrete: commands to run, what to look at, what to bring back.
 - If `git pull` conflicts inside `handover/`, someone edited the wrong file: keep the owner's version of each PC's own file, tell the owner, and do not guess.

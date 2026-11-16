@@ -33,7 +33,7 @@ Still supplied by `ProcessorBase`, not the layer: APVTS, mixer strips (`ch{N}_`)
 ## Risks and blockers
 
 1. **Parameter ids (biggest).** Layer rows are `<letter><slot>_`; products use the same prefixes as mu-Tronic, so a product is a subset of Tronic's layout. mu-Toni on the host with 8 slots keeps its ids. A true N=1 host would drop 7 of 8 parameter sets and break automation and MIDI maps. **Keep capacity per product as a compile-time property (8), not 1.** mu-On's track types share `t{N}_`; the host declares each prefix once, so that works.
-2. **Audio-thread scheme change.** TryLock to Published is a real-time risk: `dsp-controller` review required for that stage.
+2. **Audio-thread scheme change.** TryLock to Published is a real-time risk: `dsp-steward` review required for that stage.
 3. **State and presets.** Layer presets already go through the registry and mu-Tronic imports product presets (`ProductImport.cpp`). Full-state root tags differ (`MuToniState` vs `kStateType`); a per-product tag and a list-to-slot (layer count) migration are needed. *Inferred.*
 4. **Plugin identity.** Each product has its own `PLUGIN_CODE`, formats, licence key files, product slug and checkout URL, currently inside the processors. These become per-target defines / a traits struct. Only mu-Tronic is Standalone-only.
 5. **DAW bus layout.** mu-Clid's multi-bus counts are fixed at plugin scan time.
@@ -72,5 +72,5 @@ mu-Tronic as the N=16 variant of the same host is nearly free.
 ## Next steps if pursued
 
 1. `architecture-steward` ruling: "single-layer host = the mu-Tronic host with a compile-time N and a per-product traits struct", plus where the host lives in `mu-core` without breaking the core boundary.
-2. `backlog-administrator`: a row for the spike, ranked against #1699 / #1701 (which it builds on).
+2. `backlog-steward`: a row for the spike, ranked against #1699 / #1701 (which it builds on).
 3. Run the Stage 0 spike on a branch; record the three unverified items above.

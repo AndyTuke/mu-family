@@ -29,5 +29,5 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 
 ## After the build
 
-- Hand any compiler warnings the warning-scan hook reported to the `backlog-administrator` agent to log; then ask it for the next task and keep working until the next build is worth it (CLAUDE.md, "Keep working until a build is worth it").
+- Hand any compiler warnings the warning-scan hook reported to the `backlog-steward` agent to log; then ask it for the next task and keep working until the next build is worth it (CLAUDE.md, "Keep working until a build is worth it").
 - If the work since the last `/notes` fixed/improved anything **user-facing**, run `/notes` once for the batch to add the In-Testing one-liners and push the site.

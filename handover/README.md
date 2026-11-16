@@ -10,7 +10,7 @@ How the work laptop and the build PC hand work to each other (owner request, 202
 ## Rules
 
 1. **Each PC writes only its own file.** The other PC reads it and never edits it, so git never has two writers on one file and pulls do not conflict.
-2. **The backlog stays the record of the work.** A handover item points at the backlog row (`#1703`) and the commit, and gives the steps for this machine. It never copies row text. The `backlog-administrator` still owns `backlog.md`; closing a row still needs the build evidence.
+2. **The backlog stays the record of the work.** A handover item points at the backlog row (`#1703`) and the commit, and gives the steps for this machine. It never copies row text. The `backlog-steward` still owns `backlog.md`; closing a row still needs the build evidence.
 3. **An item is finished when it is gone from the sender's file.** The receiver answers in its own file under `## Results`, quoting the item id. The sender reads the result, acts on it (for example closes the row), then deletes the item. The receiver then deletes its own result, because an id that is no longer open in the other file means "acknowledged".
 4. **Ids are never reused.** Laptop items are `L-001`, `L-002`, …; build PC items are `B-001`, …. Each file keeps its `Next id` line.
 5. **Pull before reading, push after writing.** Start a session with `/handover start`, end it with `/handover end` ([../.claude/commands/handover.md](../.claude/commands/handover.md)). Commit only the `handover/` files in a handover commit.

@@ -1,4 +1,4 @@
-Perform a deep code audit across the whole codebase and log the findings (through the `backlog-administrator` agent, which is the only writer) as `**[Audit]**` rows in the Open section. Only Tier 1-3 findings (HIGH, MED) and Risks get a row; Tier 4-7 Minor findings are P3 one-liners (merge same-area ones into one row), and findings on code that already has an open row are added to that row instead. **Do not fix anything** — this command produces a discussable list, not a diff. Fixes happen as a separate explicit step after the user triages.
+Perform a deep code audit across the whole codebase and log the findings (through the `backlog-steward` agent, which is the only writer) as `**[Audit]**` rows in the Open section. Only Tier 1-3 findings (HIGH, MED) and Risks get a row; Tier 4-7 Minor findings are P3 one-liners (merge same-area ones into one row), and findings on code that already has an open row are added to that row instead. **Do not fix anything** — this command produces a discussable list, not a diff. Fixes happen as a separate explicit step after the user triages.
 
 This is the broader sibling of `/optimise`. Where `/optimise` audits changed files and auto-fixes them, this command sweeps the entire project source and surfaces findings for human decision.
 
@@ -112,7 +112,7 @@ Audio path performance:
 
 ## How to surface findings
 
-Do not edit `backlog.md` yourself. Draft each finding as a row with this anatomy, then pass the batch to the `backlog-administrator` agent to insert (it assigns the numbers, checks for duplicates and runs `check-backlog.ps1`):
+Do not edit `backlog.md` yourself. Draft each finding as a row with this anatomy, then pass the batch to the `backlog-steward` agent to insert (it assigns the numbers, checks for duplicates and runs `check-backlog.ps1`):
 
 ```
 | <N> | **[Audit]** <SEVERITY if Tier 1-3> — <one-sentence summary>. <Trace through code with exact file:line refs>. <Concrete consequence — what breaks for users>. Fix sketch: <one-line proposed change>. | 🔴 Open | — |

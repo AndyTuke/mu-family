@@ -312,7 +312,7 @@ itself in `mu-core-tests` (`GoldenRenderHarnessTests.cpp`) on a fake processor.
    tree. That is the only way a golden changes. It runs the test exe twice in separate processes and
    rejects a result that differs (the cross-process repeat test), refuses to also change source, and
    writes a commit-message template to `tests/_out/golden/`. Commit goldens alone, never inside a
-   commit that moves code, and with the `dsp-controller`'s sign-off on the reason.
+   commit that moves code, and with the `dsp-steward`'s sign-off on the reason.
 5. On a mismatch the run fails naming the first diverging key and segment (with its time and RMS) and
    writes the golden, the actual fingerprint, the list of differences and a 24-bit WAV of each
    differing stream to `tests/_out/golden/<product>/<scenario>/`.

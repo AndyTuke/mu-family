@@ -318,11 +318,11 @@ once shipped:
 | Mod-target ids (`MuOnModDest.h`, `kFmPercDests`) | `fp.<id>.prop` (`fp.tune.prop` ...), parameters `fmp_*`, `allUnderPrefix(kFmPercDests, "fmp_")`; the `f` letter stays free |
 | Class and file | `mu_on::FmPercEngine` in `mu-on/Source/Audio/FmPercEngine.h` (header-only like `RumbleEngine`, one class per file; no helper file until a second product wants it, then the helper moves to `mu-core/Audio/` before the second copy) |
 | Disc initial | **F** (taken: E Rhythm, P Pattern, A Arp, K, B, H, S, R; "P" is Pattern's, "F" is FM's own letter) |
-| Chooser descriptor | one line, 20 characters or fewer: "FM percussion" proposed (`ux-controller` owns the final wording and the six-card group fit) |
+| Chooser descriptor | one line, 20 characters or fewer: "FM percussion" proposed (`ux-steward` owns the final wording and the six-card group fit) |
 | Factory presets | `.muTrack` files in mu-On's `Tracks/` folder (`FmPerc <Algorithm>`), not a new extension |
 
 The ten knob labels are one fixed set for all eight algorithms (Andy's decision): proposed `Tune, Ratio, Index, FM Dec, Fdbk, Dive, D.Time, Decay, Fold, Noise` plus the `Algo` dropdown first
-(wording is `ux-controller`'s). The algorithm names are the choice items, appended only: Tom, Conga, Zap, Click, Clank, Wood, Pluck, Burst. Any later engine of mu-On follows this row's recipe.
+(wording is `ux-steward`'s). The algorithm names are the choice items, appended only: Tom, Conga, Zap, Click, Clank, Wood, Pluck, Burst. Any later engine of mu-On follows this row's recipe.
 
 **Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
 folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a

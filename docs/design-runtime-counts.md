@@ -124,4 +124,4 @@ Method: pin the thread, run the three cases interleaved three times, take the be
 - **Persistence**: any stored array sized by count (scenes, clip states) keeps its on-disk shape; the file's own count, not `limits.layers`, bounds a read.
 - **Ordering/ownership**: moving storage from members to heap changes construction order of `ProcessorBase` members (apvts must stay the first member). Keep `limits` declared before every member that is sized from it.
 
-Needs `dsp-controller` review (a Blocked verdict stops the change): phases 2 and 3 (every audio-thread array, the render scratch lifetime, the `directOuts` span, the bus-count branch, no allocation in `processBlock`), and the phase 5 benchmark result. Phases 1, 4 and 6 are structural and need only the static checks plus the test suites.
+Needs `dsp-steward` review (a Blocked verdict stops the change): phases 2 and 3 (every audio-thread array, the render scratch lifetime, the `directOuts` span, the bus-count branch, no allocation in `processBlock`), and the phase 5 benchmark result. Phases 1, 4 and 6 are structural and need only the static checks plus the test suites.

@@ -2,7 +2,7 @@
 
 **Status:** design only. Nothing is built. Written by the Architecture Steward for Andy's brief of 2026-10-15 and
 revised the same day after his answers (section 9 records them); the look and feel of every screen below is the
-`ux-controller`'s, and real-time review of the audio-thread parts is the `dsp-controller`'s before anything is
+`ux-steward`'s, and real-time review of the audio-thread parts is the `dsp-steward`'s before anything is
 pushed. Only the short "still open" list in section 9 needs Andy; everything else is ruled.
 
 **Settled by Andy, 2026-10-15 (the shape of the product):** a fifth product; **Standalone only** (no VST3, no CLAP); **freeware** (no licence key, no
@@ -16,7 +16,7 @@ mode keeps its final-mix gate as a mu-Tant shell function (live product bit-iden
 runtime engine loading is **not adopted**. Sections 2.5, 3.1 and 3.2 stand: static layer libraries compiled into mu-Tronic; engines do not update independently of mu-Tronic
 (suite-wide releases; mu-Tronic is rebuilt and released whenever an app's engine changes). Licence follows the install through a small per-app manifest (supporter flag,
 checkout URL, content dir) written at install and at launch; mu-Tronic has no key code of its own and stays freeware. Whether it shows a generic Support prompt for an
-installed-but-unlicensed engine is a later T1 / `ux-controller` decision. Three zero-cost constraints go into E1 (`RenderContext` mirrors a C struct, layer state is text, `render`
+installed-but-unlicensed engine is a later T1 / `ux-steward` decision. Three zero-cost constraints go into E1 (`RenderContext` mirrors a C struct, layer state is text, `render`
 makes no host callback) so a module ABI stays possible. Analysis: extraction-plan sections 8 and 9.
 
 **Andy's brief.** "An empty unit with the same mod, effects and mixer as all the other apps. The voices are empty slots, into which we can add a voice
@@ -52,7 +52,7 @@ validation, no host state restore, no licence flow.
 ### 1.1 Vocabulary (design-naming §1 stands)
 
 Andy's word "voice" means what the family calls a **layer**: one engine + one sequencer + one mixer channel. The code keeps **Layer**; "voice" stays
-reserved for a polyphonic voice inside an engine (`SynthVoice`, `ToniVoice`). User-facing wording in mu-Tronic is the `ux-controller`'s call; the docs
+reserved for a polyphonic voice inside an engine (`SynthVoice`, `ToniVoice`). User-facing wording in mu-Tronic is the `ux-steward`'s call; the docs
 and code say layer. New terms recorded in design-naming §1:
 
 | Term | Means |
@@ -116,7 +116,7 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 | Self-containment (section 1.3) | The engine belongs to the layer and the step grid is per layer; a 16-slot instance cannot afford five engines per slot, so a locked `Track` holds one. As built, the standalone keeps all five per track (an unlocked track must switch engine in the same block); the per-slot pool `GrooveVoices` is gone. |
 | Global grid and clock | Gone from the layer: each `Track` owns its step row, length, swing and accent and reports `loopBeats()` (a 16-step row is one bar). The standalone's grid view is a view over its tracks; the shared clock is `RenderContext::startBeat`, as for every type. |
 | Rumble reading another layer | Stays the only cross-layer audio read. Priority 1; the source is a slot index resolved through `RenderContext::peer(slot)`. Because the types are now independent, the source may be **any priority-0 layer of any type** in the instance (a Kick, an Arp, a Pattern), which costs nothing extra and is the useful case; a priority-1 source (another Rumble) or an Empty slot processes silence. The source slot index is a layer parameter and is remapped on swap/remove by the base's `remapLayerReferences` hook (generic since Stage 6, called in phase 3 where parameters may be written); `layersReordered` is **not** the hook for it (ruled at E3, 2.1.9 point 4). The Track-side rewrite is one library function, so mu-Tronic's processor calls it rather than copying it. |
-| Chooser | Types are grouped by product in the picker: `LayerTypeInfo::group` ("mu-Clid", "mu-Tant", "mu-Toni", "mu-On") and `displayName` ("Rhythm", "Pattern", "Arp", "Kick" ...). Nine types plus Empty; the layout of the chooser (nine cards or a grouped list) is the `ux-controller`'s. A type is offered only if registered in the build, so a mu-Tronic that has not yet got Pattern and Rhythm simply does not list them. |
+| Chooser | Types are grouped by product in the picker: `LayerTypeInfo::group` ("mu-Clid", "mu-Tant", "mu-Toni", "mu-On") and `displayName` ("Rhythm", "Pattern", "Arp", "Kick" ...). Nine types plus Empty; the layout of the chooser (nine cards or a grouped list) is the `ux-steward`'s. A type is offered only if registered in the build, so a mu-Tronic that has not yet got Pattern and Rhythm simply does not list them. |
 | Default names | `<displayName> <slot>` ("Kick 3"), editable and saved (section 4). |
 
 ---
@@ -128,11 +128,11 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 Stage 8 of design-plugin-family waited for exactly this decision. Ruling: **dispatch stays virtual on `Layer`; a registry only creates and describes.**
 This section is the specification of record for E1. Subsections 2.1.2 to 2.1.5 are the four design fixes C1 to C4 of the real-time review
 ([extraction-plan.md 2.1a](extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18), written 2026-10-15 as stage E0d); C5 to C18
-stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-controller` round 1 (2026-10-15): C1 and C3 Pass with notes, C2 and
+stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-steward` round 1 (2026-10-15): C1 and C3 Pass with notes, C2 and
 C4 Not yet (R1 to R7), structure kept; this revision folds in R1 to R7, the binding notes N1 to N7, the accepted amendments and the open-point rulings (2.1.6).
 Round 2 (2026-10-15): C1 and C2 Pass with notes, C3 Pass, C4 Not yet (F1, folded in with the R5 rule line and the round-2 binding notes on the packed word,
-lock order, eviction under `layersLock` and phase 4). `dsp-controller` sign-off: C1-C3 signed (round 2, with binding notes); C4 accepted once F1 and the R5
-rule line are in the doc (dsp-controller: no further round).** E1 may start on C1 to C3. **E1 built 2026-10-16** (branch `extraction`); the
+lock order, eviction under `layersLock` and phase 4). `dsp-steward` sign-off: C1-C3 signed (round 2, with binding notes); C4 accepted once F1 and the R5
+rule line are in the doc (dsp-steward: no further round).** E1 may start on C1 to C3. **E1 built 2026-10-16** (branch `extraction`); the
 `architecture-steward`'s rulings on where the build differs from this text, and what each product must convert when it adopts the contract, are in 2.1.7. The
 subsections below already show the accepted as-built shape.
 
@@ -848,7 +848,7 @@ modelled).
 | mu-Toni gate | `gateCounter` frames from the note-on; stop: `run == false` notes off inside `render` | event-anchored | Unchanged; stop handled inside `render` (flags form). `wasRunning` stays in the runner (it includes the MIDI-trigger gate). |
 | mu-On (`GrooveSequencer`) | one global `nextGlobalStep` cursor, resync beyond plus or minus one step; frame offset `round((t - start) / bps)`; stop edge `grooveVoices.reset()`; Rumble envelope at the beat | transport-anchored cursor | One cursor per track row with the same arithmetic (E3.4); stop edge as `onTransportStopped`; Rumble envelope at `ctx.startBeat`; tempo-synced taps from `ctx.bpm`. Order of `reset` against the parameter refresh: pin P5 first; if the hook order differs, mu-On uses the flags form inside `render` (open point 9). |
 | mu-Tant (`gateAt(beat)`, `resolveLane` at the beat) | absolute beat, wrapped to 64 beats by the resolver | transport-anchored, no cursor | The mu-Tant standalone keeps `wrapBeats = 64` as its host policy (`beatWrap = 64`), because an unwrapped counter reaches a different double after 64 beats of internal play; `Pattern::render` applies `wrapBeat(startBeat, 64)` itself (never bare `fmod`, which is negative on a pre-roll beat), which is exact on already-wrapped input, so mu-Tant stays bit-identical and the layer is correct in an unbounded host (mu-Tronic), including at negative beats. |
-| mu-Clid (`RhythmSequencer`) | step from the beat (`stepAt`), `lastEffectiveStep` wrap detector, dip-hold `resolveBlockBeat`, block-granular triggers at frame 0; plugin Note mode runs its own beat counter | transport-anchored; the dip-hold and Note-mode counter are host transport policy | Dip-hold and the Note-mode counter stay host-side (they produce `startBeat`). The context carries **no** product trigger field (accepted, amendment d); `SampleRhythm` runs its own cursor, which must reproduce `RhythmSequencer`'s wrap and swap-start arithmetic bit for bit (E5.5, own `dsp-controller` gate; open point 6). MIDI note-off countdown: event-anchored, counted from the block start (caveat above). |
+| mu-Clid (`RhythmSequencer`) | step from the beat (`stepAt`), `lastEffectiveStep` wrap detector, dip-hold `resolveBlockBeat`, block-granular triggers at frame 0; plugin Note mode runs its own beat counter | transport-anchored; the dip-hold and Note-mode counter are host transport policy | Dip-hold and the Note-mode counter stay host-side (they produce `startBeat`). The context carries **no** product trigger field (accepted, amendment d); `SampleRhythm` runs its own cursor, which must reproduce `RhythmSequencer`'s wrap and swap-start arithmetic bit for bit (E5.5, own `dsp-steward` gate; open point 6). MIDI note-off countdown: event-anchored, counted from the block start (caveat above). |
 
 **What the three E1 constraints imply.** (1) *C-struct mirror:* fixed-width scalars, `uint8_t` flags, no reference, no JUCE or `std` type, `structSize` and
 `version` at the head, fields only appended; the MIDI view is a POD array the base decodes once per block into storage sized at construction
@@ -881,7 +881,7 @@ callback); a per-layer beat wrap inside the resolver (mu-Toni's dotted rates do 
 beat-domain note-offs for the existing products (above); a product trigger mask in the context (product vocabulary in core, and a field that mu-Tronic could
 never fill).
 
-#### 2.1.6 Open points: the `dsp-controller`'s rulings (round 1, 2026-10-15)
+#### 2.1.6 Open points: the `dsp-steward`'s rulings (round 1, 2026-10-15)
 
 None of the twelve blocks E1. The pins (P) and measurements (M) named here are listed in [extraction-plan.md](extraction-plan.md) step E0.6.
 
@@ -894,13 +894,13 @@ None of the twelve blocks E1. The pins (P) and measurements (M) named here are l
 4. **mu-Clid output after drain:** Karplus inserts can ring for minutes. "Stop at Done" is accepted, with a signed golden update at E5.4d if pin P2 shows
    non-zero samples after `isFullyDrained()`.
 5. **C11 placement:** accepted with N7 (each product keeps its own top-of-`processBlock` `ScopedNoDenormals`, 2.1.1).
-6. **mu-Clid trigger source:** accepted as amendment (d): no trigger field; `SampleRhythm` runs its own cursor. E5.5 is re-opened with its own `dsp-controller`
+6. **mu-Clid trigger source:** accepted as amendment (d): no trigger field; `SampleRhythm` runs its own cursor. E5.5 is re-opened with its own `dsp-steward`
    gate: the per-layer cursor must reproduce `RhythmSequencer`'s wrap and swap-start arithmetic bit for bit.
 7. **Hard cap 30 s:** accepted if pin P4 shows no golden tail exceeds it; recorded that a retired `ampRelToEnd` sample longer than 30 s now fades at 30 s (2.1.3).
 8. **mu-Clid flush at prepare:** accepted as a deliberate change.
 9. **mu-On stop order:** pin first (P5: the stop edge with `applyParams` before `reset`, and a 0-frame stop block); if the hook order differs, mu-On uses the
    flags form inside `render`.
-10. **Oversize blocks:** today's truncation is a defect. The oversize segment is re-recorded in a goldens-only commit the `dsp-controller` signs, then kept in the
+10. **Oversize blocks:** today's truncation is a defect. The oversize segment is re-recorded in a goldens-only commit the `dsp-steward` signs, then kept in the
     tolerance-0 gate; the chunking test is the main evidence (pin P7 records today's segment per product first).
 11. **mu-Tant bank-lock miss:** accepted (only contention changes: a miss silences one layer, not all); a tail takes the same bank try-lock as its live layer.
 12. **View pool:** accepted with N3 (pool of 4, the publish-twice assert, an overflow view instead of a wait, counted in the T1 stress test).
@@ -955,7 +955,7 @@ type reaches only `RetireTail.h` (design-naming §3). (b) `BlockTransport::beatW
 - **Each product sets its `RetireBin` count policy in its constructor** (`setRetireCountPolicy`): mu-Tant `RenderPastCount` (E4.6); mu-Clid decided at E5 after
   pin P3 (E5.4d); mu-Toni and mu-On park nothing, so they leave the default.
 - **mu-Clid's `VoiceEngine::bufferLock`** (`mu-core/Audio/VoiceEngine.cpp`, `tryEnterRead` in `process`) is a `juce::ReadWriteLock`, whose reader bookkeeping
-  can allocate on the audio thread. It is replaced, in `mu-core` (it is the shared engine) and by a mechanism the `dsp-controller` signs, **before mu-Clid renders
+  can allocate on the audio thread. It is replaced, in `mu-core` (it is the shared engine) and by a mechanism the `dsp-steward` signs, **before mu-Clid renders
   through the contract**: a gate item of E5.0, so that `SampleRhythm::render` and the tails pass the AllocationProbe.
 - **Oversize-block goldens (pin P7)** are re-recorded when each product adopts `renderAndMix` (E2.5, E3.6, E4.7, E5.7), in a signed goldens-only commit
   (2.1.6 point 10), never in the code-moving commit.
@@ -1003,7 +1003,7 @@ and renders only through `renderAndMix`; `GrooveVoices` is deleted. `check-layer
 |---|---|---|
 | 1 | `UI/TrackHost.h` (`mu_on::TrackHost`); `TrackContent(ProcessorBase&, TrackHost&)` with `ProcessorBase` forward-declared and unused; `StepRows(TrackHost&)` | **Accept.** The unused `ProcessorBase&` stays: the content factory signature is `(ProcessorBase&, <Type>Host&)` for every type (2.2), and the shared sections that take a processor arrive with mu-Tronic's chrome. **Done (review commit):** `engineOf` / `selectEngine` are now `getTrackEngine` / `selectTrackEngine`, because host methods carry the type name (2.1.8 row 1) so one adapter can implement several hosts. `getModLive` stays as ArpHost's does (the overloads differ by arity). `StepRows` takes only the host because it reads no `ProcessorBase` service; it is the standalone's all-tracks grid and mu-Tronic does not show it as is (point 8) |
 | 2 | `mu-on-layer` INTERFACE target in `mu-on/CMakeLists.txt` (`Persistence/TrackParams.cpp`, `Sequencer/Track.cpp`); `MU_ON_LAYER_UI_SOURCES` (`StepRows.cpp`, `TrackContent.cpp`); `mu-on-layer-tests` (console target: library + mu-core layer-side sources + one test, no `Plugin/` source), with the stream hashed through the real processor and through hand-built contexts equal; the checker finds the library by its `add_library` | **Accept** as the 2.5 / 2.1.8 family shape; the target name `mu-<product>-layer-tests` matches Toni. `GrooveSequencer` is out of the library (row 3b, done) |
-| 3 | `Audio/TrackEngine.h`: `TrackEngine` holds a `std::variant` of the five engines behind one interface (`prepare`, `reset`, `resetToPrepared`, `setParams`, `trigger`, `render`); built and prepared on the message thread, installed and removed under the track's `engineLock`, freed on the message thread. **Final shape (after the `dsp-controller`'s F1):** a track that is not `engineLocked` (every mu-On track) holds **all five** prepared engines (`engines[5]`, `heldMask`, `holdsEngine(e)`) and the audio thread plays the one `t{N}_eng` names *in the same block*, whichever thread changed the parameter; an `engineLocked` track (mu-Tronic) holds only its own engine, built by `syncEngine()` on the message thread (silence until built, nothing built on the audio thread) | **Accept the placement and the name.** It is the engine side of the layer (`Audio/`, role `Engine` in design-naming); the `Track` prefix says whose engine it is, like `ToniVoice` in a `Toni` library. `std::variant` and `std::visit` do not allocate. **Ruling on F1:** the first E3 shape (one engine per track, rebuilt on a parameter change, silence until the 100 Hz poll) dropped the step at a host-automated engine change; the fix is right and mu-On is back to 5 engines x 8 tracks. The "8 engines, not 40" saving applies **only to `engineLocked` tracks**, which is what mu-Tronic's 16 slots need (one engine per layer, design 1.4); the plan's E3.5 claim for the standalone is withdrawn. One class and one flag (`engineLocked`) select between the two policies. The variant is as large as its largest engine, so the locked policy's saving is what `sizeof` says; the `dsp-controller` owns that measurement. The golden `engine-automation-midplay` covers the automation case |
+| 3 | `Audio/TrackEngine.h`: `TrackEngine` holds a `std::variant` of the five engines behind one interface (`prepare`, `reset`, `resetToPrepared`, `setParams`, `trigger`, `render`); built and prepared on the message thread, installed and removed under the track's `engineLock`, freed on the message thread. **Final shape (after the `dsp-steward`'s F1):** a track that is not `engineLocked` (every mu-On track) holds **all five** prepared engines (`engines[5]`, `heldMask`, `holdsEngine(e)`) and the audio thread plays the one `t{N}_eng` names *in the same block*, whichever thread changed the parameter; an `engineLocked` track (mu-Tronic) holds only its own engine, built by `syncEngine()` on the message thread (silence until built, nothing built on the audio thread) | **Accept the placement and the name.** It is the engine side of the layer (`Audio/`, role `Engine` in design-naming); the `Track` prefix says whose engine it is, like `ToniVoice` in a `Toni` library. `std::variant` and `std::visit` do not allocate. **Ruling on F1:** the first E3 shape (one engine per track, rebuilt on a parameter change, silence until the 100 Hz poll) dropped the step at a host-automated engine change; the fix is right and mu-On is back to 5 engines x 8 tracks. The "8 engines, not 40" saving applies **only to `engineLocked` tracks**, which is what mu-Tronic's 16 slots need (one engine per layer, design 1.4); the plan's E3.5 claim for the standalone is withdrawn. One class and one flag (`engineLocked`) select between the two policies. The variant is as large as its largest engine, so the locked policy's saving is what `sizeof` says; the `dsp-steward` owns that measurement. The golden `engine-automation-midplay` covers the automation case |
 | 3a | `Persistence/TrackParams.{h,cpp}`: `EngineType` and its helpers, the `t{N}_` id helpers, the legacy lane prefixes, `addLayerParams` (one table per prefix: every engine's rows on every track), `addTrackGlobalParams` (`seq_swing`, `seq_accent`) | **Accept** (2.3, the `ArpParams` precedent). `addTrackGlobalParams` is the standalone's global rows and mu-Tronic does not call it: see point 8 |
 | 3b | `GrooveSequencer.h` held two classes and `StepPattern.h` held `StepRow` and `StepPattern` | **Done (review commits):** `Sequencer/StepRow.h` and `Sequencer/StepClock.h` (the two things `Track` needs; `StepClock::currentStep` is the playhead helper `StepRows` calls); `GrooveSequencer.{h,cpp}` moved to `Tests/` (test support, not in the library); `StepPattern` stays in `Sequencer/` as the standalone's view over the rows |
 | 3c | `Sequencer/TrackTypes.h`: `layerTypeOf(EngineType)`, `isTrackType`, `engineOfType`, `typeFromPreset(tree)`, `createTrack(slot)`, `makeTrackTypeInfo(engine)` and the five `LayerTypeInfo` constants (`kKickType` ... `kRumbleType`) | **Accept the file and the five constants** (the constants are the registered types, 1.4; a header of free functions and constants is not a class, so the file-equals-class rule does not apply, and Toni's single constant sits in `Arp.h` only because it has one). `typeFromPreset` is a free function, not a `LayerTypeInfo` field, until the registry exists (T1 adds the field and points the five constants at it). **Done (review commit):** the mapping (`layerTypeOf`, `isTrackType`, `engineOfType`) lives once beside `EngineType` in `Persistence/TrackParams.h` with `static_assert`s of the order (`LayerTypeId` is saved by name, so its order could change), and `Track::typeId` uses it |
@@ -1059,7 +1059,7 @@ to a layer-internal engine.
 **Point 8: what mu-Tronic still needs from this library (owed, not E3 blockers; (a) to (d) built in T1b step 2b, 2026-10-20, per 2.1.11).** (a) `TrackContent` and `Track::bindParams` bind to the global rows `seq_swing` and `seq_accent`;
 mu-Tronic has no global groove, so before it links the library the groove parameters become per-layer rows (appended to the `t{N}_` table, pre-release) or the host names the
 ids; the plan's E3.3 seeding (global values seed each row on load) stays for the standalone. (b) `StepRows` draws every live layer; mu-Tronic's Track content shows only its own
-row, so a one-row component is split out of it (T1, `ux-controller` for the look). (c) `initParams` (point 6). (d) `Track::prepare` builds no engine: the host calls `syncEngine()`
+row, so a one-row component is split out of it (T1, `ux-steward` for the look). (c) `initParams` (point 6). (d) `Track::prepare` builds no engine: the host calls `syncEngine()`
 after `engineLocked` and the engine parameter are set, and (for a locked track the engine never changes, so only on a type change) builds on the message thread; mu-On needs the call at create, and
 its `engineParamChanged` listener is now only a safety net for the all-five policy. A generic message-thread service hook on `Layer` is the shape
 if mu-Tronic would otherwise copy that listener; decided at T1. **All four decided 2026-10-20: 2.1.11 points 4 to 6.**
@@ -1093,7 +1093,7 @@ options open for mu-Tronic: the Pattern never constructs, owns or frees an engin
 Contract on `getPatternEngine` and `getPatternBankLock`: message thread; the base calls `bindParams` under `layersLock` on a move (a swap or a remove), so the call
 **allocates nothing and takes no lock**; the engine already exists, prepared, before the layer is created, and outlives every layer bound to it. mu-Tronic's
 adapter does the same (**recommended: one engine per slot, built when the slot's first Pattern is created, so the standalone and mu-Tronic share one path**; per-layer engines whose phase travels are
-a later choice for Andy, to be made with the `dsp-controller`'s `sizeof` measurement of 16 engines, because it changes the sound after a move). Not an E4 or T5 blocker.
+a later choice for Andy, to be made with the `dsp-steward`'s `sizeof` measurement of 16 engines, because it changes the sound after a move). Not an E4 or T5 blocker.
 
 **Point 4: `swapLoopBeats` is the host's policy.** It chooses *which* loop ends a pending swap from the swap timing, the master loop, the live count and the slot; the type contributes only
 the per-slot length (`Pattern::loopBeats()`), which the base now caches (point 6). It builds on `mu_hotswap` (`mu-core/Plugin/HotSwap.h`), which checker rule 1 forbids
@@ -1173,7 +1173,7 @@ same commit; Rumble follows with its `remapLayerReferences` override (2.1.9 poin
    (the strip returns to defaults) keeps its request, because there the sidechain setup itself changes. **Amended 2026-10-20 (T1b 2a review):** `applyStateTree` and a
    stopped full-preset load never carried a follower request in code (only `resetLayer` does), and none is added: the follower is a millisecond smoother, a restore
    rewrites every parameter at a silent moment, and a new request there would be a behaviour change in four shipped products for no audible gain. Design row 7 above and extraction-plan C17 are amended; `LayerTypeSwapTests::followerRestarts` and the matching `TronicArpTests` case
-   change to pin "unchanged by a type change, zeroed by reset" (test-steward). The `dsp-controller` signs the removal.
+   change to pin "unchanged by a type change, zeroed by reset" (test-steward). The `dsp-steward` signs the removal.
 3. **Retire policy.** A type change parks the old layer, which renders as a tail reading no parameters. `None` cuts it, a click for any sounding voice, so **every
    registered layer type declares `Fade`**, with `fadeMs` and `maxSeconds` left at the `RetirePolicy` defaults (25 ms, 2 s: the one family value, `RetirePolicy`'s own
    defaults, which `Pattern` already uses without writing a literal). A new literal in a layer type is wrong.
@@ -1182,7 +1182,7 @@ same commit; Rumble follows with its `remapLayerReferences` override (2.1.9 poin
      when the fade ends. A Rumble tail has no peer and processes the track's `silence` buffer (as a Rumble with no source does), and the fade cuts its reverb at 25 ms; a
      `Natural` Rumble tail is a later, separate ruling. The tail must not call a `ParamBinding` (it asserts).
    - *Arp* (the missing policy): the same, over the voice and its insert. This changes mu-Toni's own behaviour: a removed layer now fades 25 ms instead of cutting, so
-     the bin's count policy stays at its default and the structural-edit goldens that remove a sounding layer are re-recorded in a signed goldens-only commit (`dsp-controller`
+     the bin's count policy stays at its default and the structural-edit goldens that remove a sounding layer are re-recorded in a signed goldens-only commit (`dsp-steward`
      reviews; presets and renders changing is accepted, Andy 2026-10-17).
 4. **Groove rows are per layer, in both products.** `t{N}_swing` (0 to 1, default 0) and `t{N}_accent` (0 to 1, default 1) are appended to `addLayerParams`'s `t{N}_`
    table; `Track::bindParams` and `TrackContent` bind `layerParamId(slot, "swing")` / `"accent"` (the content rebinds its attachments when its layer changes, as it does for
@@ -1201,12 +1201,12 @@ same commit; Rumble follows with its `remapLayerReferences` override (2.1.9 poin
 6. **A locked Track's type cannot drift.** `create(slot, type)` calls `Track::lockEngine(engineOfType(type))`, which sets `engineLocked` and the engine; for a locked
    track `engineSetting()` returns that engine and ignores `t{N}_eng`. The parameter is therefore only a record (point 5 keeps it right), a stray automation or a loaded row
    cannot change the layer's type, and the "type wins on restore" reconciliation of 2.1.9 point 6 holds by construction. mu-On's tracks are never locked, so the standalone is unchanged.
-7. **UI additions of step 2a (ruled 2026-10-20).** (a) `mu-core/UI/LayerContent.h` is the content base: `setLayer`, `releaseModulationArcs`, `onStatusUpdate` and a virtual `getModDestProvider()` (null default). The provider stays on the content, not on `LayerTypeInfo`: `ModDestProvider` is a UI struct whose resolvers bind to the content's own matrix and widgets, and `LayerTypeInfo` is message-thread data that only forward-declares UI types. Every product's `<Type>Content` derives from it when its type is registered in mu-Tronic (`ArpContent` now; `TrackContent` at 2c; `PatternContent` and `RhythmContent` at their registration), not before. (b) `MuLookAndFeel::setAccentOverride(Component&, Colour)` / `clearAccentOverride` (a component property read up the parent chain by `appAccent`, the main-page knob colour and `lcdLitColour`) is the one mechanism for a host that paints the shown layer in its type's colour; `setAppAccent` stays one value per LookAndFeel. It covers knobs, lit LCDs and `appAccent` readers; segment and toggle selected-states keep the app colour (they read the theme's colour IDs), which is the `ux-controller`'s to confirm against design-ui-family section 11. (c) `LayerHeaderBar::setTypeTag` is accepted: off by default, no height, other products unaffected. (d) `MU_TRONIC_WITH_UI` is accepted as the headless split for T1b: defined on the app target only, and confined to the one `.cpp` per type (`Persistence/<Type>LayerType.cpp`), never a header or any other file, so the console test target registers the same engine description with null content and picture factories. If a second `#if` appears, split the factories into an app-only `<Type>LayerUi.cpp` instead. The factories are therefore unexercised by `mu-tronic-tests`; the preset helpers in `ProcessorBase` are pure and are tested (test-steward). (e) `ArpLayerType.{h,cpp}` under `Persistence/` is correct per point 1. (f) The `PARENT_SCOPE` lines in mu-On, mu-Tant and mu-Clid are correct and complete point 1.
+7. **UI additions of step 2a (ruled 2026-10-20).** (a) `mu-core/UI/LayerContent.h` is the content base: `setLayer`, `releaseModulationArcs`, `onStatusUpdate` and a virtual `getModDestProvider()` (null default). The provider stays on the content, not on `LayerTypeInfo`: `ModDestProvider` is a UI struct whose resolvers bind to the content's own matrix and widgets, and `LayerTypeInfo` is message-thread data that only forward-declares UI types. Every product's `<Type>Content` derives from it when its type is registered in mu-Tronic (`ArpContent` now; `TrackContent` at 2c; `PatternContent` and `RhythmContent` at their registration), not before. (b) `MuLookAndFeel::setAccentOverride(Component&, Colour)` / `clearAccentOverride` (a component property read up the parent chain by `appAccent`, the main-page knob colour and `lcdLitColour`) is the one mechanism for a host that paints the shown layer in its type's colour; `setAppAccent` stays one value per LookAndFeel. It covers knobs, lit LCDs and `appAccent` readers; segment and toggle selected-states keep the app colour (they read the theme's colour IDs), which is the `ux-steward`'s to confirm against design-ui-family section 11. (c) `LayerHeaderBar::setTypeTag` is accepted: off by default, no height, other products unaffected. (d) `MU_TRONIC_WITH_UI` is accepted as the headless split for T1b: defined on the app target only, and confined to the one `.cpp` per type (`Persistence/<Type>LayerType.cpp`), never a header or any other file, so the console test target registers the same engine description with null content and picture factories. If a second `#if` appears, split the factories into an app-only `<Type>LayerUi.cpp` instead. The factories are therefore unexercised by `mu-tronic-tests`; the preset helpers in `ProcessorBase` are pure and are tested (test-steward). (e) `ArpLayerType.{h,cpp}` under `Persistence/` is correct per point 1. (f) The `PARENT_SCOPE` lines in mu-On, mu-Tant and mu-Clid are correct and complete point 1.
 
 **Sub-steps (each builds, passes its suites and commits alone):** 2a the gates and the Arp content (`mu-core`, `mu-tronic`, `mu-toni` for the `create` signature, no Track
 code); 2b the mu-On library made ready (groove rows, `lockEngine` and `completeSetup`, the Track and Arp retire tails, the one-row step component split out of `StepRows`,
 `PARENT_SCOPE`); 2c Kick registered (`Persistence/TrackLayerTypes.cpp`, `TrackHost` adapter, the content in mu-Tronic, the equivalence test, the cost test re-run). The
-`ux-controller` rules the single-row STEPS layout inside a Track content for 2c; the split in 2b is pixel-identical in mu-On.
+`ux-steward` rules the single-row STEPS layout inside a Track content for 2c; the split in 2b is pixel-identical in mu-On.
 
 **Rulings from the 2c review (2026-10-20).**
 
@@ -1234,7 +1234,7 @@ code); 2b the mu-On library made ready (groove rows, `lockEngine` and `completeS
 10. **One disc picture in `mu-core`.** `mu_toni::ArpMiniVisual` (with 2c's text overload) and `mu_on::TrackMiniVisual` now draw the same disc. That is a second copy of shared
     behaviour; Pattern and Rhythm would be a third and fourth. At step 3 add `mu_core::LayerDiscVisual(Colour, String)` in `mu-core/UI/Components/`, delete both classes
     (mu-Toni's sidebar passes the number, mu-On's the engine initial, mu-Tronic the type's initial; pixel-identical in both apps), and have each type's picture factory use it.
-    Until then 2c's overload is accepted as the smaller step. The glyph itself (the step row design-ui 4.5a names) is the `ux-controller`'s.
+    Until then 2c's overload is accepted as the smaller step. The glyph itself (the step row design-ui 4.5a names) is the `ux-steward`'s.
 11. **A slot host adapter must not cast a foreign layer.** `ArpSlotHost::getArp` casts whatever the slot holds to `Arp`; with five types registered, slot 0 (which the
     content's constructor binds) can be a Kick, and the cast is undefined behaviour. `TrackSlotHost::getTrack` answers with an unbound stand-in; the Arp adapter takes the same
     pattern (a type check, else a stand-in `Arp`). Fix with step 3. Test layers use ids no product registers: see the reserved test id in `TronicProcessorTests` (use a
@@ -1252,9 +1252,9 @@ code); 2b the mu-On library made ready (groove rows, `lockEngine` and `completeS
 18. **mu-On's own `.muTrack` carries an `engine` name property the generic save does not write: no problem.** The only thing that selects a type is `mu_on::typeFromPreset`, which reads the `eng` row (or the legacy `lane` property) and never `engine`; the generic save writes the `t{N}_eng` row because `Track::completeSetup` keeps it equal to the locked engine (point 5). So a mu-Tronic Kick file loads in mu-On (the row sets the engine) and a mu-On file loads in mu-Tronic. `engine` is a human-readable label only; do not add reads of it.
 19. **Default-groove seeding in `createTrack` is correct** (point 9). mu-On does not call `createTrack` (its own create path and `layerAdded` seed the groove), so the standalone is unchanged.
 
-#### 2.1.12 T1b: the Rhythm type registered (implementer record, 2026-10-20; rulings marked **Asked** are open for the `architecture-steward` / `ux-controller` / Andy)
+#### 2.1.12 T1b: the Rhythm type registered (implementer record, 2026-10-20; rulings marked **Asked** are open for the `architecture-steward` / `ux-steward` / Andy)
 
-Registers `Rhythm` (mu-Clid's layer library, `mu_clid::SampleRhythm`) as the eighth type, with Pattern as the template. Built; not yet reviewed by the `dsp-controller`, `test-steward` or `ux-controller`; the Standalone was not launched or looked at. What was built, and the choices made where this document did not settle one:
+Registers `Rhythm` (mu-Clid's layer library, `mu_clid::SampleRhythm`) as the eighth type, with Pattern as the template. Built; not yet reviewed by the `dsp-steward`, `test-steward` or `ux-steward`; the Standalone was not launched or looked at. What was built, and the choices made where this document did not settle one:
 
 1. **Where the code is.** `mu-clid/Source/Sequencer/RhythmType.h` (header-only, like `PatternType.h`, so mu-Clid's own build and recorded sound are untouched): `SlotRhythm : SampleRhythm` (the layer), `RhythmSlotServices` (the type's `LayerServices`), `rhythmLayerTypeInfo()`, the `.muRhythm` converters. `mu-tronic/Source/Persistence/RhythmLayerType.{h,cpp}`: `RhythmSlotHost` (the services plus the `RhythmHost` over `ProcessorBase`), the content and disc factories, colour (`appPurple`) and tag ("Clid"). Rule 10 holds. mu-Clid's processor still drives `SampleRhythm` itself and is unchanged in behaviour.
 2. **The layer clocks itself.** `SampleRhythm::render` expected the host to run the step clock, the hits and the play state before it (mu-Clid's `layersBlockStarting`). `SlotRhythm` does that in the first call of a host block from `RenderContext`: its own `RhythmStepClock` (free-running: there is no `mstrLoop` in mu-Tronic), `RhythmSequencer::resolveBlockBeat` for the restart / dip rule (mu-Clid's transport rule, per layer), `RhythmCursor::advance`, `takeHit`, `publishPlayState`, then the mixer strip and `lastEffectiveStep` for the modulation pass. **Proof:** the channel stream of a slot equals the one mu-Clid's own processor records (`mu_clid_fixture::kRecordedHash`, `RhythmLayerFixture.h`, asserted by `RhythmLayerRecordTests` in mu-clid-tests and `TronicRhythmTests`), and so does the stream of a slot loaded from a `.muRhythm` file mu-Clid itself wrote. Differences from mu-Clid, by construction: the swap boundary is the pattern's own length (`loopBeats()`), not a master loop; a forward transport jump is handled by the cursor's step walk (no `onTransportJump`).
@@ -1262,7 +1262,7 @@ Registers `Rhythm` (mu-Clid's layer library, `mu_clid::SampleRhythm`) as the eig
 4. **Sample.** The `SampleLibrary` is the services' (paths per slot, the primary folder, the preview); the layer's voice engine is the layer's own (`create` builds it, so a successor never shares it with a tail). The sample is saved in the layer node as `sample`, relative to mu-Clid's `Samples` folder (shared, `contentFolderName`), with the embedded-sample properties read when a file has them. A new layer carries no sample path (`attachServices` clears the slot's). `VoiceEngine` gained `decodeFile` / `installSample` / `takeSample` (`loadFile` is the first two): `preloadStaged` decodes a staged preset's sample at stage time into a scratch engine, and the commit at the boundary installs it with no file work. **`ProcessorBase::stageLayerPresetTree` now calls `Layer::preloadStaged`** (it was designed and documented but never called; Pattern's `preloadStaged` was dead until now).
 5. **Preview.** `LayerServices::mixIntoMaster(master, n)` (audio thread, per chunk of the prepared size, after the mixer; `ProcessorBase::audioServices` holds lock-free pointers) lets the sample browser's preview reach the master bus. Accepted with 3 (architecture-steward, 2026-10-20), see design-plugin-family.md Layer ownership. The preview is added after the mixer and so bypasses the master FX and master gain on purpose, as mu-Clid's does.
 6. **`.muRhythm` interop.** mu-Clid keeps a rhythm as `r0_` properties on the root; a slot applies composed rows. `LayerTypeInfo::presetFileToNode` / `presetNodeToFile` (null for every other type) convert at the file boundary inside `loadTypedLayerPreset` / `saveTypedLayerPreset`, so a file saved by mu-Clid loads into a slot and the reverse (same root tag `MuClidRhythm`, `mu_clid::kRhythmPresetTag`; the file's name, colour, category and embedded sample are not a slot's to take, and a slot saves path-linked, never embedded, with a temp-folder path blanked). Verified both ways (`TronicRhythmTests::presets`). The two hooks are accepted (architecture-steward, 2026-10-20), see design-plugin-family.md Layer ownership, as the standard way for a type whose file is not the composed node; a different shape or tag in mu-Tronic would break "a preset saved by mu-Clid loads in mu-Tronic and the reverse" (3.4).
-7. **MIDI output mode** now works in the Standalone: `SlotRhythm` forwards its engine's note-on / note-off through `ctx.emitMidi`, a leaving layer's owed note-off goes out from `onRetireStart`, and `PluginProcessor::processBlock` clears the host MIDI buffer after `renderAndMix` and merges the layers' output (`mergeLayerMidiOut`, 64 events), so the input is not echoed to the MIDI output device; `producesMidi()` and `NEEDS_MIDI_OUTPUT` are on. The merge adds to a host-owned `MidiBuffer`: JUCE keeps its storage after `clear()`, so the first block after `prepareToPlay` calls `ensureSize` once, moving the single possible allocation to start-up, before any note; design 2.1.5 R7 (the room a host buffer has) is still the MIDI product's to settle. **Asked** (`dsp-controller`).
+7. **MIDI output mode** now works in the Standalone: `SlotRhythm` forwards its engine's note-on / note-off through `ctx.emitMidi`, a leaving layer's owed note-off goes out from `onRetireStart`, and `PluginProcessor::processBlock` clears the host MIDI buffer after `renderAndMix` and merges the layers' output (`mergeLayerMidiOut`, 64 events), so the input is not echoed to the MIDI output device; `producesMidi()` and `NEEDS_MIDI_OUTPUT` are on. The merge adds to a host-owned `MidiBuffer`: JUCE keeps its storage after `clear()`, so the first block after `prepareToPlay` calls `ensureSize` once, moving the single possible allocation to start-up, before any note; design 2.1.5 R7 (the room a host buffer has) is still the MIDI product's to settle. **Asked** (`dsp-steward`).
 8. **Tail.** `Fade` with the family defaults (point 3 of 2.1.11): the held voice is rendered with no trigger and no parameter through `applyLinearFade`; a voice with no sample ends at once. The type's `Layer` is the tail, as Arp's.
 9. **A pattern from a preset starts from its step 0 at the boundary** it waited for (`applyExtras` calls `RhythmCursor::requestSwapStart` with the cursor's boundary step and the clock's epoch, only while the transport runs), as mu-Clid's hot-swap commit does.
 10. **Not done, and where it stands.** (a) **Decided by Andy, 2026-10-20: a new layer starts from the app's own default, "including defaults".** `ProcessorBase::createLayerOfType(slot, type)` (the chooser's path; `setLayerType` stays the plain primitive) loads `_default.<ext>` from the type's preset folder (`muClid/Rhythms/_default.muRhythm`, and the equivalents of the other apps) through the same file-to-node path as a preset, when the file is that type's (`layerPresetType`, so a `_default.muTrack` of one engine is ignored by another); a missing, unreadable or other-type file is ignored quietly and the type's built-in start is used. A state restore, a staged or loaded preset never pass through it, so they win. Built-in start for Rhythm: mu-Clid's first rhythm, sixteen steps with four hits and no sample (mu-Clid ships no default sample; its `applyDefaultRhythm` only reads the user's `_default.muRhythm`); for Kick, Bass, Hat and Snare the default groove (point 9 of 2.1.11). Whether the other apps save per-layer `_default` files under those names is theirs to confirm; the mechanism is generic. Tests: `TronicRhythmTests::newLayerDefaults`. (b) The header's preset list is the shell's generic one: mu-Clid's categorised list, the save card with category, description and "embed sample" are not offered in a slot. (c) The effect-send modulation target keeps its default name and the voice band's "Effect" label is not wired to the mixer's effect name, and the mixer does not draw the strip of a MIDI-mode Rhythm as inactive (mu-Clid's `isChannelSilent` / `onOutputModeChanged`). (d) `RhythmMiniVisual` is replaced by the shared disc ("R"), as for Pattern. (e) `mu-clid-layer-tests` has no test of `RhythmType.h` without a processor; `check-layer-boundary` guarantees it names none.
@@ -1338,7 +1338,7 @@ extensions are unchanged, so five ids (the mu-On engines) share the prefix `t` a
 
 `LayerTypeInfo` (all message-thread data): `id`, `name`, `group` (the product it belongs to, for the chooser), `paramPrefixLetter` (`r v a t`), `presetExtension`,
 `typeFromPreset(tree)`, `contentFolderName`, `modTargetTable`, `addLayerParams(layout, slot)` (called once per prefix, not once per id), `create(slot, type)` (the id lets one function make the five Track types, 2.1.11 point 6),
-`createServices()`, `createContent(...)`, `createMiniVisual(...)`, and the type's colour token (named by the `ux-controller`). It constructs and describes; it never
+`createServices()`, `createContent(...)`, `createMiniVisual(...)`, and the type's colour token (named by the `ux-steward`). It constructs and describes; it never
 dispatches (design-plugin-family "Why virtual and not a table" stands).
 
 ---
@@ -1435,7 +1435,7 @@ constant for "framework max": one constant, one value per binary.
 
 Two saved-data consequences, both safe because mu-Tronic is new: (1) `MixerEngine::kExtSidechainSrc = MaxChannels` moves to 16 in this binary; the strip
 sidechain source encoding is therefore *per product*, and the import rule below remaps it; (2) the colour palette has 8 entries and `colourIndex` repeats
-past 8 (the base's "first unused" rule falls back to modulo); `ux-controller` to confirm.
+past 8 (the base's "first unused" rule falls back to modulo); `ux-steward` to confirm.
 
 **Parameters.** Every slot declares every type's parameters with its own prefix (`r{N}_ v{N}_ a{N}_ t{N}_`, N = 0..15) plus the shared strip (`ch{N}_`):
 the schemes are already unique (design-naming §3), so nothing collides and a slot's type selects which prefix is live (the five mu-On engines share `t{N}_`, so
@@ -1534,12 +1534,12 @@ A scene is **an action across layers**, designed into the base now so no product
   not lost. No lock is taken on the audio thread. **Not built:** the C7 commit. `runDeferredWork` still applies each flagged layer one by one on the message thread
   (after the poll, up to about 10 ms late), so the layers of a scene are flagged at the same boundary but not applied in the same block; the `frozenMask` provision
   exists in the view and in `RenderContext::frozen`, but no layer type honours it yet. Recorded as an open follow-up.
-- **Controller feedback.** A queued scene lights the clip column; surface and screen design is the `ux-controller`'s ([design-launchpad.md](../design-launchpad.md) lists the
+- **Controller feedback.** A queued scene lights the clip column; surface and screen design is the `ux-steward`'s ([design-launchpad.md](../design-launchpad.md) lists the
   Launchpad mapping as still open).
 
 ---
 
-## 4. UI structure (structure only; the look is the `ux-controller`'s)
+## 4. UI structure (structure only; the look is the `ux-steward`'s)
 
 - **Sidebar and panel.** `LayerSidebar` and `LayerPanel` are unchanged in kind. `LayerSidebar` gains a **page** (`kLayersPerPage` in `MuLimits.h`, default 8, used by the sidebar,
   the mixer overlay and `mu-control`; the page count is derived and nothing hard-codes 8 or 2) and an empty-slot item ("add a layer"); `LayerPanel::setContent` is already callable again so the content swaps with the
@@ -1551,14 +1551,14 @@ A scene is **an action across layers**, designed into the base now so no product
   T1b shows the type's `LayerTypeInfo::name` as `<displayName>`, not the saved id.
 - **Layer-type chooser.** Choosing a type for an empty slot (or changing it) is a shell dialog listing the registry grouped by product (section 1.4); the type's
   preset dropdown appears in the `LayerHeaderBar` as today, filled from the slot's type. The main area is painted by the **type's colour** (Andy, UI decision;
-  token named by the `ux-controller`): `LayerTypeInfo` carries the token, so a type added later brings its own colour with it.
+  token named by the `ux-steward`): `LayerTypeInfo` carries the token, so a type added later brings its own colour with it.
 - **Mixer overlay.** 16 strips do not fit one row beside returns, buses and master: strips page 1-8 / 9-16 with the buses, returns and master always visible
   (`MixerOverlay` gains the page, shared with the sidebar). Bus strips are `MixerChannel` of a new `Type::Bus` (section 5).
 - **Controller pages.** `mu-control` `SurfaceModel` reads `kLayersPerPage` and a page index from the `LiveView`; the pad column that is absolute for 8 layers
   becomes absolute within the page. New `ControlAction::PagePrev` / `PageNext` in `mu-core/Control/` (device-independent; they change the page, never the processor
   state). On the Launchpad, top-row buttons 5 and 6 are PagePrev / PageNext in mu-Tronic ([design-launchpad.md](../design-launchpad.md) §3.6). Andy: "the Launchpad will
   be important for this", so the controller stage (T8a) is not an afterthought. Not built before T8a.
-- **Accent.** Ice white (Andy, UI decision) is the `ux-controller`'s; structurally it is one `appPrimaries` entry for the product, nothing in the layer libraries.
+- **Accent.** Ice white (Andy, UI decision) is the `ux-steward`'s; structurally it is one `appPrimaries` entry for the product, nothing in the layer libraries.
 
 ---
 
@@ -1611,7 +1611,7 @@ Mute / solo: a muted bus silences the dry path of every channel routed to it; th
 path are cut, as the channel solo works today. `isAudible()` takes the bus into account. (Unit-tested in section 7.)
 
 **Latency.** The only built-in inserts with latency would need delay compensation across buses (now two inserts deep); none of the current insert algorithms report latency
-(the `dsp-controller` confirms at review). If one is added later, buses require the compensation rule (all channel paths to the master delayed to the
+(the `dsp-steward` confirms at review). If one is added later, buses require the compensation rule (all channel paths to the master delayed to the
 longest bus path); note it as a standing constraint on `InsertProcessor`.
 
 ### 5.3 What is mu-core
@@ -1626,13 +1626,13 @@ unaffected. The unit tests are core tests (section 7).
 ## 6. Staged build plan (smallest first)
 
 Each stage ends with a Debug build, its suites, the `*_roundtrip` listening tests of every product it touched (byte-identical where stated), and the static
-checks. `dsp-controller` reviews every stage that changes the audio thread (T2, T4 to T8). A failed proof is reverted, not carried. Stage kinds as in Layer
+checks. `dsp-steward` reviews every stage that changes the audio thread (T2, T4 to T8). A failed proof is reverted, not carried. Stage kinds as in Layer
 ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 
 | Stage | Kind | What | Touches | Proof |
 |---|---|---|---|---|
 | **T0** | M | Groundwork with no behaviour change: `MU_MAX_LAYERS` / `MU_MAX_BUSES` / `MU_BUS_INSERTS` / `kLayersPerPage` in `MuLimits.h` (defaults 8 / 0 / 2 / 8); add `LayerTypeId`, `LayerTypeInfo`, `Layer::typeId`; `check-layer-boundary.ps1`; build a throw-away 16-slot APVTS layout from the param tables to **record construction time and memory** (the section 3.4 cost check). **No product source is touched** (the `Scales.h` renames moved to T4 and T5). | `mu-core`, `tests/scripts` | full Debug build of all five; every suite and `*_roundtrip` byte-identical; `mu-core-tests-16` builds and passes; measurement recorded in this doc |
-| **T1** | M | **Split 2026-10-19: T1a (built, uncommitted at this date) is the empty unit below; T1b registers the real types (see "What is left").** **The empty unit.** `mu-tronic/` (Standalone only, freeware) with the eight folders, 16 `EmptyLayer`s, `setLayerType` (only `Empty` registered), the shared mixer/FX/master/modulator panel/preset flow/transport, sidebar and mixer **paging**, a `.muTronic` round trip. No audio sources, no licence code. This is the brief's "empty unit". | new product; `LayerSidebar`/`MixerOverlay` page (core, ux-controller) | builds; opens; the standalone smoke (no pluginval: no plugin formats); 16 strips page; state round trip; the other four unchanged (byte-identical) |
+| **T1** | M | **Split 2026-10-19: T1a (built, uncommitted at this date) is the empty unit below; T1b registers the real types (see "What is left").** **The empty unit.** `mu-tronic/` (Standalone only, freeware) with the eight folders, 16 `EmptyLayer`s, `setLayerType` (only `Empty` registered), the shared mixer/FX/master/modulator panel/preset flow/transport, sidebar and mixer **paging**, a `.muTronic` round trip. No audio sources, no licence code. This is the brief's "empty unit". | new product; `LayerSidebar`/`MixerOverlay` page (core, ux-steward) | builds; opens; the standalone smoke (no pluginval: no plugin formats); 16 strips page; state round trip; the other four unchanged (byte-identical) |
 | **T2** | S | **Buses** in the shared mixer (section 5), opt-in `MU_MAX_BUSES` / `MU_BUS_INSERTS`, then tests with a test-tone layer in the core tests; mu-Tronic turns them on (**3 buses, 2 inserts each**). Rename the `outputBus` UI label to Out. | `mu-core` mixer + overlay + params | `BusRoutingTests`, `BusSidechainTests`, `BusInsertTests`, `BusStateResetTests` (section 7); all four products byte-identical (buses 0); a scripted mu-Tronic render with test-tone layers through a two-insert bus chain |
 | **T3** | S | `Layer::render`, `RenderContext`, `renderLayers`, `RetireBin`, `setLayerType` with real types, `LayerServices`, `bindParams`, `preloadStaged`, `loopBeats` (section 2.1), defaults only; mu-core tests drive a fake layer type. No product changes yet. | `mu-core` | `LayerRenderTests` (order, priority, empty skipped, lock miss silent and still advancing, retire fade then free off thread, no allocation under the lock), `LayerTypeSwapTests`; products byte-identical |
 | **T4** | S | **Done as E2 (2026-10-16).** **mu-Toni layer** (cleanest; mu-Toni is pre-release, so this may go ahead now): `readVoice` + pointers + held notes into `Arp::render`; param table and `LayerParamIds.h` into `Persistence/`; `ArpHost`; rename `Audio/Scales.h` to `ToniScales.h`; `mu-toni-layer` target; **mu-Toni standalone moves onto `renderLayers`** (so the glue exists once); mu-Tronic registers `Arp`. | mu-toni, mu-tronic | `TONI_roundtrip` byte-identical; mu-Toni suites; a mu-Tronic render with two Arp layers equals two mu-Toni layers' renders (the equivalence test, section 7) |
@@ -1672,7 +1672,7 @@ first type is registered); per-type prefixes and the multi-prefix layout (T1b); 
 and the `PatternHost` adapter (both only before the Pattern type is registered). (2) **T1b** register real types, one at a time (Arp first, the cleanest, then the five Track types, then Pattern, then Rhythm): link the layer library and
 its `MU_<P>_LAYER_UI_SOURCES`, one line in `registerLayerTypes`, multi-prefix `LayerLayout` and the live-type-only save (3.4), C17 follower reset, the type's `addLayerParams` in the layout,
 `getLayerPresetDir`/`slotPresetFiles` from the slot's type (not a mu-Tronic `Layers` folder; done at 2a), **layer-preset load and save in a slot (step 3, 2.1.11 point 8; before Pattern)**, a `TronicProcessorTests` case and an equivalence test per type, the cost test re-run;
-the `dsp-controller` reviews the C17 and multi-prefix changes. (3) **T1c** `swapLayers` on a Published host. (4) **T2** buses (`mu-core` mixer; it edits audio code every product renders
+the `dsp-steward` reviews the C17 and multi-prefix changes. (3) **T1c** `swapLayers` on a Published host. (4) **T2** buses (`mu-core` mixer; it edits audio code every product renders
 through, so it follows E5, which has now closed). (5) **T8a** scenes, controller pages, per-layer MIDI in, type-carrying clips; **T8b** importers for `.muTant` and `.muClid`
 (`.muToni` and `.muOn` with T8a). (6) **T9** release: only with all four engines ready, freeware, no licence work. The cost measurement and the sidebar/mixer paging, T1's first
 checks, are done at T1a.
@@ -1744,19 +1744,19 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
    `architecture-steward` reviews every T4 to T7 diff.
 4. **CPU.** 16 layers of mixed engines (mu-On Rumble, mu-Tant filters, mu-Clid insert tails) can exceed a laptop budget. Empty layers cost nothing; a CPU
    meter lands in T8; a per-layer "freeze/mute stops processing" rule (a muted layer skips `render` but not note tracking) is a candidate saving, decided
-   with the `dsp-controller` at T3. The honest limit is "16 slots", not "16 of the heaviest".
+   with the `dsp-steward` at T3. The honest limit is "16 slots", not "16 of the heaviest".
 5. **Cross-layer audio (Rumble).** The only layer that reads another layer's output. Contained by `renderPriority` + `peer`, in the same instance; the source may be
    any priority-0 layer of any type (section 1.4); an empty, priority-1 or removed source processes silence (as today). The source index is remapped on swap/remove.
 6. **Same-name collisions in one binary** (global names, include paths). Handled in 2.5; the checker greps.
 7. **Hot-swap of a type change** replaces an engine, not just data. Uses the shared `RetireBin` and `preloadStaged`; staged at the boundary like any swap;
    `LayerTypeSwapTests`.
-8. **Colour palette** has 8 colours for 16 layers (section 3.4). `ux-controller`.
+8. **Colour palette** has 8 colours for 16 layers (section 3.4). `ux-steward`.
 9. **Live-product impact.** mu-Clid and mu-Tant are shipping (1.1). **Superseded 2026-10-15: Andy ordered their extraction (T5, T7) before mu-Tronic product work**; safety is the golden / compat / equivalence net and the release rules of extraction-plan.md sections 3 and 4. (Earlier answer: after their next releases.)
    Before that only additive `mu-core` stages (T0 to T3) reach them, byte-identical or reverted; the release-cut rule is moot now that both live products are extracted. None of the stages
    changes saved data or parameter ids (prefixes and extensions stay).
 10. **Free product carries the engines of the Pay What You Want apps.** A free mu-Tronic gives away mu-Toni's and mu-On's engines (and later mu-Tant's and mu-Clid's)
     without a Support prompt. This follows from Andy's answers (freeware, every engine a layer) and the layer libraries contain no licence code; recorded so it is a
-    known consequence, not a surprise. Resolved by A14 (2026-10-15): licence follows the install via a per-app manifest, no key code in mu-Tronic; whether a Support prompt is shown for installed-but-unlicensed engines is a T1 / `ux-controller` call (extraction-plan sections 8 and 9).
+    known consequence, not a surprise. Resolved by A14 (2026-10-15): licence follows the install via a per-app manifest, no key code in mu-Tronic; whether a Support prompt is shown for installed-but-unlicensed engines is a T1 / `ux-steward` call (extraction-plan sections 8 and 9).
 11. **Layer count in the existing `getLayerName`/`getLayerColourIndex` overrides** (each product returns `"Voice N"`-style names): mu-Tronic names a layer from
     its type and slot (`Layer::name`), a default the base already provides.
 
@@ -1766,13 +1766,13 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 |---|---|---|---|
 | 1 | Fifth product | Yes; the four apps continue | header, 0 |
 | 2 | Plugin formats | **Standalone only** ("a new performance framework that might make mu-link redundant"); no VST3/CLAP; parameter-count/pool work dropped | 3.1, 3.4 |
-| 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Lemon Squeezy; site lists it as freeware. A14 (2026-10-15): licence state of the engines follows the install via a per-app manifest, no key code in mu-Tronic; a Support prompt for unlicensed installed engines is a later T1 / `ux-controller` decision | 3.1, 3.2 |
+| 3 | Licence / price | **Free**, freeware like mu-Link and mu-Clid MIDI; no key, no Lemon Squeezy; site lists it as freeware. A14 (2026-10-15): licence state of the engines follows the install via a per-app manifest, no key code in mu-Tronic; a Support prompt for unlicensed installed engines is a later T1 / `ux-steward` decision | 3.1, 3.2 |
 | 3a | Engine loading (A14) | **Static layer libraries**, not runtime modules; engines update with mu-Tronic (suite-wide releases) | 2.5, 3.2 |
 | 4 | Name | mu-Tronic (display), `mu-tronic` (slug), code `MTrn` (JUCE needs an upper-case letter) | 3.1 |
 | 5 | Timing | **Revised 2026-10-15: all four extractions first (E0 to E5 of extraction-plan.md), mu-Tronic product work after; the first release waits for all four engines (no early release).** Earlier: T5, T7 after next releases | extraction-plan.md, risk 9 |
 | 6 | mu-link | Leave as is; coexist; no freeze; revisit later | 8 |
 | 7 | Buses | 3 buses, 2 inserts each, both compile-time (`MU_MAX_BUSES`, `MU_BUS_INSERTS`) | 5 |
-| 8-11 | UI | Ice-white accent; main area painted by layer-type colour; layer names editable and saved; Launchpad top-row 5 and 6 change page | 4, `design-ui.md` (ux-controller), design-launchpad §3.6 |
+| 8-11 | UI | Ice-white accent; main area painted by layer-type colour; layer names editable and saved; Launchpad top-row 5 and 6 change page | 4, `design-ui.md` (ux-steward), design-launchpad §3.6 |
 | 12 | Overview paging | Pages of 8 by default, page size and count constants, not hard-wired ("2 pages of 8 perhaps, keep it flexible") | 1.1, 4 |
 | 13 | Scenes | Yes; an action across layers | 3.6 |
 | 14 | mu-On engines | Each of Kick, Bass, Hat, Snare, Rumble is its own layer type | 1.4, 2.5 |
@@ -1783,9 +1783,9 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 1. **Closed (Andy, 2026-10-15): no early release.** mu-Tronic launches only when all four engines (all nine types) are ready.
 2. **Closed (A14, Andy, 2026-10-15): static libraries, no runtime engine loading.** "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."
    Licence follows the install via a per-app manifest (supporter flag, checkout URL, content dir); mu-Tronic has no key code. Analysis: [extraction-plan.md](extraction-plan.md) sections 8 and 9.
-   Remaining small point, for T1 and the `ux-controller` (not Andy yet): does mu-Tronic show a generic Support prompt for an installed-but-unlicensed engine in use, or none.
+   Remaining small point, for T1 and the `ux-steward` (not Andy yet): does mu-Tronic show a generic Support prompt for an installed-but-unlicensed engine in use, or none.
 3. **Closed (Andy, 2026-10-15): Rumble reads any layer type.**
-4. **Launchpad scenes.** How a scene is fired on the pad (a modifier, a spare button, a column). Not needed until T8a; `ux-controller` proposes.
+4. **Launchpad scenes.** How a scene is fired on the pad (a modifier, a spare button, a column). Not needed until T8a; `ux-steward` proposes.
 5. **Later revisit of mu-link** (no date).
 
 ---

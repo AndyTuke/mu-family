@@ -317,7 +317,7 @@ Eight channel strips, a divider, the three return strips, a divider, Master plus
 
 ### 5.3 Assigning a channel to a bus (the control)
 
-The strip's existing **Output selector** (`outBusBox`, `kOutBusH` 18, the LCD dropdown at the strip foot, channel strips only) is the control. It is extended, not duplicated: items **Main**, **Bus 1**, **Bus 2**, **Bus 3** (no Out items: Standalone only). Default Main. The label is **"Out"** in its tooltip and status text (`Out` / `Bus 2`; ruled 2026-10-20: "Out" is the family word for a strip's destination, as design.md section 1.2 renames the direct out, so "Output" is not used). A channel routed to a bus shows the bus name lit in the LCD; Main shows the dimmer Main text, so a quick scan of a page shows what is grouped. A return strip has no selector (returns go to Main). Sends to the FX returns are unaffected by the assignment (what the channel sends to the returns is independent of its output; the signal path is the dsp-controller's and the architecture-steward's to confirm, the UI only shows the choices). **No bus-to-bus routing in version 1.**
+The strip's existing **Output selector** (`outBusBox`, `kOutBusH` 18, the LCD dropdown at the strip foot, channel strips only) is the control. It is extended, not duplicated: items **Main**, **Bus 1**, **Bus 2**, **Bus 3** (no Out items: Standalone only). Default Main. The label is **"Out"** in its tooltip and status text (`Out` / `Bus 2`; ruled 2026-10-20: "Out" is the family word for a strip's destination, as design.md section 1.2 renames the direct out, so "Output" is not used). A channel routed to a bus shows the bus name lit in the LCD; Main shows the dimmer Main text, so a quick scan of a page shows what is grouped. A return strip has no selector (returns go to Main). Sends to the FX returns are unaffected by the assignment (what the channel sends to the returns is independent of its output; the signal path is the dsp-steward's and the architecture-steward's to confirm, the UI only shows the choices). **No bus-to-bus routing in version 1.**
 
 ### 5.4 The Buses page (re-ruled: three buses, two inserts each)
 
@@ -350,7 +350,7 @@ Bus knob colours are the mixer's category colours (sidechain, inserts), never an
 
 ### 5.5 Why three buses, two inserts
 
-Andy's call (2026-10-15, "3 buses for now with 2 inserts"). It also fits the page exactly with the Master's own insert panel reused, which is the better answer than the earlier four-bus, one-insert plan. UI cost: one tab, one strip type, one derived width token; nothing new in the insert controls. Engine cost is the architecture-steward's and dsp-controller's to size (three sums, six inserts, three sidechain followers). A later "more buses" request is a layout question (5.4), not a constant to raise.
+Andy's call (2026-10-15, "3 buses for now with 2 inserts"). It also fits the page exactly with the Master's own insert panel reused, which is the better answer than the earlier four-bus, one-insert plan. UI cost: one tab, one strip type, one derived width token; nothing new in the insert controls. Engine cost is the architecture-steward's and dsp-steward's to size (three sums, six inserts, three sidechain followers). A later "more buses" request is a layout question (5.4), not a constant to raise.
 
 ### 5.6 What the mixer is not
 
@@ -377,7 +377,7 @@ Performance mode adds nothing else to the UI: the sidebar page control, the mixe
 
 ## 7. Identity (follow-up)
 
-Name "μ-tronic" per [design-ui-family.md section 9](../design-ui-family.md#9-plugin-identity), applied to the Standalone's window title, executable and About card; there is no plugin code, VST3 class name or CLAP id (so the non-ASCII class-name problem does not apply). The icon uses the ice-white product colour on the family's dark round emblem ground; its design and the About credits are the web-designer's and architecture-steward's.
+Name "μ-tronic" per [design-ui-family.md section 9](../design-ui-family.md#9-plugin-identity), applied to the Standalone's window title, executable and About card; there is no plugin code, VST3 class name or CLAP id (so the non-ASCII class-name problem does not apply). The icon uses the ice-white product colour on the family's dark round emblem ground; its design and the About credits are the web-steward's and architecture-steward's.
 
 ## 8. New tokens and components (all rulings above, for the coder)
 

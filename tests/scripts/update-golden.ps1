@@ -8,7 +8,7 @@
 #   pwsh tests/scripts/update-golden.ps1 -Product mu-toni -Scenario factory -Reason "..." -TestExe path\to\mu-toni-tests.exe
 #
 # What it does, in order (any failed step stops it and writes nothing):
-#   1. needs -Reason (what changed and why it is correct; the dsp-controller signs it before the commit);
+#   1. needs -Reason (what changed and why it is correct; the dsp-steward signs it before the commit);
 #   2. refuses on a dirty working tree, so the golden change can never ride along with a source change;
 #   3. runs the product's test exe twice in update mode for ONE scenario (there is no update-all), each in
 #      its own process and its own temp folder, and requires the two files to be identical: the
@@ -123,7 +123,7 @@ Goldens: $Product/$Scenario ($Config) - <what behaviour changed>
 Reason: $Reason
 Baseline: $baseline (build $buildNo)
 
-This commit changes goldens only. dsp-controller sign-off on the reason: <pending>
+This commit changes goldens only. dsp-steward sign-off on the reason: <pending>
 
 Refs #<issue>
 Version: v<major.minor>.$buildNo
@@ -131,5 +131,5 @@ Version: v<major.minor>.$buildNo
 Set-Content -LiteralPath (Join-Path $msgDir 'commit-msg.txt') -Value $template -Encoding utf8
 
 Write-Host "update-golden: recorded tests/golden/$Product/$Scenario/$fileName (not staged, not committed)."
-Write-Host "Next: dsp-controller signs the reason, then 'git add tests/golden' and commit with tests/_out/golden/commit-msg.txt as a goldens-only commit."
+Write-Host "Next: dsp-steward signs the reason, then 'git add tests/golden' and commit with tests/_out/golden/commit-msg.txt as a goldens-only commit."
 exit 0

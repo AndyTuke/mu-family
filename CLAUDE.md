@@ -36,20 +36,20 @@ $env:JUCE_PATH = "D:\JUCE"
 
 ## Working pace (owner rule, 2026-10-21)
 
-Keep the workflow fast: before any check, test, build, review or agent call ask whether it is really required, or whether fixing forward is quicker. One full test sweep at the end of each day instead of per step, no routine `dsp-controller` reviews, no worktrees for small items, never build on C:. Full rules in [docs/workflow-pace.md](docs/workflow-pace.md); **where they conflict with the round procedure and build rules below, the pace rules win.**
+Keep the workflow fast: before any check, test, build, review or agent call ask whether it is really required, or whether fixing forward is quicker. One full test sweep at the end of each day instead of per step, no routine `dsp-steward` reviews, no worktrees for small items, never build on C:. Full rules in [docs/workflow-pace.md](docs/workflow-pace.md); **where they conflict with the round procedure and build rules below, the pace rules win.**
 
 ## How a round works
 
-1. **Take work.** Ask the `backlog-administrator` for the next task(s) from the top of Open; it returns a brief.
-2. **Prepare.** Once per batch of related work, get rulings from `ux-controller` / `architecture-steward` where the docs don't settle it, and do the `design-future` standing check.
+1. **Take work.** Ask the `backlog-steward` for the next task(s) from the top of Open; it returns a brief.
+2. **Prepare.** Once per batch of related work, get rulings from `ux-steward` / `architecture-steward` where the docs don't settle it, and do the `design-future` standing check.
 3. **Code.** Make the changes; run the static checks (`tests/scripts/check-*.ps1`).
-4. **Review the batch (only where it pays; see Working pace).** `dsp-controller` is called only when the owner asks or the change is genuinely risky; other reviewers only for genuinely new decisions. Findings go onto the existing backlog row (via the `backlog-administrator`) and are fixed forward; no re-review rounds for minor findings.
+4. **Review the batch (only where it pays; see Working pace).** `dsp-steward` is called only when the owner asks or the change is genuinely risky; other reviewers only for genuinely new decisions. Findings go onto the existing backlog row (via the `backlog-steward`) and are fixed forward; no re-review rounds for minor findings.
 5. **Build when it is worth it** (see "Keep working until a build is worth it"), say in one line why, and report the number read from `mu-core/BuildNumber.h`.
-6. **Follow up.** `test-steward` for tests, `user-documentation-author` for the manuals, `/notes` for release notes: each once for the batch.
-7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-administrator`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
+6. **Follow up.** `test-steward` for tests, `docs-steward` for the manuals, `/notes` for release notes: each once for the batch.
+7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-steward`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
 ## Handover between the two PCs (owner rule, 2026-10-30)
 
-Work is shared between the review-only laptop and the build PC through `origin/main`. The handover files in [handover/](handover/README.md) carry what the backlog cannot: the concrete steps one PC needs the other to do (build, run, listen, look) and the results that come back. **Start a session with `/handover start`** (pull, read the other PC's file, act on results) and **end it with `/handover end`** (write what the other PC must do, commit and push). Each PC writes only its own file; the backlog stays the record of the work and is still changed only through the `backlog-administrator`. Procedure: [.claude/commands/handover.md](.claude/commands/handover.md).
+Work is shared between the review-only laptop and the build PC through `origin/main`. The handover files in [handover/](handover/README.md) carry what the backlog cannot: the concrete steps one PC needs the other to do (build, run, listen, look) and the results that come back. **Start a session with `/handover start`** (pull, read the other PC's file, act on results) and **end it with `/handover end`** (write what the other PC must do, commit and push). Each PC writes only its own file; the backlog stays the record of the work and is still changed only through the `backlog-steward`. Procedure: [.claude/commands/handover.md](.claude/commands/handover.md).
 
 ## Build workflow
 
@@ -65,11 +65,11 @@ Work is shared between the review-only laptop and the build PC through `origin/m
 
 **Release notes per batch of user-facing changes:** whenever the work since the last `/notes` fixes or improves anything **user-facing**, run `/notes` once for the whole batch ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
-**The `backlog-administrator` agent ([.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md)) is the only writer of [backlog.md](backlog.md)** (owner rule, 2026-10-09). Nothing else — the main conversation, other agents, slash commands, hooks — edits it directly; they hand the change to the agent, which applies the ordering and format rules and runs `check-backlog.ps1`. It also hands tasks out: ask it for the next task (or a named issue) and it returns a brief with the steps, files, docs to read, blockers and done criteria.
+**The `backlog-steward` agent ([.claude/agents/backlog-steward.md](.claude/agents/backlog-steward.md)) is the only writer of [backlog.md](backlog.md)** (owner rule, 2026-10-09). Nothing else — the main conversation, other agents, slash commands, hooks — edits it directly; they hand the change to the agent, which applies the ordering and format rules and runs `check-backlog.ps1`. It also hands tasks out: ask it for the next task (or a named issue) and it returns a brief with the steps, files, docs to read, blockers and done criteria.
 
-**Keep working until a build is worth it** (owner rule, 2026-10-12; replaces the fixed issue cap). After a build, ask the `backlog-administrator` for the next task and keep fixing issues from the top of Open without asking, prioritising the current stage. There is no fixed number per round: stop and build when a build is the sensible next step, which is when one of these is true: (1) the next change can't be checked or built on without it, (2) a group of related changes is complete and ready to verify together, (3) the risk of an unbuilt compile error or a hard-to-find failure has grown (many files, `mu-core` touched, several products affected), (4) the change must be heard or seen to judge it, or (5) the owner asks. Don't build after each small fix just because it's finished, and don't keep going past the point where a failed build would be hard to trace. Say in one line why you are building.
+**Keep working until a build is worth it** (owner rule, 2026-10-12; replaces the fixed issue cap). After a build, ask the `backlog-steward` for the next task and keep fixing issues from the top of Open without asking, prioritising the current stage. There is no fixed number per round: stop and build when a build is the sensible next step, which is when one of these is true: (1) the next change can't be checked or built on without it, (2) a group of related changes is complete and ready to verify together, (3) the risk of an unbuilt compile error or a hard-to-find failure has grown (many files, `mu-core` touched, several products affected), (4) the change must be heard or seen to judge it, or (5) the owner asks. Don't build after each small fix just because it's finished, and don't keep going past the point where a failed build would be hard to trace. Say in one line why you are building.
 
-When issues in `backlog.md` change status or new ones are needed, hand the changes to the `backlog-administrator` as one batched call at the end of the round (not after every small step), so the file reflects the current state and stays correctly ordered.
+When issues in `backlog.md` change status or new ones are needed, hand the changes to the `backlog-steward` as one batched call at the end of the round (not after every small step), so the file reflects the current state and stays correctly ordered.
 
 New feature ideas live in [docs/design-future.md](docs/design-future.md) under **Unscheduled Ideas**. Ask the user before implementing any of them.
 
@@ -77,28 +77,30 @@ New feature ideas live in [docs/design-future.md](docs/design-future.md) under *
 
 ### Agent precedence
 
-Seven agents each own one area and are the final word in it; none edits another's files:
+Seven stewards (Andy's rule, 2026-11-16: every agent is a steward, each with a name) each own one area and are the final word in it; none edits another's files:
 
 | Agent | Final say on | Writes |
 |---|---|---|
-| `backlog-administrator` | `backlog.md` content, order, status; task hand-over | `backlog.md` only |
-| `ux-controller` | look, feel, design docs | UI design docs |
-| `architecture-steward` | structure, naming, placement, family docs | architecture and naming docs |
-| `dsp-controller` | real-time safety and DSP correctness (a **Blocked** verdict stops the change) | nothing (read-only) |
-| `test-steward` | what is tested and its recorded status | tests, `tests/**`, `tests.md` |
-| `user-documentation-author` | user manuals | manual scripts and `.docx` |
-| `web-designer` | the website, its copy and release-notes pages | `site/**` |
-| main conversation | the code, and the owner's instructions | source |
+| Bob (`backlog-steward`) | `backlog.md` content, order, status; task hand-over | `backlog.md` only |
+| Sid (`ux-steward`) | look, feel, design docs | UI design docs |
+| Ted (`architecture-steward`) | structure, naming, placement, family docs | architecture and naming docs |
+| Bert (`dsp-steward`) | real-time safety and DSP correctness (a **Blocked** verdict stops the change) | nothing (read-only) |
+| Fred (`test-steward`) | what is tested and its recorded status | tests, `tests/**`, `tests.md` |
+| Frank (`docs-steward`) | user manuals | manual scripts and `.docx` |
+| Ernie (`web-steward`) | the website, its copy and release-notes pages | `site/**` |
+| Claude (main conversation) | the code, and the owner's instructions | source |
+
+**How the team talks** (Andy's rule, 2026-11-16): Andy follows the workflow as a conversation between named people. Before every call Claude writes one short line to Andy, `**Claude -> Bob:** <the abbreviated instruction>`; the full brief goes only in the agent prompt. Every steward's report starts with `SHORT:` (one or two plain sentences) and then `DETAILS:`; Claude shows Andy only the short part as `**Bob -> Claude:** <short>` and keeps the details out of the chat, acting on them. Independent calls run in parallel and each gets its own pair of lines. Claude stays Claude.
 
 **Call the agents without asking** (owner rule, 2026-10-09). The main conversation invokes them on its own whenever their trigger applies, and does not ask the owner for permission first:
 
-Each agent's file says when to use it. Calls are once per batch of related work, not per small change, and subject to the Working pace rules (no routine `dsp-controller` review; a **Blocked** verdict, when one is requested, is fixed first). `backlog-administrator` gets one batched call at the end of a round.
+Each agent's file says when to use it. Calls are once per batch of related work, not per small change, and subject to the Working pace rules (no routine `dsp-steward` review; a **Blocked** verdict, when one is requested, is fixed first). `backlog-steward` gets one batched call at the end of a round.
 
-**Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12), for all reviewers (`dsp-controller`, `architecture-steward`, `test-steward`, `ux-controller`, `user-documentation-author`): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-administrator`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-administrator` to close the row. A genuinely separate defect still gets its own row. A review never triggers another review.
+**Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12), for all reviewers (`dsp-steward`, `architecture-steward`, `test-steward`, `ux-steward`, `docs-steward`): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-steward`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-steward` to close the row. A genuinely separate defect still gets its own row. A review never triggers another review.
 
 Run independent agents in parallel. Report their outcomes to the owner briefly; only owner decisions an agent hands up are asked about.
 
-On a conflict: the owner overrides everything; the `dsp-controller` wins on anything that runs on the audio thread; the `architecture-steward` wins on where code lives and what it is called; the `ux-controller` wins on what the user sees. Anything an agent finds outside its own area goes to the main conversation, which hands it to the owner of that area.
+On a conflict: the owner overrides everything; the `dsp-steward` wins on anything that runs on the audio thread; the `architecture-steward` wins on where code lives and what it is called; the `ux-steward` wins on what the user sees. Anything an agent finds outside its own area goes to the main conversation, which hands it to the owner of that area.
 
 ## Git commit messages
 
@@ -117,9 +119,9 @@ Version: v1.2.972
 
 The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within **On Hold** and **Closed**, items are ordered by issue number **descending** (highest first). **Open is in recommended development order** (owner rule, 2026-10-09): work from the top; a new item goes on the top until it is ranked into its place, and the note under the Open heading names the stages. Every backlog update must preserve this ordering. A backlog row is for owner-visible work, defects and Risks; a small change that belongs to an open item is recorded on that item's row, and a trivial internal tidy-up needs only its commit message (the git log is the full development history).
 
-**Open rows are short and carry a few fixed fields** (priority P1/P2/P3, who logged it, details, dated updates, who still has to sign off); the exact format and rules are in [.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md). Review findings go on the item's row, not into new rows.
+**Open rows are short and carry a few fixed fields** (priority P1/P2/P3, who logged it, details, dated updates, who still has to sign off); the exact format and rules are in [.claude/agents/backlog-steward.md](.claude/agents/backlog-steward.md). Review findings go on the item's row, not into new rows.
 
-The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it with `pwsh` after editing the backlog, and use its `-FixTally` switch instead of hand-editing the tally line. **Two PCs edit the backlog** (owner, 2026-10-16): `git pull --rebase` before any backlog edit, take a new number only after that pull, commit and push straight after; the laptop logs, rates and ranks, the build PC closes rows with build evidence. The full procedure is in [.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md).
+The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it with `pwsh` after editing the backlog, and use its `-FixTally` switch instead of hand-editing the tally line. **Two PCs edit the backlog** (owner, 2026-10-16): `git pull --rebase` before any backlog edit, take a new number only after that pull, commit and push straight after; the laptop logs, rates and ranks, the build PC closes rows with build evidence. The full procedure is in [.claude/agents/backlog-steward.md](.claude/agents/backlog-steward.md).
 
 ## Family-shared design documents
 
@@ -147,7 +149,7 @@ The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `
 
 These hold for everything in `mu-core` and every product that links it. Product-specific rules live in each product's CLAUDE.md.
 
-- **The status bar shows the name and value of the last control touched, in every app, without fail** (owner hard rule, 2026-11-08). Every knob, number box, dropdown, switch, button, segment control and custom control, including every new one, reports: a knob through the shell (`forwardKnobStatus`, `LayerPanel::onStatusUpdate`); a dropdown, number box or segment control by being given a status name (`setStatusName`: it then reports to the editor, a `mu_ui::StatusSink`, see `mu-core/UI/StatusSink.h`); every `juce::Button` automatically (the shell binds it; a glyph-only button needs `mu_ui::setStatusName`); a custom control by calling `mu_ui::reportStatus` itself (or carrying a `// status-ok: <reason>` comment if it is not a control). The rule and table are in [docs/design-ui-family.md](docs/design-ui-family.md) (section 6, "Every control reports to the status bar"); the `ux-controller` checks it on every UI change. Checked on each app's real editor by `tests/scripts/run-ui-audits.ps1` (a `<product>-ui-audit` per product, plus the static `check-status-controls.ps1`); run it, and fix anything it lists, whenever a control or panel is added or changed.
+- **The status bar shows the name and value of the last control touched, in every app, without fail** (owner hard rule, 2026-11-08). Every knob, number box, dropdown, switch, button, segment control and custom control, including every new one, reports: a knob through the shell (`forwardKnobStatus`, `LayerPanel::onStatusUpdate`); a dropdown, number box or segment control by being given a status name (`setStatusName`: it then reports to the editor, a `mu_ui::StatusSink`, see `mu-core/UI/StatusSink.h`); every `juce::Button` automatically (the shell binds it; a glyph-only button needs `mu_ui::setStatusName`); a custom control by calling `mu_ui::reportStatus` itself (or carrying a `// status-ok: <reason>` comment if it is not a control). The rule and table are in [docs/design-ui-family.md](docs/design-ui-family.md) (section 6, "Every control reports to the status bar"); the `ux-steward` checks it on every UI change. Checked on each app's real editor by `tests/scripts/run-ui-audits.ps1` (a `<product>-ui-audit` per product, plus the static `check-status-controls.ps1`); run it, and fix anything it lists, whenever a control or panel is added or changed.
 - **Everything in APVTS** — if a parameter isn't in the ValueTree it won't save. All parameters wire through APVTS.
 - **Audio thread never allocates** — all allocation in `prepareToPlay`, never in `processBlock`.
 - **mu-core never depends on a plugin** — strictly one-way: plugins link mu-core, never the reverse. The `mu-control` library (controller drivers) follows the same rule and `mu-core` must never include it. A `mu-core/**` file must not `#include` a plugin header or name a plugin symbol (`mu_clid::`, `mu_tant::`, …); mu-core knows only `ProcessorBase` + the shared interfaces. Enforced by `tests/scripts/check-core-boundary.ps1`. **When adding a file, decide its side first:** generic with no plugin-specific param IDs / semantics → `mu-core`; references product-specific concepts → that product's source tree. New plugin-specific code goes under the product's namespace (`mu_clid::`, `mu_tant::`) so the side is visible at every reference.

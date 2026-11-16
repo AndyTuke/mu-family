@@ -9,7 +9,7 @@ A step can carry **locks**: absolute values for chosen engine parameters, played
 - A lock sets the **absolute value** of one parameter on one step. Any engine knob that has a modulation destination can be locked, **Tune included**.
 - No held button on a laptop: an **Add p-Lock toggle** at the bottom of the Step panel. While it is on, turning an engine knob locks that knob for the selected step.
 - **Tails like Elektron:** a lock takes effect when its step triggers and holds until the next step that triggers, then the track's own values return.
-- One **per-step toggle, Mod On | Off** (Andy, 2026-11-11, replacing Replace | Add): *Mod On* means modulation still moves a locked parameter, starting from the locked value; *Mod Off* means modulation is ignored for the locked parameters of that step. Default Off would be the Elektron-like absolute lock; default to be ruled by `ux-controller`.
+- One **per-step toggle, Mod On | Off** (Andy, 2026-11-11, replacing Replace | Add): *Mod On* means modulation still moves a locked parameter, starting from the locked value; *Mod Off* means modulation is ignored for the locked parameters of that step. Default Off would be the Elektron-like absolute lock; default to be ruled by `ux-steward`.
 - **Slide is not part of this.** The Bass already has ties and glide and is the only voice that needs it.
 - **Limit 8 locks per step**, from one named constant that can be raised later; storage must be dynamic in use but fixed in size (no allocation on the audio thread).
 - A step with locks shows a small **red LED** at its bottom-left. Selecting a locked step: every locked knob shows its **locked value**, carries a **red LED in its centre**, and a **ghost line on the outside of the knob** marks the track's own value.
@@ -47,7 +47,7 @@ Today `Track::render` does: Phase 2 `resolve` (params through the modulation mat
    - **Mod On:** the matrix runs on the locked seed, so modulation moves the parameter around the lock.
    - **Mod Off:** after the matrix, the locked parameters are set back to the lock value (modulation ignored for them).
 4. **Transport stop / seek / start** reset `activeLockStep` to none (the track's own values).
-5. The existing limit stays: parameters are per block, and an engine takes one trigger per block (design-step-conditions "Known limit"), so a lock applies from the block its step fires in. **This is the one point for the `dsp-controller`**: is block-rate application acceptable for fast steps at large buffers, or must a lock split the block at the trig (the drum filter already renders in pieces)? Recommendation: block-rate, since that matches how every other per-step value behaves today.
+5. The existing limit stays: parameters are per block, and an engine takes one trigger per block (design-step-conditions "Known limit"), so a lock applies from the block its step fires in. **This is the one point for the `dsp-steward`**: is block-rate application acceptable for fast steps at large buffers, or must a lock split the block at the trig (the drum filter already renders in pieces)? Recommendation: block-rate, since that matches how every other per-step value behaves today.
 
 Nothing allocates and no lock is taken; the cells are atomics (the same pattern as the other step values), and the key table is built in `prepare`.
 
@@ -55,9 +55,9 @@ Nothing allocates and no lock is taken; the cells are atomics (the same pattern 
 
 - **Step panel, bottom:** a toggle button **P-Lock** (an LED toggle in the family style) and a **Mod: On | Off** two-way control that is enabled only while the selected step has locks. Both report to the status bar ("P-Lock: On", "Step Lock Mod: On").
 - **While P-Lock is on and a step is selected:** turning an engine knob writes a lock for that step instead of changing the track's knob. The knob shows the lock (value, red centre LED) and the track value as a ghost line outside the knob. Turning it back to the ghost value does not remove the lock; removal is explicit.
-- **Removing a lock:** double-click a locked knob (P-Lock on), or **Clear locks** in the Step panel (all of the step's locks). Needs `ux-controller` confirmation; Elektron's hold-and-press has no laptop equivalent.
+- **Removing a lock:** double-click a locked knob (P-Lock on), or **Clear locks** in the Step panel (all of the step's locks). Needs `ux-steward` confirmation; Elektron's hold-and-press has no laptop equivalent.
 - **Full step:** with 8 locks used, a knob not yet locked ignores the turn and the status bar says "Step has 8 locks".
-- **Step LED:** a small red LED on the step cell when the step has any lock. **Conflict to settle:** the step cell's bottom-left already holds the step number on the beat steps (5, 9, 13 in the current screenshots). Options: the LED left of the number, or the bottom-right corner. `ux-controller` rules.
+- **Step LED:** a small red LED on the step cell when the step has any lock. **Conflict to settle:** the step cell's bottom-left already holds the step number on the beat steps (5, 9, 13 in the current screenshots). Options: the LED left of the number, or the bottom-right corner. `ux-steward` rules.
 - **Selecting a step with locks (P-Lock off too):** the knobs show the locks, so the user sees what the step does; editing a locked knob with P-Lock off changes the track value, not the lock.
 - **Status bar rule** applies to every new control (toggle, mode control, the lock knob marks).
 
@@ -82,9 +82,9 @@ Trigless locks (a lock on a step with no note), slide between locks, locks on Ru
 
 ## Review needed before code
 
-- `ux-controller`: the LED placement, the lock marks on the knob, the removal gesture, the Mod toggle wording.
+- `ux-steward`: the LED placement, the lock marks on the knob, the removal gesture, the Mod toggle wording.
 - `architecture-steward`: file placement in mu-core, names (`StepLockSet`, `LockedValues`), the key scheme.
-- `dsp-controller`: the peek-before-resolve order and block-rate application (point 5 in section 3).
+- `dsp-steward`: the peek-before-resolve order and block-rate application (point 5 in section 3).
 - `test-steward`: the test list.
 
 ## Staging

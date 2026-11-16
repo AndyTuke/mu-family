@@ -421,7 +421,7 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    **Row listeners after a swap (accepted):** a service that listens to a type's rows (`RhythmSlotServices`) applies a row
    write, queued or immediate, to whatever layer of that type now sits in the slot, reading the parameter's current value. The
    swap moves the rows with the layers, so that value is the layer's own and the apply is redundant but harmless. Condition:
-   the row writes happen inside the quiesced window, so the dsp-controller checks the window's length with two Rhythm layers
+   the row writes happen inside the quiesced window, so the dsp-steward checks the window's length with two Rhythm layers
    swapped; if it is long, the writes move after the flag is lowered.
    **Reset layer** (`resetLayer`) means "back to a freshly added layer in this slot": layer data, parameters **and the
    mixer strip** (level, pan, sends, mute/solo, sidechain, output bus) all return to defaults, family-wide, as
@@ -504,7 +504,7 @@ The staged plan for layer ownership is complete: derived types as value members,
   per-slot pointers to the rows, rebound under `layersLock` in `layersMoved`, and the envelope persists only when non-default.
   `GrooveVoices` owns one engine of each type per slot (or lazily, DSP's call) and renders the selected `eng`.
   **Render order: all non-Rumble layers first, then Rumble layers**, so a Rumble source is always rendered this
-  block regardless of layer order (to `dsp-controller` for review); a Rumble whose source is itself a Rumble or is out of range
+  block regardless of layer order (to `dsp-steward` for review); a Rumble whose source is itself a Rumble or is out of range
   processes silence.
 - **mu-On FM Perc engine (ruled 2026-10-21; Andy approved; names in [design-naming.md](design-naming.md), sound design in [mu-on/research-fm-drums.md](mu-on/research-fm-drums.md)).**
   A sixth Track engine, one engine with an **Algorithm** choice of eight voice topologies (Tom, Conga, Zap, Click, Clank, Wood, Pluck, Burst) over one operator core.
@@ -529,7 +529,7 @@ The staged plan for layer ownership is complete: derived types as value members,
     A project saved with a FM Perc track and opened in an older build clamps the unknown engine; that direction is not supported. The legacy five-lane migration (`kNumLegacyLanes` = 5) is untouched.
     Cost: 11 more host-visible parameters per slot (mu-On with 8 slots: 88; mu-Tronic standalone: 176).
   - *Cost of holding the engine.* An unlocked mu-On track holds every engine (the sixth too), so `FmPercEngine::prepare` allocates only small fixed buffers and an idle voice returns early. The 2x
-    oversampling for Zap, Clank and Burst is `dsp-controller`'s call at the DSP review (use `OversampledProcessor` if it fits a per-voice pattern, else a small half-band); it must not
+    oversampling for Zap, Clank and Burst is `dsp-steward`'s call at the DSP review (use `OversampledProcessor` if it fits a per-voice pattern, else a small half-band); it must not
     allocate outside `prepare`.
   - *Interaction with mu-Tronic.* The engine is just a sixth Track type: `trackLayerType(LayerTypeId::FmPerc)` registered after `Rumble`, one line in the chooser order, `hasClipBank` true, `takesNotes` false,
     a valid Rumble source (a Rumble on a tom is legal; `isRumbleSourceSlot` already excludes only Empty and Rumble). Per-step pitch does not exist (design-engine); tuned toms use separate tracks or a modulator on Tune.
@@ -792,7 +792,7 @@ Source is Internal; default false). The master-volume row appears when `hasMaste
 ### Rulings on the S7 and S8 additions (2026-10-12)
 
 - **`TransportBar::refreshTempo()`**: accepted as is. It is generic (standalone only, reads `ShellBackend::getInternalBpm`), and sits beside `refreshPresets()`.
-- **Engraved groove tokens**: `MuTheme::Lighting::grooveShade` (0.45) and `grooveLight` (0.09) are the one definition of a groove. `MixerOverlay::paintMetal` still has its own two lambdas with `ringTrack` and `lampHot * 0.3`, which are numerically the same (0.45 and 0.09), and `mu-link`'s `MixerPanel` has a third copy. **Adopt now, not later**: the values are identical so nothing changes on screen and it removes a drifting hard-coded factor (`* 0.3`). Do it as one helper, not by pasting the tokens into three places: `MuLookAndFeel::drawGroove(Graphics&, Point<int> start, int length, bool vertical)` in `mu-core/UI/Components/MuLookAndFeel.{h,cpp}` (dark line on the start edge, light line one pixel right of or below it, both via `L.shadow(L.grooveShade)` and `L.highlight(L.grooveLight)`). `MixerOverlay` and `MixerPanel` call it; the `lampHot * 0.3` expression disappears. The main conversation (coder) does this; no `ux-controller` ruling is needed because the look is unchanged (tell it afterwards so the groove is listed in `design-ui-family` section 11).
+- **Engraved groove tokens**: `MuTheme::Lighting::grooveShade` (0.45) and `grooveLight` (0.09) are the one definition of a groove. `MixerOverlay::paintMetal` still has its own two lambdas with `ringTrack` and `lampHot * 0.3`, which are numerically the same (0.45 and 0.09), and `mu-link`'s `MixerPanel` has a third copy. **Adopt now, not later**: the values are identical so nothing changes on screen and it removes a drifting hard-coded factor (`* 0.3`). Do it as one helper, not by pasting the tokens into three places: `MuLookAndFeel::drawGroove(Graphics&, Point<int> start, int length, bool vertical)` in `mu-core/UI/Components/MuLookAndFeel.{h,cpp}` (dark line on the start edge, light line one pixel right of or below it, both via `L.shadow(L.grooveShade)` and `L.highlight(L.grooveLight)`). `MixerOverlay` and `MixerPanel` call it; the `lampHot * 0.3` expression disappears. The main conversation (coder) does this; no `ux-steward` ruling is needed because the look is unchanged (tell it afterwards so the groove is listed in `design-ui-family` section 11).
 - **`HoverStatus`**: generic (a mouse listener that reports a name and value to the status bar; nothing about mu-link), so it moves to `mu-core/UI/Components/HoverStatus.h`, namespace `mu_ui`, header-only; `mu-link` includes it from there. Decide the side before the second copy: any plugin panel with a segment control or number field and no status line will want it. Not on the chrome `.cpp` list (header-only).
 - **`ClientColumns`**: stays in `mu-link` (`mu_link::ClientColumns`). It places eight *client* columns, a divider and the master column for two mu-link panels; it is mu-link's concept (the plugins' `MixerOverlay` lays out channels, returns and a master by its own constants). Generalise it to a neutral `ColumnLayout` in `mu-core` only when a second place needs the same calculation.
 - **`mu-link-tests` build**: correct as done. `UIChromeSources.cmake` is the one source list (include moved above the tests so both targets use it); `JUCE_MODAL_LOOPS_PERMITTED=1` and `ScopedJuceInitialiser_GUI` match `mu-core-tests` and the other products' `TestMain`; the extra `juce_audio_utils`, `juce_gui_extra` and `juce_data_structures` links are what the window needs. Recompiling `MuLinkComponent.cpp` and the panels into the test target is the accepted cost of testing the window without the app target.
@@ -938,7 +938,7 @@ its own persistence integer; put the map in `mu-control` (it needs no device).
 
 Performance mode is the gig view: the normal main preset screen for the preset now playing, **locked (read-only)**, with an
 indication of the mode, driven only by a control surface. The screen is a display derived from the live state; it never
-acts. This section is structure only; the look is the `ux-controller`'s. The file is in
+acts. This section is structure only; the look is the `ux-steward`'s. The file is in
 [design-launchpad.md §3.2c](design-launchpad.md#32c-the-performance-file-architecture-ruling-2026-10-12-backlog-1279).
 
 **0. Scope (owner, 2026-10-13): standalone only for now, plugins not closed off.** `ShellBackend` gains a defaulted
@@ -982,7 +982,7 @@ with the chrome list in `UIChromeSources.cmake`, so mu-link links the chrome wit
 **3. The lock lives in `ShellChrome`, once.** While `performanceMode` is true the chrome puts an input shield over the content area
 (sidebar, main panel, overlays, transport bar): it swallows mouse and key events, so **no product panel needs any code** to be read-only.
 The mode toggle (the way out) sits above the shield, and the host window's own close button is unaffected. The shield is a shared chrome
-component; its look and the toggle's place are for the `ux-controller`. Consequence: **there are no on-screen or keyboard step actions**.
+component; its look and the toggle's place are for the `ux-steward`. Consequence: **there are no on-screen or keyboard step actions**.
 Surface and MIDI map are the only inputs while locked; the keyboard table keeps only the mode toggle.
 
 **4. The screen follows the surface.** In mode, the editor sets its layer selection from `LiveView.selectedLayer` (one way; outside the
@@ -1038,7 +1038,7 @@ family setting saved **with the preset**:
   Settings "Timing" dropdowns write the parameter; the old value was never persisted (runtime-only atomic), so there is nothing to seed from. mu-Clid has no
   bar-line rule, so `OnBar` reads as `OnLayerLoop` there (accepted; (c) and (d) must not offer or display `OnBar` for a product without the rule, see (d));
   (c) mu-Toni and mu-On pass `OnBar` default and gain the control;
-  (d) the "Timing" dropdown leaves the two products' `SettingsOverlay` for a preset-level control in the shared `MasterLoopSection` (the `ux-controller`
+  (d) the "Timing" dropdown leaves the two products' `SettingsOverlay` for a preset-level control in the shared `MasterLoopSection` (the `ux-steward`
   places it, as it is preset data now, not an app setting; the control offers only the values the product supports, so mu-Clid shows two and a stored `OnBar` is shown as the layer loop). Each stage is a Debug build of all products and the unit tests.
 - **Standing check:** easier. One definition and one parameter replace two enums and two predicate sets, the other products gain the choice
   without a copy, and the pad launch needs nothing new.
@@ -1055,7 +1055,7 @@ the exclusivity claim is not assumed either way; the registry works with both. A
 | 1 | `PerformanceFile` + tests (#1279) | **Done 2026-10-13** (`mu-core/Persistence/PerformanceFile`, saves via `replaceFileAtomically`, tests in `mu-core-tests`) |
 | 1b | Swap timing in `mu-core` (item 6, stages a to d) | nothing from this feature; best before step 4 so launches use the final setting |
 | 2 | `LiveState`, `LiveView`, the actions, `perform`, `supportsPerformanceMode`, persistence, tests with fake callbacks | step 1; `stageItem` is the existing `stageFullPreset`. This is the #1328 work for `SelectLayer`, the performance actions and `PresetNext/Prev`. **Not** #1276. **2a built 2026-10-13 (1b4bf08); 2b and the review fixes built 2026-10-13 (a0fd6ec):** `PerformanceMode` takes `index` (-1 toggle, 0 off, 1 on), `MidiControlMap` saves and loads `index` with a round-trip test, `ProcessorBase::saveLiveState / restoreLiveState` are called by all four session products (mu-Clid parses first and skips the `_default.muClid` auto-load when `LiveState::modeSaved`), and the queue identity is the stage serial plus `reconcile`. architecture-steward re-check 2026-10-13: **Pass** (placement, boundary script, persistence wiring as ruled). Step 3 may start |
-| 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-controller` ruling. **Built 2026-10-13 (570ee8e); architecture-steward review 2026-10-13: Pass** on structure (accessors, `ShellChrome::InputShield` and entry order, `StepIndicator` in `UI/Components`, pure `PerformanceIndication` in `UI/` under `mu_ui::perf`, `LayerSidebar` wired once by `EditorShellBase::setMainArea`, no product symbol, no state in the editor). Toggle order right to left: Mixer, Perf, gear. The interim header-only `UI/PerformanceChooser.h` and the `FileChooser` in `EditorShellBase` are gone: the chooser is a `ShellChrome` page (`UI/PerformanceChooser` component over `UI/PerformanceChooserModel`, logic in `mu_ui::perf::ChooserModel`, no display), loading through the neutral `ShellBackend::getProductStateId()` / `loadPerformance()` hooks, picking presets through `PresetBrowser::beginPick` and naming through `SaveDialog::setNameAndDescriptionOnly` (architecture-steward review 2026-10-13: Pass, boundary checker clean). The "Queued" status says "(at the next swap point)" until `LiveView` exposes the preset's `SwapTiming`; the ux wording of "when" is a follow-up, not a structural one |
+| 3 | `ShellBackend` accessors, the input shield, the indication and mode toggle, editor following `selectedLayer` | step 2 and the `ux-steward` ruling. **Built 2026-10-13 (570ee8e); architecture-steward review 2026-10-13: Pass** on structure (accessors, `ShellChrome::InputShield` and entry order, `StepIndicator` in `UI/Components`, pure `PerformanceIndication` in `UI/` under `mu_ui::perf`, `LayerSidebar` wired once by `EditorShellBase::setMainArea`, no product symbol, no state in the editor). Toggle order right to left: Mixer, Perf, gear. The interim header-only `UI/PerformanceChooser.h` and the `FileChooser` in `EditorShellBase` are gone: the chooser is a `ShellChrome` page (`UI/PerformanceChooser` component over `UI/PerformanceChooserModel`, logic in `mu_ui::perf::ChooserModel`, no display), loading through the neutral `ShellBackend::getProductStateId()` / `loadPerformance()` hooks, picking presets through `PresetBrowser::beginPick` and naming through `SaveDialog::setNameAndDescriptionOnly` (architecture-steward review 2026-10-13: Pass, boundary checker clean). The "Queued" status says "(at the next swap point)" until `LiveView` exposes the preset's `SwapTiming`; the ux wording of "when" is a follow-up, not a structural one |
 | 4 | `mu-control` surface model reads `LiveView`: top row = `PerformanceItem(n)`, right column = `SelectLayer`, grid = `LaunchClip` | #1276, step 2; the grid needs 5 |
 | 5 | `LaunchClip`, `ClipNext/Prev`, the clip bank and per-layer clip fields in `LiveState` | #1277 (this part of #1328); the bank and launch path are steps C1 to C4 of [Clip bank](#clip-bank--family-standard-ruled-2026-10-13-backlog-1277), the `LiveState` part is its C5 |
 
@@ -1079,7 +1079,7 @@ carries a recommendation and the build assumes it until he answers.
 They do not clash: no type called `Clip` exists, `Layer` is the container, `Clip` is one stored state of it. "Slot" stays for FX / insert slots and
 the stager's index. New names: `mu_core::ClipBank` (the store), `mu_limits::kClipsPerLayer = 8` (in `MuLimits.h`), XML tags
 `Clips` / `Clip`, actions `LaunchClip` / `ClipNext` / `ClipPrev` (already declared, `ControlAction.h`), and in the UI a `ClipStrip` (for the
-`ux-controller`). A product never adds `<Type>Clip`: a clip is the product's *layer preset* and has no type of its own.
+`ux-steward`). A product never adds `<Type>Clip`: a clip is the product's *layer preset* and has no type of its own.
 
 **2. What a clip is.** One clip = **exactly what that product's layer preset carries**, no more: the layer's parameters, sequencer data, engine
 selection and modulators; **not** the mixer strip, not the name or colour (the layer keeps its own on launch). It is stored as the tree the product's
@@ -1180,7 +1180,7 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
 - **Size.** A full preset grows by up to eight layer-preset trees per layer. No cap beyond the 8 x 8.
 
 **8. Staged build order.** Each step: one product at a time after C1, a Debug build, that product's suite plus `mu-core-tests`, and `check-core-boundary`
-(mu-core names no product). `dsp-controller` reviews C3 and C4 only (the stage and commit paths, reused unchanged); C1, C2 and C5 never touch the audio thread.
+(mu-core names no product). `dsp-steward` reviews C3 and C4 only (the stage and commit paths, reused unchanged); C1, C2 and C5 never touch the audio thread.
 
 | Step | Kind | Work | Tests (written with the step) |
 |---|---|---|---|
@@ -1189,10 +1189,10 @@ layer preset is one clip's worth of state; carrying a bank would make loading it
 | C3 | M/S | `captureLayerPresetTree` / `stageLayerPresetTree` split for Tant first, then Toni, On; `storeClip` / `clearClip` / `loadClipFromFile` / `launchClip`; no `LiveState` yet | Per product: store then change parameters then launch (stopped) restores them, mixer strip, name and colour untouched; launch while playing is pending (`hasPendingSwap`) and applies only at the boundary, firing `onLayerPresetCommitted`; empty clip, out-of-range index and launch while a full preset is staged return false and change nothing; launching leaves the bank unchanged; a structural edit cancels a pending launch; a layer-preset file load after a launch supersedes it; the `swap` / `slot swap` hot-swap listening tests |
 | C4 | S | mu-Clid: the same two hooks over `PresetIO`; `<Clips>` in `buildFullPresetTree`, the prepare and commit of a full preset, host session; sample-path-only rule; mu-Clid MIDI compiles and ignores the bank (Open question 5) | `mu-clid-tests` (build the target explicitly) and `mu-clid-midi-tests`: full-preset and session round trip with clips; an old `.muClid` loads empty; a staged full preset carries its banks and sets them at the commit; launch (stopped and staged) equals loading the same `.muRhythm`; the existing `HotSwapCancelTests` shape for a cancelled launch; `CLID_roundtrip` and the retire-tail listening test |
 | C5 | M | `LiveState` / `LiveView` clip fields, `slotStageSerial`, `remapLayers`, `publishClipMasks`, `LaunchClip` / `ClipNext` / `ClipPrev` in `perform` | `mu-core-tests` with fake callbacks, as the performance step 2: launch queues and commit moves `playingClip`; superseded and cancelled launches clear `queuedClip`; full-preset commit clears all clip state; remap on remove and swap; `ClipNext` / `ClipPrev` wrap and skip empties; mode off returns false; `perform` mute on the playing clip |
-| C6 | UX | `ClipStrip` in the layer header (built and reviewed 2026-10-14), store / clear commands, wording; then the `mu-control` grid mapping (performance step 4) | `ux-controller` ruling first; the grid is the controller tests of #1276 |
+| C6 | UX | `ClipStrip` in the layer header (built and reviewed 2026-10-14), store / clear commands, wording; then the `mu-control` grid mapping (performance step 4) | `ux-steward` ruling first; the grid is the controller tests of #1276 |
 | C7 | S | Clipboard (item 10): `ClipClipboard`, `copyClip` / `cutClip` / `pasteClip` / `canPasteClip`, the shared `clipFitsSlot` check, `CopyClip` / `CutClip` / `PasteClip` actions in `perform`; no UI | `mu-core-tests` with the fake product and the typed fake: copy leaves the bank, cut = copy + clear, paste type check (wrong root tag, wrong slot type, empty clipboard refuse and change nothing), paste deep-copies (a second paste after editing the source is unchanged), paste onto the lit clip relaunches it, Performance mode and a staged full preset refuse, the clipboard survives the source layer's removal |
-| C8 | M | Auto-save (item 10): per-layer tracker, 400 ms poll from `SwapPoll`, flush before a clip stage, before a structural edit and before a state capture, the `clipAutoSave` setting; `dsp-controller` reviews | `mu-core-tests`: edit then settle writes the playing clip and only it; an unchanged layer is never written (capture idempotence, **run for every product's real capture: Tant, Toni, On, Clid, each Tronic type**); a launch does not rewrite the clip it loaded (baseline after migration); edits during a queued launch land in the old clip; explicit Store while a preset is staged is not overwritten by the tick; structural edit, type change, Clear, Performance mode, setting off and offline render write nothing; flush on save puts a late edit into the saved bank |
-| C9 | UX | Right-click menu on a pad (Copy, Cut, Paste, Clear; enabled states), the "Auto-save clip edits" setting row, the edited-clip cue | `ux-controller` ruling first (wording, enabled states, whether Shift+click Store stays); `ClipStripTests` with the recording sender |
+| C8 | M | Auto-save (item 10): per-layer tracker, 400 ms poll from `SwapPoll`, flush before a clip stage, before a structural edit and before a state capture, the `clipAutoSave` setting; `dsp-steward` reviews | `mu-core-tests`: edit then settle writes the playing clip and only it; an unchanged layer is never written (capture idempotence, **run for every product's real capture: Tant, Toni, On, Clid, each Tronic type**); a launch does not rewrite the clip it loaded (baseline after migration); edits during a queued launch land in the old clip; explicit Store while a preset is staged is not overwritten by the tick; structural edit, type change, Clear, Performance mode, setting off and offline render write nothing; flush on save puts a late edit into the saved bank |
+| C9 | UX | Right-click menu on a pad (Copy, Cut, Paste, Clear; enabled states), the "Auto-save clip edits" setting row, the edited-clip cue | `ux-steward` ruling first (wording, enabled states, whether Shift+click Store stays); `ClipStripTests` with the recording sender |
 
 **C3 brief (confirmed 2026-10-14, for the coder).** Reading the three composed products' `saveLayerPreset` / `loadLayerPreset`, the split in item 5 is exact; fixed details:
 - `ProcessorBase` virtuals (default empty): `juce::ValueTree captureLayerPresetTree(int layer)` and `void stageLayerPresetTree(int layer, juce::ValueTree tree, bool keepIdentity)`.
@@ -1284,11 +1284,11 @@ existing 100 Hz `SwapPoll` (no new timer, nothing on the audio thread):
   type check never fires in the tracker. A Published `swapLayers` exchanges two slots: flush both, drop both trackers.
 - **Cost and limits.** One capture and one tree compare per 400 ms step, only for lit layers; a clip capture carries no audio (mu-Clid never embeds a sample into a clip), so
   trees are tens of kilobytes. Memory is two extra trees per lit layer. No new cap on clips. Back-off: if a layer's capture takes more than 4 ms, that layer's visit interval doubles
-  (message thread, so this is a UI-hitch limit, not an audio one); `dsp-controller` to confirm the budget on mu-Tant and a loaded mu-Tronic.
+  (message thread, so this is a UI-hitch limit, not an audio one); `dsp-steward` to confirm the budget on mu-Tant and a loaded mu-Tronic.
 - **Saved state.** No file change: the auto-saved bank is the existing `<Clips>` data and it rides every full preset and session (the flush above makes the save
   current). Layer-preset files and performance files are unaffected. The only new persistent thing is the **`clipAutoSave` setting**, a shell preference beside the other
   settings-overlay options (default **on**, as Andy asked), not a parameter, not in a preset or the APVTS, because it is a behaviour of the app, not part of any sound.
-- **Side effects of the bank to state plainly (ux-controller to word):** a tweak to a lit clip now overwrites it, so there is no "audition and return". Recommend the
+- **Side effects of the bank to state plainly (ux-steward to word):** a tweak to a lit clip now overwrites it, so there is no "audition and return". Recommend the
   strip shows a brief "saved" cue on the pad and the setting is easy to find; no history or undo in this round (**Andy 9**). Host automation moving a parameter of a lit
   clip is indistinguishable from a hand edit and will be saved (accepted; switch the setting off for automated sessions).
 
@@ -1301,13 +1301,13 @@ accessor is the seam if that is added. Message thread only.
   `bool cutClip(slot, clip)` (copy, then `clearClip`; if the copy fails nothing is cleared), `bool pasteClip(slot, clip)`, `bool canPasteClip(slot) const` (the same check, for
   menu enabling). **Paste type check:** a single shared `clipFitsSlot(slot, tree)` that `launchClip`, `loadClipFromFile` and `pasteClip` all call (list hosts: the tree's root tag equals
   `captureLayerPresetTree(slot).getType()`; typed hosts: `layerPresetType(tree) == slotTypeId(slot)`); the three existing inline checks move into it, so a clip of the wrong product or type
-  can never enter a bank by any route. Paste stores a deep copy with the clipboard's name, replacing whatever is there (confirm: the strip's existing overwrite confirm, `ux-controller`).
+  can never enter a bank by any route. Paste stores a deep copy with the clipboard's name, replacing whatever is there (confirm: the strip's existing overwrite confirm, `ux-steward`).
   **Paste onto the lit clip relaunches it** (`launchClip`), so the lit pad still equals what plays and the tracker re-adopts at the commit; pasting onto any other clip does not launch.
   Paste does not light the clip (a store lights it, a paste is not "what you are playing").
 - **Actions.** Three new `ControlActionType`s: `CopyClip`, `CutClip`, `PasteClip`, `layer` + `index` as `StoreClip`; **screen only, exactly like `StoreClip` / `ClearClip`**: absent from the
   name list (no map or surface can name them), refused in Performance mode and while a full preset is staged, handled in `ProcessorBase::perform`. They are actions, not direct calls from
   `ClipStrip`, so the strip keeps its single sender seam and the tests record them like the others. Auto-save has no action (it is not user-invoked).
-- **Where the menu lives.** `ClipStrip` (right-click on a pad): Copy, Cut, Paste, Clear; enabled states `ux-controller` rules (Copy, Cut, Clear need an occupied clip; Paste needs
+- **Where the menu lives.** `ClipStrip` (right-click on a pad): Copy, Cut, Paste, Clear; enabled states `ux-steward` rules (Copy, Cut, Clear need an occupied clip; Paste needs
   `canPasteClip`).
 
 *Standing check.* **Easier**: auto-save is generic poll-and-compare over the existing capture, so the combined instance and every future layer type get it with no code
@@ -1326,10 +1326,10 @@ A product that captured a clock, counter or random value into its layer tree wou
    that a sound reset in mu-On currently does not. Recommend empty it, guarded by the existing reset confirmation; the alternative is a bank that survives a
    reset and only `Clear` removes. The build follows the answer; C2's test pins it.
 4. **Launch while a full preset is staged.** Recommend `launchClip` returns false: the clips on screen are about to be replaced by the new preset's, and
-   applying an old clip on top of the new layer would be wrong. For `ux-controller`: show the pads as not launchable.
+   applying an old clip on top of the new layer would be wrong. For `ux-steward`: show the pads as not launchable.
 5. **mu-Clid MIDI.** It shares `Rhythm` and so gets an (empty, unused) bank for free. Does it need to keep a `<Clips>` child it did not write when it loads and re-saves a
    mu-Clid file? Recommend it preserves nothing and says so; check at C4 which full-preset code path it uses.
-6. **Pressing the playing clip while another is queued on that layer** (`ux-controller` / Andy): mute (the design-launchpad rule as written) or cancel the queued
+6. **Pressing the playing clip while another is queued on that layer** (`ux-steward` / Andy): mute (the design-launchpad rule as written) or cancel the queued
    launch (what `PerformanceItem` does for the current item). Recommend cancel, then mute on the next press; the surface semantics stay one rule.
 7. **A bank as a shareable file** (`.muClips`, eight clips for one layer): not scheduled; nothing here closes it off (the container is already self-contained).
 8. **Auto-save in Performance mode (Andy, 2026-10-21).** Recommend **off while locked**: a show tweak on a mapped knob is not written to the bank, the same reason `StoreClip` is refused
@@ -1432,7 +1432,7 @@ a controller. So `mu-core` owns the **slot** and `mu-control` fills it:
   `#include` of a `mu-control` header from `StandaloneShell.h` (a `mu-core` to `mu-control` dependency, even if guarded); `ProcessorBase` owning the manager (it
   is built in plugins and headless renders).
 
-**5. Threads.** Everything in `mu-control` is message-thread or MIDI-input-thread; **it never touches the audio thread** and needs no `dsp-controller` review
+**5. Threads.** Everything in `mu-control` is message-thread or MIDI-input-thread; **it never touches the audio thread** and needs no `dsp-steward` review
 unless that changes. A driver's input callback runs on the MIDI thread: it decodes into `SurfaceEvent`s, pushes them onto a fixed-size lock-free FIFO and
 triggers an `AsyncUpdater` (built as `ManagedPorts`, which wraps the driver's ports so the driver and model only ever run on the message thread; connection changes from the hot-plug watcher take the same route); the manager drains on the message thread, runs the mapping and calls `ControlSink::perform` there (the `ControlSink` contract). LED
 output is built and sent on the message thread (the model diffs against the last frame and sends only the changes, batched into one lighting message).
@@ -1489,7 +1489,7 @@ are shared** (design-launchpad 3.5 found two processes can open the pair togethe
    takes it. `ControllerManager`'s constructor then takes `ControlSink&`, `const LiveView&`, the settings folder and `SurfaceFocus&`; it still names no
    `ProcessorBase`, editor or product. `wantOpen()` gains one condition, "this app holds the focus"; everything else (open, close, Live on every exit path,
    hot-plug) is unchanged. Item 4's "hub supplies a sink" sentence stands for a later F3 hub.
-3. **`ControlStatus` gains `Standby`** ("another mu app has the pad"; the lamp and wording are the `ux-controller`'s, design-ui-family 14). Not `InUse` (a foreign
+3. **`ControlStatus` gains `Standby`** ("another mu app has the pad"; the lamp and wording are the `ux-steward`'s, design-ui-family 14). Not `InUse` (a foreign
    program) and not `Released` (the user let go): `Standby` is the normal state of every app but one and needs no action. The manager still reads port names for
    `Found` while on standby.
 4. **`ControlAction` gains `FocusNext` and `FocusPrev`** (stable names, serialisable like the others). `SurfaceModel` maps the two buttons; the **manager handles them
@@ -1501,7 +1501,7 @@ are shared** (design-launchpad 3.5 found two processes can open the pair togethe
    dark moment, no overlap on either port model. **Entering Performance mode takes the focus** (the latest deliberate act wins); **leaving it, quitting
    (`closeNow()`), or a stale heartbeat gives the focus to the next ring member**, or leaves it free. An app that is not in the ring never opens a port.
 6. **Lights.** With two or more apps in the ring, top buttons 1 and 2 show the current app's accent (bright), via `SurfaceLook::accentRgb`; with one they are dark
-   and inert (below). The exact colours and whether one of them shows the neighbouring app's accent are the `ux-controller`'s.
+   and inert (below). The exact colours and whether one of them shows the neighbouring app's accent are the `ux-steward`'s.
 7. **The mapping conflict (needs Andy).** Version 1 uses all eight top buttons for `PerformanceItem(1..8)` (design-launchpad 3.6, settled 2026-10-13), so buttons 1
    and 2 are items 1 and 2. A rig profile must therefore be **opt-in and static**, never an automatic remap when a second app appears (a mid-gig launch would change
    what a pad means): a "Share the pad between apps" setting, stored once for the device in `mu-controller-mapping.xml` (it describes the pad, not an app),
@@ -1511,13 +1511,13 @@ are shared** (design-launchpad 3.5 found two processes can open the pair togethe
 **What v1 does with buttons 1 and 2.** Nothing new: they stay items 1 and 2 (as built in M4). No reservation, no dark buttons, no registry file is written or read while the
 setting is off, so a single-app user sees no change.
 
-**Stages** (each ends with `check-core-boundary.ps1` clean and tests; all on the message thread, so no `dsp-controller` review unless that changes).
+**Stages** (each ends with `check-core-boundary.ps1` clean and tests; all on the message thread, so no `dsp-steward` review unless that changes).
 
 | Stage | Work | Tests |
 |---|---|---|
 | F0 | Nothing (v1 as built). Hardware check recorded in design-launchpad 3.5: two standalones in Performance mode at once, and a DAW holding the ports. | |
 | F1 | `SurfaceFocus` interface, `SharedSurfaceFocus`, factory and `ControlHost` argument, `Standby`, `FocusNext/Prev`, the manager conditions, the rig mapping profile and setting | `mu-core-tests`: registry round trip, stale and version-mismatch slots, ring order, take-on-enter; `ControllerManagerTests` with two managers over one fake registry and `FakeDevicePorts` (hand-over order, no overlap, Live once, an unplugged pad, a quitting owner, a vanished owner); `SurfaceModelTests` on both descriptions |
-| F2 | Settings group line "pad: mu-Tant" and the accent lamp; `ux-controller` ruling first | UI checks |
+| F2 | Settings group line "pad: mu-Tant" and the accent lamp; `ux-steward` ruling first | UI checks |
 | F3 | **Only if needed**: a hub that owns `DevicePorts` and the driver, for plugins in a DAW or to light the pad with no owner. Protocol (below). | When scheduled |
 
 **If F3 is ever built, the protocol carries surface events and lighting frames, not `ControlAction`s.** Down to the app: `SurfaceEvent`s (device-independent ids,
@@ -1585,7 +1585,7 @@ once. A fallback drain from `processBlock` was rejected: it would put message-th
 on the audio thread, against the mailbox rule above. Offline render inside the products is covered by
 `flushPendingAsyncUpdates()`.
 
-User-facing wording (for the release notes and the manuals, via `/notes` and the `user-documentation-author`):
+User-facing wording (for the release notes and the manuals, via `/notes` and the `docs-steward`):
 
 > mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers
 > do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take
@@ -1827,7 +1827,7 @@ Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-cl
 
 ### Update check — family standard (ruled 2026-10-19; built, shipping from v1.2.0.1490)
 
-**History.** The first check asked the GitHub "latest release" API from `ShellChrome::startVersionCheck()` (no opt-out, no daily limit, no dismissal, a detached thread, GitHub's anonymous rate limit). This design replaced it and is built: `mu-core/Plugin/UpdateCheckPolicy.h`, `UpdateChecker.{h,cpp}`, `mu-core/UI/UpdateNotice.h`, `scripts/write-latest-json.ps1`, `tests/scripts/check-latest-json.ps1`. `upgradeBanner` and `kUpgradeBannerH` are retired (ruled with the `ux-controller`, 2026-10-19; look in design-ui-family §6 "Update notice"): the notice is a link in the status bar, `StatusBar::setUpdateLinkVisible(bool)` plus the `onUpdateClicked` callback, in mu-core and shared by every product.
+**History.** The first check asked the GitHub "latest release" API from `ShellChrome::startVersionCheck()` (no opt-out, no daily limit, no dismissal, a detached thread, GitHub's anonymous rate limit). This design replaced it and is built: `mu-core/Plugin/UpdateCheckPolicy.h`, `UpdateChecker.{h,cpp}`, `mu-core/UI/UpdateNotice.h`, `scripts/write-latest-json.ps1`, `tests/scripts/check-latest-json.ps1`. `upgradeBanner` and `kUpgradeBannerH` are retired (ruled with the `ux-steward`, 2026-10-19; look in design-ui-family §6 "Update notice"): the notice is a link in the status bar, `StatusBar::setUpdateLinkVisible(bool)` plus the `onUpdateClicked` callback, in mu-core and shared by every product.
 
 **Scope.** Every product, because every product hosts `ShellChrome`: every product that ships, including mu-Link (through `LinkShellBackend`), in VST3, CLAP and Standalone, on Windows. The `APPLE` paths keep compiling in principle (the platform key below simply has no macOS entry). No product writes any update code.
 

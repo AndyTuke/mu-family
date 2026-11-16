@@ -131,7 +131,7 @@ The generic drum recipes (kick, hat, snare, bell, 808 metal ratios, OPL rhythm m
 4. Is 2x oversampling for Zap/Clank/Burst acceptable, or is deliberate aliasing wanted as a character?
 5. Should Tune be shown in notes with a snap option so tom sets are tuned to a scale?
 6. Do you want a per-step pitch/ratio lane in the sequencer (a separate, larger item) so this engine can play melodic perc and tuned tom fills without modulators?
-7. Name and disc letter ("FM Perc", "P"?). Needs the ux-controller and architecture-steward.
+7. Name and disc letter ("FM Perc", "P"?). Needs the ux-steward and architecture-steward.
 8. Operator/oversampler helpers in mu-core now, or in mu-On until a second user?
 
 ## Sources actually read

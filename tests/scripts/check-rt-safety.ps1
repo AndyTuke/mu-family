@@ -4,7 +4,7 @@
 # function runs inside processBlock. It therefore scans the files that make up the audio path
 # (mu-core Audio/, Modulation/, Sequencer/, Control/, ProcessorBase*.cpp and the Plugin/ render, retire and transport helpers; every product's Source/Audio,
 # Source/Sequencer, Source/Modulation and Source/Plugin/PluginProcessor*) and reports lines that match one
-# of the rules below. Expect false positives; the dsp-controller reads the report, it decides nothing.
+# of the rules below. Expect false positives; the dsp-steward reads the report, it decides nothing.
 # The exit code is ALWAYS 0 (setup errors excepted: exit 2), so the script can run in /build without
 # ever failing it. Promote it to a gate only after the findings have been triaged.
 #
@@ -24,7 +24,7 @@
 #                 std::string or juce::String key (allocates on a miss, hashes a string every time)
 #   name-call     getName( / getLayerName( (they build a juce::String) inside a function named processBlock or render*
 #
-# Refinements (each one removes a known false-positive class; see the dsp-controller triage):
+# Refinements (each one removes a known false-positive class; see the dsp-steward triage):
 #   C-1  Header functions get setup context too. A brace walk finds each function defined in a header (`inline T
 #        Class::name(` or an in-class `T name(...) {`, signature may span lines) and attributes hits to it. A
 #        constructor (name equal to the enclosing class, or Class::Class) or destructor is setup, as are the setup

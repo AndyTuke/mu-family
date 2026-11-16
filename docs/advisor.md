@@ -51,7 +51,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 
 **Website and services**
 - Static HTML site in `site/`, hosted on GitHub Pages (published by the dispatch-only `publish-site.yml` workflow; Netlify was dropped 2026-11-15). Local preview: `tests/scripts/serve-site.ps1`.
-- Site work happens on the local branch `site-local` in a separate worktree (`D:\Dev\mu-site`) and is merged to `main` in one batch (`.claude/agents/web-designer.md`).
+- Site work happens on the local branch `site-local` in a separate worktree (`D:\Dev\mu-site`) and is merged to `main` in one batch (`.claude/agents/web-steward.md`).
 - Sales and downloads: Lemon Squeezy fixed-price checkout (£20, mu-Tronic £30); zips from GitHub Releases (`site/download.html`, each product's `Source/License/LicenseKey.h`). Mailing list: MailerLite embedded form (`site/download.html`).
 
 ## Claude Code setup
@@ -60,7 +60,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 - `CLAUDE.md` at the repo root plus one per product: `mu-clid/`, `mu-clid-midi/`, `mu-tant/`, `mu-toni/`, `mu-on/`, `mu-link/` (about 600 lines in total).
 - `.claude/settings.json` (checked in): allows Bash, PowerShell, WebFetch and WebSearch without prompts; PostToolUse hooks on Bash that run `post_build_todo.ps1`, copy Release artefacts to the OneDrive Windows folder, scan build output for compiler warnings (an agent hook), run the first-build-of-day oversight trigger (`scripts/mu_build_hook.ps1`) and collect build artefacts (`scripts/mu_build_artifacts.ps1`); a UserPromptSubmit hook that injects pending oversight audit text (`scripts/mu_oversight_inject.ps1`).
 - `.claude/settings.local.json` (per machine): extra command allowances and a SessionStart hook running `.claude/hooks/comms-start.ps1` (untracked).
-- Subagents in `.claude/agents/`: `backlog-administrator`, `architecture-steward`, `dsp-controller`, `ux-controller`, `test-steward`, `user-documentation-author`, `web-designer`. Each owns one area and writes only its own files; `CLAUDE.md` has the precedence table.
+- Subagents in `.claude/agents/`: `backlog-steward`, `architecture-steward`, `dsp-steward`, `ux-steward`, `test-steward`, `docs-steward`, `web-steward`. Each owns one area and writes only its own files; `CLAUDE.md` has the precedence table.
 - Slash commands in `.claude/commands/`: `bug`, `build`, `commit`, `deepaudit`, `notes`, `optimise`, `release`, `update`.
 - Hooks scripts in `.claude/hooks/`: `post_build_todo.ps1`, `comms-start.ps1`.
 - User-level memory (`C:\Users\andyt\.claude\projects\d--Dev-mu\memory\`), not in the repo: owner preferences and project state.
@@ -79,7 +79,7 @@ Decisions the owner has made that the advisor must respect and not re-suggest. A
 - JUCE is pinned and kept current through the single pin in `juce-version.txt`; bump only through the documented procedure (repo: `CLAUDE.md`).
 - No workflow runs on push or pull request, ever (repo: `CLAUDE.md`).
 - Release builds only when the owner asks; Debug is the working build (repo: `CLAUDE.md`).
-- The backlog (`backlog.md`) is written only by the `backlog-administrator` agent (repo: `CLAUDE.md`).
+- The backlog (`backlog.md`) is written only by the `backlog-steward` agent (repo: `CLAUDE.md`).
 - The owner edits `CLAUDE.md` files himself; the advisor must not propose edits to them as ready-to-apply changes (stated in session, 2026-10-14).
 - The website stays on its local `site-local` branch until a batched publish; the paid apps are free downloads with a licence reminder and a fixed-price licence (£20, mu-Tronic £30); mu-Clid MIDI and mu-link are freeware (repo and session, 2026-10-15).
 

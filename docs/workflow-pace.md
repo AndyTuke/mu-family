@@ -15,15 +15,15 @@ Before any check, test, build, review or agent call, ask: **"Is this really requ
    - **How to run them (2026-11-14): `pwsh tests/scripts/run-tests.ps1`.** It builds the test targets and runs every suite in parallel (the slow ones cut by category), one summary line per suite, logs in `build/test-logs/`. About 5 minutes for the whole family, against over an hour in series. A product's test app skips its golden renders unless given `--goldens` (the script's `-Goldens` adds them; `--all` runs everything in the one app). `-Fast` skips mu-Tant and mu-Toni. Each suite ends with its slowest tests, so a slow one is easy to find.
    - **Goldens are a gate for behaviour-preserving moves, not for every build** (owner, 2026-10-31). Record them at a stage boundary (or on the commit just before a refactor); while sounds are changing they stay stale and their failures are not chased. They run only when the audio path changed, in Release or with a long cap (the Debug mu-Tant and mu-Toni runs exceed 5 minutes). The saved-state hash (`*.state.hash`) is information only: the comparison ignores it, the audio, peak and MIDI lines are the gate.
 2. **Reviews.**
-   - The `dsp-controller` is **not** called routinely. Read audio-thread changes carefully yourself; call it only when the owner asks or the change is genuinely risky (new audio-thread locking or allocation, a new lock-free structure).
-   - Other reviewers (`ux-controller`, `architecture-steward`) are called when a decision is truly new, not for every step of a feature. One combined pass per feature, no re-review rounds for minor findings.
+   - The `dsp-steward` is **not** called routinely. Read audio-thread changes carefully yourself; call it only when the owner asks or the change is genuinely risky (new audio-thread locking or allocation, a new lock-free structure).
+   - Other reviewers (`ux-steward`, `architecture-steward`) are called when a decision is truly new, not for every step of a feature. One combined pass per feature, no re-review rounds for minor findings.
 3. **Builds.**
    - Focused builds while working. One full Debug build of all products when the owner needs something to try or at a real stage boundary. Release only when the owner says.
    - Build once after a merge, not once per agent step.
 4. **Agents and worktrees.**
    - Edit directly in the main checkout for small items and use the existing incremental build. Use an isolated worktree only for a large piece of work running in parallel.
    - A worktree is a full copy with its own build (5 to 16 GB). Remove it as soon as its branch is merged.
-5. **Backlog and docs.** Batch the backlog update at the end of a round (one `backlog-administrator` call), not after each step. Docs and manuals follow the work in a batch, not per step.
+5. **Backlog and docs.** Batch the backlog update at the end of a round (one `backlog-steward` call), not after each step. Docs and manuals follow the work in a batch, not per step.
 6. **Scope.** No large new feature while the Open list is long, unless the owner asks for it.
 7. **Messages.** Short. No recaps of what the owner can already see. Ask the owner only what genuinely needs them.
 
