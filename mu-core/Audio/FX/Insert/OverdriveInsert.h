@@ -69,7 +69,7 @@ public:
             for (int ch = 0; ch < nChState; ++ch)
             {
                 float in = chans[ch][i];
-                if (! std::isfinite(in)) in = 0.0f;   // a NaN or Inf must not latch in the filter states
+                in = std::isfinite(in) ? juce::jlimit(-1.0e4f, 1.0e4f, in) : 0.0f;   // a NaN or Inf must not latch in the filter states, nor a huge sample overflow them
                 const float x  = in * pg + b;
                 const float sat = adaa[ch].process(x);
                 const float centred = sat - restingOffset;

@@ -30,7 +30,9 @@ struct Adaa1Tanh
         return sat;
     }
 
-    void reset() noexcept { xPrev = 0.0f; }
+    // The previous input a fresh stream is taken to start from; a caller whose silence is not 0 (an offset before the curve) passes it,
+    // so the first sample has no step from 0.
+    void reset(float x0 = 0.0f) noexcept { xPrev = x0; }
 
 private:
     float xPrev = 0.0f;

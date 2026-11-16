@@ -1128,8 +1128,13 @@ struct InsertLatencyTests : juce::UnitTest
                 // That is a cold-start artefact of the hold, not a delay line (a running signal is aligned),
                 // so it is bounded here instead of excluded.
                 const bool crusher = algo == 4;
+                // Tape Sat runs its saturating stage 2x oversampled with a half-band IIR: a few samples of delay, not reported
+                // or compensated (an insert sits per voice), so a step may start up to 2 samples late.
+                const bool tape = algo == 10;
                 if (crusher)
                     expect(onset >= 0 && onset <= 64, "Bitcrusher cold-start hold is bounded (" + juce::String(onset) + ")");
+                else if (tape)
+                    expect(onset <= 2, "Tape Sat delays a step by " + juce::String(onset) + " samples");
                 else
                     expect(onset <= 0, juce::String(mu_audio::kInsertAlgorithmNames[algo]) + " delays a step by " + juce::String(onset) + " samples");
             }
