@@ -35,7 +35,9 @@ public:
     // The sample `delaySamples` behind the newest one (clamped to the line's range).
     float read(float delaySamples) const noexcept
     {
-        const float d  = std::clamp(delaySamples, 1.0f, (float) (size - 4));
+        // Floor of 2 samples so the Hermite taps never reach the oldest slot; a NaN fails the test and takes the floor.
+        if (! (delaySamples >= 2.0f)) delaySamples = 2.0f;
+        const float d  = std::min(delaySamples, (float) (size - 4));
         const float rp = (float) write - d;
         const int   i1 = (int) std::floor(rp);
         const float fr = rp - (float) i1;

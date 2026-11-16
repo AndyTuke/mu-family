@@ -62,7 +62,7 @@ public:
         for (int c = 0; c < 2; ++c)
         {
             const float lfo = std::sin(juce::MathConstants<float>::twoPi * (phase + (c == 0 ? 0.0f : offset)));
-            wet[c] = line[c].read(std::max(1.0f, centreS * (1.0f + depthNow * lfo)));
+            wet[c] = line[c].read(std::max(2.0f, centreS * (1.0f + depthNow * lfo)));
             // The tanh keeps even 95 % feedback from running away on loud input.
             line[c].push(in[c] + std::tanh(feed[c] * fb));
             feed[c] = wet[c];
