@@ -64,10 +64,12 @@ public:
         const int nChState = juce::jmin(nCh, 2);   // state is kept for two channels; extra channels pass through
         if (nChState <= 0 || ns <= 0 || oversampling == nullptr) return;
         // Slot 0 = Drive 0..100, Slot 1 = Output -24..0 dB, Slot 2 = Head Bump 0..100 %, Slot 3 = Tone 200..20000 Hz (log).
-        const float drive    = insertSlot(p, 0);
-        const float outputDb = insertSlot(p, 1);
-        const float bump     = juce::jlimit(0.0f, 100.0f, insertSlot(p, 2)) / 100.0f;
-        const float toneHz   = juce::jlimit(200.0f, 20000.0f, insertSlot(p, 3));
+        // Each knob is read through finiteOr: a NaN passes through jlimit unchanged and would poison the always-running bump filter.
+        auto finiteOr = [](float v, float fallback) { return std::isfinite(v) ? v : fallback; };
+        const float drive    = juce::jlimit(0.0f, 100.0f, finiteOr(insertSlot(p, 0), 30.0f));
+        const float outputDb = juce::jlimit(-24.0f, 0.0f, finiteOr(insertSlot(p, 1), 0.0f));
+        const float bump     = juce::jlimit(0.0f, 100.0f, finiteOr(insertSlot(p, 2), 0.0f)) / 100.0f;
+        const float toneHz   = juce::jlimit(200.0f, 20000.0f, finiteOr(insertSlot(p, 3), 20000.0f));
         const float preGain  = std::pow(10.0f, drive * 0.012f);   // 0..100 -> 1..~16x (0..24 dB)
         const float outGain  = std::pow(10.0f, outputDb / 20.0f) / std::sqrt(preGain);
         const float dcCoeff  = 1.0f - (2.0f * juce::MathConstants<float>::pi * 20.0f / (float) currentSampleRate);
