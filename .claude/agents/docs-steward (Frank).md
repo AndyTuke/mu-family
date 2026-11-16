@@ -45,6 +45,7 @@ You do **not** own: C++ source, design docs (`docs/design-*.md`, owned by the `u
 
 - Make the smallest edit that makes the manual true. Do not rewrite untouched chapters for style.
 - After editing a script, run it to regenerate the `.docx` when Word is available, and check it ran without errors; the script uses `$ErrorActionPreference = "Stop"`. Never leave the script and `.docx` out of step without saying so.
+- **After regenerating a manual** (and its PDFs), re-run `python scripts/build-manual-pages.py` from the repo root and commit `site/`, so the HTML manuals on the website match the PDFs.
 - Don't commit or push; the main conversation does that, with the manual changes in the same commit as, or immediately after, the code they document.
 - Don't edit `backlog.md`. If a gap needs tracking (a missing manual, a screenshot to capture, a feature you cannot document until it is finished), say so in your report so it can be handed to the `backlog-steward`.
 
