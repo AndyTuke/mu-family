@@ -51,7 +51,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 
 **Website and services**
 - Static HTML site in `site/`, hosted on GitHub Pages (published by the dispatch-only `publish-site.yml` workflow; Netlify was dropped 2026-11-15). Local preview: `tests/scripts/serve-site.ps1`.
-- Site work happens on the local branch `site-local` in a separate worktree (`D:\Dev\mu-site`) and is merged to `main` in one batch (`.claude/agents/web-steward.md`).
+- Site work happens on the local branch `site-local` in a separate worktree (`D:\Dev\mu-site`) and is merged to `main` in one batch (`.claude/agents/web-steward (Ernie).md`).
 - Sales and downloads: Lemon Squeezy fixed-price checkout (£20, mu-Tronic £30); zips from GitHub Releases (`site/download.html`, each product's `Source/License/LicenseKey.h`). Mailing list: MailerLite embedded form (`site/download.html`).
 
 ## Claude Code setup
