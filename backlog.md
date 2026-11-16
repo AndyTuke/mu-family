@@ -1,6 +1,6 @@
 # Issues
 
-**Tally (updated 2026-11-15): Open 0 · On Hold 4 · Closed 1756 · Total 1760**
+**Tally (updated 2026-11-16): Open 1 · On Hold 4 · Closed 1756 · Total 1761**
 
 **Status key:** ✅ Closed | 🔴 Open | 🟡 On Hold (deferred, blocked, or pending external action)
 
@@ -12,6 +12,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 | # | Description | Status | Closed Build |
 |---|---|---|---|
+| 1817 | **[mu-core/fx] Merge the duplicated Chorus, Flanger and Phaser (insert and send versions) into one common effect collection.** P2 · logged by Andy 2026-11-16 (via Claude) · Details: today each effect has two implementations: `mu-core/Audio/FX/Send/{Chorus,Flanger,Phaser}Effect.h` (richer, e.g. Chorus up to 4 voices and spread; run through `EffectAlgorithmBase::processInner` with a sendMode wet-only flag, defined by `FXAlgorithmRegistry::effectAlgorithms()`) and `mu-core/Audio/FX/Insert/{Chorus,Flanger,Phaser}Insert.h` (simpler single-LFO versions on the four generic insert knobs via `InsertAlgorithmBase`). Andy's decisions: (1) one folder `FX/Algorithms/` holding one class per effect, each marked insert, send or both; (2) `SpringReverb.h` and `TapeSpringEcho.h` move out of the FX root into `FX/Engines/` (their wrapper `TapeSpringInsert` stays an algorithm); (3) one DSP core per effect shared by both hosts; the insert has only four knobs, so any send parameter that does not fit (e.g. Chorus voice count) is FIXED to a chosen value in insert mode while the send keeps all parameters; (4) the richer send sound wins, old insert presets may sound different (no migration). Done when: one implementation per effect, both hosts use it, mu-core tests green including the existing Chorus/Flanger/Phaser tests ported, a focused Debug build of one product using each host works, `design-fx.md` and `design-naming.md` updated. Not built or run. · Needs: Ted (structure), Bert (audio-thread), Fred (tests) | 🔴 Open | — |
 
 ## 🟡 On Hold
 
