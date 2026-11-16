@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 25;
+inline constexpr int kInsertAlgoCount = 30;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -70,8 +70,9 @@ inline const char* const kNoteNames[12]    = { "C","C#","D","D#","E","F","F#","G
 inline const char* const kWaveNames[4]     = { "Saw","Square","White","Pink" };
 inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 inline const char* const kTremoloShapeNames[3] = { "Sine","Triangle","Square" };
+inline const char* const kStutterDirNames[3]   = { "Fwd","Rev","Alt" };
 
-// Per-algorithm slot table. 25 rows × 4 cols.
+// Per-algorithm slot table. 30 rows × 4 cols.
 //
 // Source order MUST match the index order of InsertProcessor::dispatch[] /
 // mu_audio::kInsertAlgorithmNames so a single integer dispatches the
@@ -230,6 +231,36 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Output", -24.0f, 0.0f,   SkewMode::Linear, "dB" },
       { "Bias",   0.0f,   100.0f, SkewMode::Linear, "%" },
       { "Sag",    0.0f,   100.0f, SkewMode::Linear, "%" } },
+
+    // -- 25 Comb -- Freq / Feedback / Damping / Mix ---------------------
+    { { "Freq",     20.0f,  5000.0f, SkewMode::Log,    "Hz", nullptr, 0, true },
+      { "Feedback", -95.0f, 95.0f,   SkewMode::Linear, "%" },
+      { "Damping",  0.0f,   100.0f,  SkewMode::Linear, "%" },
+      { "Mix",      0.0f,   100.0f,  SkewMode::Linear, "%" } },
+
+    // -- 26 FreqShift -- Shift / Fine / Feedback / Mix ------------------
+    { { "Shift",    -1000.0f, 1000.0f, SkewMode::Linear, "Hz" },
+      { "Fine",     -20.0f,   20.0f,   SkewMode::Linear, "Hz" },
+      { "Feedback", 0.0f,     80.0f,   SkewMode::Linear, "%" },
+      { "Mix",      0.0f,     100.0f,  SkewMode::Linear, "%" } },
+
+    // -- 27 Formant -- Vowel / Shift / Resonance / Mix ------------------
+    { { "Vowel",     0.0f,   100.0f, SkewMode::Linear, "%" },
+      { "Shift",     -12.0f, 12.0f,  SkewMode::Linear, "st" },
+      { "Resonance", 0.0f,   100.0f, SkewMode::Linear, "%" },
+      { "Mix",       0.0f,   100.0f, SkewMode::Linear, "%" } },
+
+    // -- 28 Stutter -- Size / Repeat / Direction / Mix ------------------
+    { { "Size",      5.0f, 500.0f, SkewMode::Log,     "ms", nullptr, 0, true },
+      { "Repeat",    0.0f, 100.0f, SkewMode::Linear,  "%" },
+      { "Direction", 0.0f, 2.0f,   SkewMode::IntStep, "", kStutterDirNames, 0 },
+      { "Mix",       0.0f, 100.0f, SkewMode::Linear,  "%" } },
+
+    // -- 29 LoFi -- Wobble / Noise / Crackle / Tone ---------------------
+    { { "Wobble",  0.0f,   100.0f,   SkewMode::Linear, "%" },
+      { "Noise",   0.0f,   100.0f,   SkewMode::Linear, "%" },
+      { "Crackle", 0.0f,   100.0f,   SkewMode::Linear, "%" },
+      { "Tone",    500.0f, 20000.0f, SkewMode::Log,    "Hz", nullptr, 0, true } },
 };
 
 // Tempo sync (the insert's own Sync switch, APVTS suffix insSync): which slot turns into sixteenth-note steps when it is on,
@@ -246,6 +277,11 @@ inline constexpr int kInsertSyncSlot[kInsertAlgoCount] = {
     0,    // 22 AutoPan   : Rate
     -1,   // 23 Gate
     -1,   // 24 Waveshaper
+    -1,   // 25 Comb
+    -1,   // 26 FreqShift
+    -1,   // 27 Formant
+    0,    // 28 Stutter   : Size
+    -1,   // 29 LoFi
 };
 inline bool insertHasSync(int algoIndex) noexcept
 {
@@ -311,6 +347,11 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*22 AutoPan     */ { 0.5f,    60.0f,   0.0f,   0.0f     },
     /*23 Gate        */ { -40.0f,  -60.0f,  1.0f,   150.0f   },
     /*24 Waveshaper  */ { 30.0f,   0.0f,    30.0f,  30.0f    },
+    /*25 Comb        */ { 220.0f,  70.0f,   30.0f,  50.0f    },
+    /*26 FreqShift   */ { 60.0f,   0.0f,    0.0f,   50.0f    },
+    /*27 Formant     */ { 0.0f,    0.0f,    40.0f,  100.0f   },
+    /*28 Stutter     */ { 125.0f,  50.0f,   0.0f,   100.0f   },
+    /*29 LoFi        */ { 25.0f,   0.0f,    0.0f,   6000.0f  },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value

@@ -60,6 +60,11 @@ inline const char* const kInsertAlgorithmNames[] = {
     "AutoPan",      // 22
     "Gate",         // 23
     "Waveshaper",   // 24
+    "Comb",         // 25
+    "FreqShift",    // 26
+    "Formant",      // 27
+    "Stutter",      // 28
+    "LoFi",         // 29
     nullptr
 };
 
@@ -253,18 +258,23 @@ inline constexpr InsertMenuEntry kInsertMenu[] = {
     {  4, "Bitcrusher",  30 },
     { 17, "Chorus",      35 },
     {  5, "Clipper",     40 },
+    { 25, "Comb",        45 },
     {  7, "Compressor",  50 },
     { 18, "Flanger",     55 },
     {  3, "Fold",        60 },
+    { 27, "Formant",     62 },
+    { 26, "Freq Shift",  64 },
     { 23, "Gate",        65 },
     {  2, "Hard Clip",   70 },
     { 11, "Karplus",     80 },
     {  8, "Limiter",     90 },
+    { 29, "Lo-Fi",       95 },
     { 14, "Overdrive",  100 },
     { 19, "Phaser",     102 },
     { 20, "Pitch Delay", 104 },
     {  9, "Ring Mod",   110 },
     {  1, "Soft Clip",  120 },
+    { 28, "Stutter",    122 },
     { 15, "Tape Delay", 125 },
     { 16, "Tape Spring", 126 },
     { 10, "Tape Sat",   130 },

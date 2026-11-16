@@ -26,6 +26,11 @@
 #include "Audio/FX/Algorithms/AutoPanInsert.h"
 #include "Audio/FX/Algorithms/GateInsert.h"
 #include "Audio/FX/Algorithms/WaveshaperInsert.h"
+#include "Audio/FX/Algorithms/CombInsert.h"
+#include "Audio/FX/Algorithms/FreqShiftInsert.h"
+#include "Audio/FX/Algorithms/FormantInsert.h"
+#include "Audio/FX/Algorithms/StutterInsert.h"
+#include "Audio/FX/Algorithms/LoFiInsert.h"
 
 InsertProcessor::InsertProcessor()
 {
@@ -74,6 +79,11 @@ InsertProcessor::InsertProcessor()
     dispatch[22] = add(mu_audio::makeInsert<mu_audio::AutoPanInsert>());
     dispatch[23] = add(mu_audio::makeInsert<mu_audio::GateInsert>());
     dispatch[24] = add(mu_audio::makeInsert<mu_audio::WaveshaperInsert>());
+    dispatch[25] = add(mu_audio::makeInsert<mu_audio::CombInsert>());
+    dispatch[26] = add(mu_audio::makeInsert<mu_audio::FreqShiftInsert>());
+    dispatch[27] = add(mu_audio::makeInsert<mu_audio::FormantInsert>());
+    dispatch[28] = add(mu_audio::makeInsert<mu_audio::StutterInsert>());
+    dispatch[29] = add(mu_audio::makeInsert<mu_audio::LoFiInsert>());
 }
 
 void InsertProcessor::prepare(double sampleRate, int blockSize)
