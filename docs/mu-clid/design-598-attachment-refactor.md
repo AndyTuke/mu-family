@@ -18,7 +18,7 @@ Per the original #598 audit, the migration is mechanical refactor with significa
 
 ## Current pattern (the manual model)
 
-Every UI control follows the same five-step manual wiring. Example — `ampDec` in [AmpSubsection.cpp](../Source/UI/Voice/AmpSubsection.cpp):
+Every UI control follows the same five-step manual wiring. Example — `ampDec` in [AmpSubsection.cpp](../../mu-clid/Source/UI/Voice/AmpSubsection.cpp):
 
 ```cpp
 // (1) Slider setup — range, skew, default
@@ -88,12 +88,12 @@ Counted from current build at v1.0.606:
 
 | Subsection | Controls | Custom widgets | Notes |
 |---|---|---|---|
-| [PitchSubsection](../Source/UI/Voice/PitchSubsection.cpp) | 9 knobs | — | All `KnobWithLabel`, all on JUCE Sliders |
-| [FilterSubsection](../Source/UI/Voice/FilterSubsection.cpp) | 8 knobs, 1 dropdown | filterType uses `DropdownSelect` | Cutoff has unit Hz↔kHz switch via `textFromValueFunction` |
-| [AmpSubsection](../Source/UI/Voice/AmpSubsection.cpp) | 9 knobs | — | Level knob has dB↔gain conversion in lambda |
-| [InsertSubsection](../Source/UI/Voice/InsertSubsection.cpp) | 4 generic knobs, 1 dropdown | algo uses `DropdownSelect` | Per-algo skew + label come from `kInsertAlgoSlots` — already done via `mu_ui::configureKnobFromSlot` |
-| [EuclideanPanel](../Source/UI/EuclideanPanel.cpp) | 21 knobs, 5 segments, 1 dropdown | `SegmentControl`, `DropdownSelect`, dynamic ranges (hits/rotate depend on stepsX) | Most complex — the dynamic range case forces an attachment-rebuild on stepsX change |
-| [ModulatorPanel / ModulatorEditor](../Source/UI/ModulatorEditor.cpp) | 2 dropdowns, 1 segment, depth/curve slider pair per assignment row | All custom widgets; `NudgeInput` is custom too | Assignment rows are dynamic — created/destroyed as user adds/removes |
+| [PitchSubsection](../../mu-clid/Source/UI/Voice/PitchSubsection.cpp) | 9 knobs | — | All `KnobWithLabel`, all on JUCE Sliders |
+| [FilterSubsection](../../mu-clid/Source/UI/Voice/FilterSubsection.cpp) | 8 knobs, 1 dropdown | filterType uses `DropdownSelect` | Cutoff has unit Hz↔kHz switch via `textFromValueFunction` |
+| [AmpSubsection](../../mu-clid/Source/UI/Voice/AmpSubsection.cpp) | 9 knobs | — | Level knob has dB↔gain conversion in lambda |
+| [InsertSubsection](../../mu-core/UI/Voice/InsertSubsection.cpp) | 4 generic knobs, 1 dropdown | algo uses `DropdownSelect` | Per-algo skew + label come from `kInsertAlgoSlots` — already done via `mu_ui::configureKnobFromSlot` |
+| [EuclideanPanel](../../mu-core/UI/EuclideanPanel.cpp) | 21 knobs, 5 segments, 1 dropdown | `SegmentControl`, `DropdownSelect`, dynamic ranges (hits/rotate depend on stepsX) | Most complex — the dynamic range case forces an attachment-rebuild on stepsX change |
+| [ModulatorPanel / ModulatorEditor](../../mu-core/UI/ModulatorEditor.cpp) | 2 dropdowns, 1 segment, depth/curve slider pair per assignment row | All custom widgets; `NudgeInput` is custom too | Assignment rows are dynamic — created/destroyed as user adds/removes |
 
 Total: **~50 controls per rhythm editor instance**, of which **~10 are not native JUCE controls** (SegmentControl, DropdownSelect, NudgeInput).
 

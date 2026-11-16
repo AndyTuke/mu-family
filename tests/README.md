@@ -257,7 +257,7 @@ resulting change over time. Gotchas learned building these:
 
 Deterministic unit tests (JUCE `UnitTest`) over pure logic — migrations, swap
 boundaries, MIDI maps, skew math. They live in
-[Source/Tests/](../Source/Tests/) and link into the `mu-clid-tests` console app:
+Source/Tests/ and link into the `mu-clid-tests` console app:
 
 ```bash
 cmake --build build --config Debug --target mu-clid-tests

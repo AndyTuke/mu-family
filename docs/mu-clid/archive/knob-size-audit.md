@@ -14,7 +14,7 @@ Formula: `kW × rowH` where `kW = panelWidth / 5`, `rowH = (panelHeight - gap) /
 
 At a typical 480-wide voice panel: **96 × ~75 px**.
 
-Consumers (sites in [Source/UI/Voice/](../Source/UI/Voice/)):
+Consumers (sites in Source/UI/Voice/):
 
 - **PitchSubsection** — `pitchOctave`, `pitchSemi`, `pitchFine`, `pitchDepth`, `pitchAtk`, `pitchDec`, `pitchSus`, `pitchRel`.
 - **FilterSubsection** — `filterCutoff`, `filterRes`, `filterDepth`, `filterAtk`, `filterDec`, `filterSus`, `filterRel`. (`filterType` is `2 * kW × rowH/2` — a dropdown, not a knob, but lives in this grid.)
@@ -26,7 +26,7 @@ Formula: same as Bucket A but `kW = panelWidth / 4` (Insert has only 4 columns).
 
 At a typical 480-wide voice panel: **120 × ~75 px**.
 
-Consumers ([Source/UI/Voice/InsertSubsection.cpp](../Source/UI/Voice/InsertSubsection.cpp)):
+Consumers ([Source/UI/Voice/InsertSubsection.cpp](../../../mu-core/UI/Voice/InsertSubsection.cpp)):
 
 - `insertDrive`, `insertOutput`, `insertDither`, `insertTone`.
 
@@ -38,14 +38,14 @@ Formula: fixed `kKnobW = 72 px`, height = row height (passed in by parent).
 
 Consumers:
 
-- [FXRow.cpp](../Source/UI/FXRow.cpp) — every param knob added to the row.
-- [DelayRow.cpp](../Source/UI/DelayRow.cpp) — `multipleKnob`, `feedbackKnob`, `spreadKnob`, `dirtKnob`, plus `msKnob` at `kMsW = 72` (declared separately but identical width).
+- [FXRow.cpp](../../../mu-core/UI/FXRow.cpp) — every param knob added to the row.
+- [DelayRow.cpp](../../../mu-core/UI/DelayRow.cpp) — `multipleKnob`, `feedbackKnob`, `spreadKnob`, `dirtKnob`, plus `msKnob` at `kMsW = 72` (declared separately but identical width).
 
 ### Bucket D — Euclidean Panel main knobs
 
 Formula: `eW × ctrlH` where `eW = colW * 0.9`, `colW = innerW / 7`, `ctrlH = rowH - kLabelH`.
 
-Consumers ([Source/UI/EuclideanPanel.cpp](../Source/UI/EuclideanPanel.cpp)):
+Consumers ([Source/UI/EuclideanPanel.cpp](../../../mu-core/UI/EuclideanPanel.cpp)):
 
 - `stepsA/B/C`, `hitsA/B/C`, `rotA/B/C` — three identical knobs per row, three rows.
 
@@ -55,7 +55,7 @@ Formula: `pW × (knobH - mP)` where `pW = (innerW - eW*3) / 4`, `knobH = ctrlH -
 
 The "minus mP" on height makes these slightly shorter than Bucket D — the switch sits under them in the same column.
 
-Consumers ([Source/UI/EuclideanPanel.cpp](../Source/UI/EuclideanPanel.cpp)):
+Consumers ([Source/UI/EuclideanPanel.cpp](../../../mu-core/UI/EuclideanPanel.cpp)):
 
 - `prePadA/B/C`, `postPadA/B/C`, `insertStA/B/C`, `insertLenA/B/C`.
 
@@ -68,7 +68,7 @@ Formula: `stripW × variable-height` where the height depends on which row the k
 - `sendEffect`, `sendDelay`, `sendReverb` height = `sendH`.
 - `panKnob` height = `panH`.
 
-Consumers ([Source/UI/MixerChannel.cpp](../Source/UI/MixerChannel.cpp)). All strip-full-width, vertically stacked.
+Consumers ([Source/UI/MixerChannel.cpp](../../../mu-core/UI/MixerChannel.cpp)). All strip-full-width, vertically stacked.
 
 ### Bucket G — Mixer channel insert knob
 
@@ -76,11 +76,11 @@ Formula: dynamic — `ipW × min(60, availH / nRows)` for the 4-knob case, halve
 
 EQ mode lays out 4 knobs in 4 stacked single-column rows; non-EQ mode lays out the visible knobs in a 2-column grid. Different visible-knob counts (1, 3, or 4) produce different row heights, capped at 60 px.
 
-Consumers ([Source/UI/MixerChannel.cpp:270-305](../Source/UI/MixerChannel.cpp#L270)) — `insDrive(2)`, `insOutput(2)`, `insTone(2)`, `insExtra(2)` for both insert slots.
+Consumers ([Source/UI/MixerChannel.cpp:270-305](../../../mu-core/UI/MixerChannel.cpp#L270)) — `insDrive(2)`, `insOutput(2)`, `insTone(2)`, `insExtra(2)` for both insert slots.
 
 ### Bucket H — Misc fixed-size
 
-- **GRMeter** ([Source/UI/Components/GRMeter.h](../Source/UI/Components/GRMeter.h)) — narrow strip beside the fader (`grW × faderH`). Not really a knob but bundled in the channel-strip controls.
+- **GRMeter** ([Source/UI/Components/GRMeter.h](../../../mu-core/UI/Components/GRMeter.h)) — narrow strip beside the fader (`grW × faderH`). Not really a knob but bundled in the channel-strip controls.
 - **EuclideanPanel logic/legato segments** — `kLegatoW × (kLogicH-6)` and `logicW × (kLogicH-6)`. Pills, not knobs.
 
 ## Summary
@@ -97,4 +97,4 @@ A practical target is **three canonical knob sizes**:
 
 Bucket H (meters/pills) stays separate because they aren't knobs.
 
-To implement consolidation, factor a `kStandardKnobW`, `kCompactKnobW`, `kWideKnobW` set of constants into [Source/UI/Components/MuClidLookAndFeel.h](../Source/UI/Components/MuClidLookAndFeel.h) and route every `setBounds` through them. This is a multi-file edit — keep it as a separate issue with one PR per bucket so regressions can be bisected.
+To implement consolidation, factor a `kStandardKnobW`, `kCompactKnobW`, `kWideKnobW` set of constants into Source/UI/Components/MuClidLookAndFeel.h and route every `setBounds` through them. This is a multi-file edit — keep it as a separate issue with one PR per bucket so regressions can be bisected.

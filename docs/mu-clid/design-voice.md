@@ -164,7 +164,7 @@ Filter envelope + pitch envelope are always noteOff'd. Filter / insert state is 
 
 ## Persistence
 
-All voice-chain state round-trips through APVTS via the declarative [mu-clid/Source/Persistence/RhythmParamTable.h](../../mu-clid/Source/Persistence/RhythmParamTable.h) table. Adding a new per-rhythm parameter means: (1) add one entry there + (2) one matching APVTS layout line in `createParameterLayout`. Every preset save/load/sync path iterates the same table.
+All voice-chain state round-trips through APVTS via the declarative [mu-core/Persistence/RhythmParamTable.h](../../mu-core/Persistence/RhythmParamTable.h) table. Adding a new per-rhythm parameter means: (1) add one entry there + (2) one matching APVTS layout line in `createParameterLayout`. Every preset save/load/sync path iterates the same table.
 
 Preset format details + algorithm-name contracts: [docs/preset-format.md](preset-format.md).
 
@@ -173,6 +173,6 @@ Preset format details + algorithm-name contracts: [docs/preset-format.md](preset
 ## Related documents
 
 - [design-627-filter-then-amp.md](design-627-filter-then-amp.md) — Stage 34 signal-flow refactor + the T12 chain reorder.
-- [design-seamless-hotswap.md](design-seamless-hotswap.md) — Stage 34 rhythm hot-swap mechanics (closed).
+- [design-seamless-hotswap.md](archive/design-seamless-hotswap.md) — Stage 34 rhythm hot-swap mechanics (closed).
 - [../design-fx.md](../design-fx.md) — global FX chain (Effect / Delay / Reverb sends + master insert; family-shared).
 - [preset-format.md](preset-format.md) — `.muRhythm` / `.muClid` XML schema.

@@ -1,6 +1,6 @@
 # #627 — Filter-then-Amp signal-flow refactor
 
-> **Revision (T12, v1.0.609)**: the amp env was moved from the *end* of the chain to **between filter and insert** so feedback-based insert FX (Karplus, etc.) can ring past env idle from their own internal state. Filter resonance / comb feedback in the filter stage is still env-gated (T11 behaviour preserved). Updated chain: `sample → filter → ampEnv → insert → output`. Retired engines hold a 2 s post-env-idle drain budget so audible insert tails complete before engine destruction in hot-swap. See [Source/Audio/VoiceEngine.cpp](../Source/Audio/VoiceEngine.cpp) for the current authoritative wiring.
+> **Revision (T12, v1.0.609)**: the amp env was moved from the *end* of the chain to **between filter and insert** so feedback-based insert FX (Karplus, etc.) can ring past env idle from their own internal state. Filter resonance / comb feedback in the filter stage is still env-gated (T11 behaviour preserved). Updated chain: `sample → filter → ampEnv → insert → output`. Retired engines hold a 2 s post-env-idle drain budget so audible insert tails complete before engine destruction in hot-swap. See [Source/Audio/VoiceEngine.cpp](../../mu-core/Audio/VoiceEngine.cpp) for the current authoritative wiring.
 
 ## Goal
 
@@ -73,11 +73,11 @@ Each step builds incrementally and is testable on its own.
 
 ### Step 1 — Collapse `ampEnvs[MaxVoices]` to single `ampEnv`
 
-**[Source/Audio/VoiceEngine.h](../Source/Audio/VoiceEngine.h)**
+**[Source/Audio/VoiceEngine.h](../../mu-core/Audio/VoiceEngine.h)**
 - Replace `std::array<juce::ADSR, MaxVoices> ampEnvs` with `juce::ADSR ampEnv`
 - Keep `voiceBuffers` for now (Step 2 removes it)
 
-**[Source/Audio/VoiceEngine.cpp](../Source/Audio/VoiceEngine.cpp)**
+**[Source/Audio/VoiceEngine.cpp](../../mu-core/Audio/VoiceEngine.cpp)**
 - `prepareToPlay`: replace the per-voice loop with `ampEnv.setSampleRate(sampleRate)`
 - `trigger`: replace `auto& ampEnv = ampEnvs[claimedIdx]; ampEnv.reset(); ampEnv.noteOn();` with `ampEnv.reset(); ampEnv.noteOn();` (no slot indexing)
 - `syncEnvelopes`: configure single `ampEnv` with `activeParams.ampEnv*`
@@ -93,13 +93,13 @@ Each step builds incrementally and is testable on its own.
 
 ### Step 2 — Move envelope application to end of chain
 
-**[Source/Audio/VoiceEngine.cpp](../Source/Audio/VoiceEngine.cpp)** `process()`:
+**[Source/Audio/VoiceEngine.cpp](../../mu-core/Audio/VoiceEngine.cpp)** `process()`:
 - Remove the per-voice `ampEnv.applyEnvelopeToBuffer(voiceBuffers[vi])` calls.
 - Remove `voiceBuffers[vi]` accumulator pattern; voices render directly into `tempBuffer` via `vb.process(...)` with `tempBuffer` as the destination. Could also drop `voiceBuffers` member entirely.
 - After `insertProc.process(tempBuffer)`, add `ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns)`.
 - `output.addFrom` unchanged.
 
-**[Source/Audio/VoiceEngine.h](../Source/Audio/VoiceEngine.h)**:
+**[Source/Audio/VoiceEngine.h](../../mu-core/Audio/VoiceEngine.h)**:
 - Remove `std::array<juce::AudioBuffer<float>, MaxVoices> voiceBuffers` member.
 - Remove its `prepareToPlay` setSize loop.
 
@@ -120,11 +120,11 @@ Each step builds incrementally and is testable on its own.
 
 ### Step 3 — Remove markRetired's filter+insert reset
 
-**[Source/Audio/VoiceEngine.cpp](../Source/Audio/VoiceEngine.cpp)** `markRetired`:
+**[Source/Audio/VoiceEngine.cpp](../../mu-core/Audio/VoiceEngine.cpp)** `markRetired`:
 - Remove `voiceFilter.reset()`, `lowCutFilter.reset()`, `insertProc.reset()`.
 - Keep `ampEnv.noteOff()` + `filterEnv.noteOff()` + `pitchEnv.noteOff()` and the `retired = true` flag.
 
-**[Source/Audio/VoiceEngine.h](../Source/Audio/VoiceEngine.h)**:
+**[Source/Audio/VoiceEngine.h](../../mu-core/Audio/VoiceEngine.h)**:
 - Update the `markRetired` doc-comment to remove the "voiceFilter.reset() + insertProc.reset()" bullet and note that the env-end gate now handles drain.
 
 **Build:** clean.

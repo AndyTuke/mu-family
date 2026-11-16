@@ -45,7 +45,7 @@ The arp is defined by a small parameter set. Confirmed so far:
 
 | Control | Type / range | Meaning |
 |---|---|---|
-| **Scale** | dropdown (12 scales) | The tonal space. Same scale table as mu-tant ([Scales.h](../../mu-tant/Source/Audio/Scales.h)) — Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic-Minor, Pentatonic-Major, Pentatonic-Minor, Blues, Chromatic. |
+| **Scale** | dropdown (12 scales) | The tonal space. Same scale table as mu-tant (Scales.h) — Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic-Minor, Pentatonic-Major, Pentatonic-Minor, Blues, Chromatic. |
 | **Root note** | dropdown (C … B) | The tonic pitch-class. Set by the dropdown, **modulated** (`arp.rootNote` — sequence it with a step-mod), or **live by a played MIDI note** (see "MIDI control"). |
 | **Root octave** | 0 … 8 (integer) | Which octave the root sits in — the base register the arp plays from (mirrors mu-tant's per-osc `octave` 0–8). **Distinct from "Octaves" below** (that's the arp's *span*; this is where it *starts*). A played MIDI note sets this too (full note = pitch-class **and** octave). |
 | **Chord** | dropdown (**APVTS**) | A named chord type from the **Chord library** (see "Chord model") — selects the note pool. Set by the dropdown / DAW automation, or **sequenced with a step-mod** on `arp.chord` (see "Sequencing chord & root"). |

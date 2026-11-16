@@ -54,9 +54,9 @@ short `suspendProcessing` window.
 |---|---|
 | [mu-clid/Source/Plugin/HotSwapStager.h/.cpp](../../mu-clid/Source/Plugin/HotSwapStager.h) | The staging state machine: per-rhythm pending slots + one full-preset pending slot, the store-release/load-acquire handshake, `checkBoundaries` (audio thread) and `processSwaps` (message thread). |
 | [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared **pure** boundary predicates and `SwapTiming` (tested in `mu-core/Tests/SwapTimingTests.cpp`); `mu_clid::hotswap` / `HotSwapBoundary.h` were removed 2026-10-13. |
-| [mu-clid/Source/Persistence/PresetIO.cpp](../../mu-clid/Source/Persistence/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
+| mu-clid/Source/Persistence/PresetIO.cpp | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
 | [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `requestDeferredWork()`; `runDeferredWork` (100 Hz message-thread poll) → `processSwaps`. |
-| [mu-clid/Source/Sequencer/RhythmSequencer.h](../../mu-clid/Source/Sequencer/RhythmSequencer.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
+| [mu-clid/Source/Sequencer/RhythmSequencer.h](../../mu-core/Sequencer/RhythmSequencer.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
 | [mu-core/Audio/MixerEngine.cpp](../../mu-core/Audio/MixerEngine.cpp) | Renders **retired** voice engines (the swap tail) + flags them drained. |
 
 **`HotSwapStager` deliberately stays on `mu_hotswap::Stager`** (decided 2026-10-13). mu-Clid's staged payload is a prebuilt `Rhythm` + `VoiceEngine` plus a full-preset slot, committed with engine install and retire tails; the shared `ProcessorBase::layerSwapper` (`LayerSwapper<ValueTree, 8>`) used by mu-Tant, mu-Toni and mu-On is the APVTS-apply driver and is not a fit. The shared handshake and loop-wrap predicates already come from `mu-core/Plugin/HotSwap.h`, so nothing is duplicated. Do not migrate it to `layerSwapper`; reasoning in [../design-plugin-family.md](../design-plugin-family.md) (stage 7, step 5).

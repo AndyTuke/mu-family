@@ -57,7 +57,7 @@ historical (a single rhythm preset isn't indexed); inside `.muClid` files,
 the same suffixes appear *without* a `r0_` prefix because they're already
 nested under a `Rhythm` child.
 
-The list of suffixes is the canonical [`mu_clid::kRhythmParamDefs[]`](../../mu-clid/Source/Persistence/RhythmParamTable.h)
+The list of suffixes is the canonical [`mu_clid::kRhythmParamDefs[]`](../../mu-core/Persistence/RhythmParamTable.h)
 table. The table is the single source of truth — adding a new per-rhythm
 parameter means adding one entry there + one APVTS-layout entry in
 [`createParameterLayout`](../../mu-clid/Source/Plugin/PluginProcessor_APVTS.cpp). Every preset
