@@ -201,7 +201,9 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 
 **Do not:** make the core blend dry and wet (the phaser insert and send need different blends); give `FXAlgorithmDef` a role field (include cycle); keep the old per-voice delay lines in the core; add the insert's missing send parameters as new insert knobs (four slots is the contract); rename the insert-only classes in bulk.
 
-## Tape saturation rework: insertAlgo 10 TapeSat (ruled 2026-11-16, Ted; not yet built)
+## Tape saturation rework: insertAlgo 10 TapeSat (ruled 2026-11-16, Ted; built as row 1818, amended 2026-11-16 after measurement: 2x oversampled)
+
+**Amendment 2026-11-16 (Ted), after the first build measured four deviations.** Rulings: (1) aliasing at 9 kHz, Drive 100 was only 3.4 dB under plain tanh (target 6): **changed**, insert 10 runs its saturating stage 2x oversampled, see "Aliasing" below; (2) HF droop of about 2 dB at 10 kHz from the ADAA step average: **fixed by the same change** (at twice the rate the droop at 10 kHz falls to about 0.5 dB); (3) level matching peaks +3.9 dB at Drive 50 with square-root makeup: **accepted**, the family-standard makeup stays and the bound is 4.5 dB (below); (4) Bump 0 skips the biquad and the test checks no lift: **accepted**, skipping is the design, and a bit-identity test against a path that does not exist adds nothing.
 
 **Why.** `TapeSatInsert` today is gain, `tanh`, DC block, one-pole low-pass: a plain soft clip with a tone knob, the same sound as SoftClip and Overdrive (insertAlgo 14, biased-tanh ADAA, the tube-style stage; it stays as it is and this ruling does not copy it). Andy approved a convincing tape model for insert 10. Slot 2 is unused today.
 
@@ -230,9 +232,16 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 
 **Drive and level matching.** `preGain = 10^(Drive/100 * 24/20)`, 1x to about 16x (0 to 24 dB), 15 ms linear smoothing. `outGain = 10^(Output/20) / sqrt(preGain)`: the square-root makeup the family already uses (SoftClip, Overdrive). For a tape-level signal (peak 0.25) this keeps the output within about 3 dB over the whole Drive range, so more drive gives denser and duller sound rather than just louder. The test measures it.
 
-**Aliasing.** No oversampling: first-order ADAA only, as Overdrive and SoftClip. Reason: ADAA gives a useful alias cut with no latency and no filter state; 2x oversampling would double the cost and add latency per voice. The de-emphasis after the curve also lowers folded energy that lands in the highs. The pre-emphasis raises the HF level into the curve, which is the worst case for aliasing, so a test checks it. If listening finds it dirty, the fallback is the existing `OversampledProcessor` at 2x for this algorithm only, ruled then.
+**Aliasing (amended: 2x oversampled, ADAA kept).** The first build (ADAA only, as Overdrive and SoftClip) measured the strongest alias at -17.1 dB against -13.7 dB for plain tanh at 9 kHz, Drive 100, 44.1 kHz: 3.4 dB better, not the 6 dB ruled. The cause is built in: the pre-emphasis lifts the tone about 1.8 dB further into the curve than a bare ADAA tanh sees, and ADAA alone cannot cure that. A cheaper fix does not reach the target: lowering the emphasis gain (+9 to +6 dB) gains about 1 dB and flattens the tape character, and a pre-filter before the shelf cuts the very highs the emphasis exists to saturate. Andy wants a good tape sound, so the ruling is to pay for quality:
+- The **saturating stage runs at 2x**: pre-emphasis, Drive gain and offset, ADAA tanh, de-emphasis. Head bump, DC block, Tone and Output stay at the base rate.
+- Oversampler: `juce::dsp::Oversampling<float>`, 1 stage (2x), `filterHalfBandPolyphaseIIR`, owned by `TapeSatInsert` and created in `prepare` (the second argument, the block size, is already passed; it is currently unnamed). **Not** the FIR equiripple filter that `OversampledProcessor` uses: the FIR adds many samples of latency per voice, which the insert chain has nowhere to compensate; the polyphase IIR halfband costs about 1 to 2 samples. `OversampledProcessor` is not reused because it wraps a whole `AudioBuffer` and fixes the FIR; the insert needs the raw object over the channel subset. Do not change `OversampledProcessor` for this.
+- Shape in `process`: take an `AudioBlock` over the first `nChState` channels, subblock `ns`, `processSamplesUp`, run the stage in the oversampled block, `processSamplesDown`. If `ns` exceeds the prepared block size, loop in chunks; never allocate. Extra channels beyond two pass through, as now.
+- The emphasis pair is prepared at `2 x sampleRate` (its coefficients are rate-aware already), and the Drive smoother runs at the oversampled rate (prepared at `2 x sampleRate`, advanced once per oversampled sample), so the gain ramp keeps its 15 ms time.
+- **Latency.** Insert 10 now adds the halfband group delay (about 1 to 2 samples, under 0.05 ms at 44.1 kHz), not reported and not compensated: inserts are per voice, mixed with other voices and the dry path, and a sub-2-sample offset on one insert type is inaudible. `InsertLatencyTests` in `MixerBlockValueTests.cpp` ("Insert algorithms report zero latency") must therefore not assert zero for `TapeSatInsert`: change that one entry to a measured bound (impulse response peak within 2 samples of the input), keep the zero assertions for the others, and keep the registry check that no algorithm grows a `getLatencySamples()`. Do not add reporting.
+- The oversampler state is part of `reset()` (`oversampling->reset()`), so the reset-equals-fresh test holds.
+- Expected result, to be confirmed by the test: the 9 kHz alias margin over plain tanh grows from 3.4 dB to well above the 6 dB threshold (the halfband removes folded energy that lands in the passband), and the 10 kHz droop falls to within 0.5 dB.
 
-**CPU (audio thread).** Per sample per channel: two first-order shelves (about 8 multiply-adds), one ADAA step (one `log(cosh)` and a divide, or `tanh` when `dx` is tiny), the DC block, one one-pole, plus the bump biquad when on: about 2 to 3 times today's insert (estimate), well below the Compressor or Vocoder. No allocation (all state is a handful of floats), nothing outside `prepare`. Shelf coefficients are set in `prepare`; bump and Tone at block rate, as Tone is today. Keep the `isfinite` guard.
+**CPU (audio thread).** Per sample per channel: the shelf pair and one ADAA step (one `log(cosh)` and a divide, or `tanh` when `dx` is tiny) at twice the sample rate, the halfband up and down filters, the DC block, one one-pole, and the bump biquad when on: about 5 to 6 times the original gain-tanh-low-pass insert (estimate, not measured; the built ADAA-only version was about 2 to 3 times), paid only on a voice that selects TapeSat, and still below the Compressor or Vocoder. Andy accepts the CPU for sound quality here. The oversampler is allocated in `prepare` per instance (a few kB), nothing on the audio thread. No allocation (all state is a handful of floats), nothing outside `prepare`. Shelf coefficients are set in `prepare`; bump and Tone at block rate, as Tone is today. Keep the `isfinite` guard.
 
 ### Knob map (slot ids unchanged, so saved presets load)
 | Slot | Label | Range | Skew | Unit | Role | Default |
@@ -256,21 +265,24 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 ### Build steps (each builds and runs its tests)
 1. Add `Algorithms/Adaa1Tanh.h`; switch `OverdriveInsert.h` to it; existing Overdrive tests unchanged.
 2. Add `Algorithms/TapeEmphasis.h`.
-3. Rewrite `Insert/TapeSatInsert.h` to the path above; `InsertProcessor.cpp` dispatch untouched.
+3. Rewrite `Insert/TapeSatInsert.h` to the path above (built); `InsertProcessor.cpp` dispatch untouched. Step 3b (amendment): add the 2x polyphase-IIR oversampling around the saturating stage, adjust the latency test entry and the aliasing and droop tests.
 4. `InsertSlotConfig.h`: Bump label on row 10 slot 2, defaults row 10, row comment ("Drive / Output / Bump / Tone").
 5. Tests: new `mu-core/Tests/TapeSatTests.cpp`, listed in `mu-core/Tests/CMakeLists.txt`. Product golden renders that use insert 10 are stale on purpose until Andy allows a re-record.
 6. Docs: manual wording (Frank), `tests.md` (Fred), release note.
 
 ### Tests (offline, no listening)
 - Even harmonics: 1 kHz sine at Drive 60, Bump 0: 2nd harmonic above the plain-`tanh` reference (the old class) and below the 3rd; odd harmonics still dominate.
-- HF compresses first: 200 Hz and 8 kHz at the same input level: the 8 kHz gain falls at least 3 dB more than the 200 Hz gain between Drive 0 and Drive 100; at -40 dBFS and Drive 30 the response is flat within 0.5 dB from 100 Hz to 10 kHz.
-- Bump: Bump 100 raises 75 Hz by 3 to 5 dB over Bump 0; Bump 0 is bit-identical to the path without the biquad.
-- Aliasing: 9 kHz sine at Drive 100, 44.1 kHz: the strongest folded component is at least 6 dB below the plain-`tanh` reference.
-- Level matching: RMS of a 0.25-peak 1 kHz sine at Output 0 within 3 dB across Drive 0, 25, 50, 75, 100.
+- HF compresses first: 200 Hz and 8 kHz at the same input level: the 8 kHz gain falls at least 3 dB more than the 200 Hz gain between Drive 0 and Drive 100; at -40 dBFS and Drive 30 the response is flat within 0.5 dB from 100 Hz to 10 kHz (the first build was flat only to 3 kHz and about 2 dB down at 10 kHz; the 2x amendment must restore this).
+- Bump: Bump 100 raises 75 Hz by 3 to 5 dB over Bump 0; Bump 0 adds no lift (the biquad is skipped; no bit-identity test).
+- Aliasing: 9 kHz sine at Drive 100, 44.1 kHz: the strongest folded component is at least 6 dB below the plain-`tanh` reference (first build: 3.4 dB, failed; expected to pass with the 2x amendment; record the measured margin in `tests.md`).
+- Level matching: RMS of a 0.25-peak 1 kHz sine at Output 0 within **4.5 dB** across Drive 0, 25, 50, 75, 100 (ruled 3 dB; the built stage peaks +3.9 dB at Drive 50 with the square-root makeup, exponents 0.6 and 0.65 are no better; accepted).
 - Stability: finite output, no latched state after a NaN or Inf burst, at 44.1, 96 and 192 kHz, block sizes 1, 7, 512 giving the same result within float noise.
+- Latency: the impulse response of insert 10 peaks within 2 samples of the input (replaces the zero-latency assertion for this algorithm only).
 - Reset: after `reset()` a render is bit-identical to a fresh instance's; settled Drive 0 output has no DC (mean below 1e-4).
 - `InsertDSPSmokeTests` and `InsertAlgoTableTests` (labels present, defaults in range) stay green.
 
-**Do not:** copy Overdrive's variable bias knob (Slot 2 is not bias; the asymmetry is fixed and small); add a Jiles-Atherton solver; add oversampling now; put the helpers in `Insert/`; add a mod-target row by hand; change the slot ids or the Tone range.
+**Do not:** copy Overdrive's variable bias knob (Slot 2 is not bias; the asymmetry is fixed and small); add a Jiles-Atherton solver; use the FIR `OversampledProcessor` for insert 10, or report its latency; put the helpers in `Insert/`; add a mod-target row by hand; change the slot ids or the Tone range.
+
+**Status:** built (row 1818, commit 49339805) without oversampling; the 2x amendment above is the open code change, owned by the main conversation.
 
 **Andy decides:** Slot 2 as head Bump (ruled here) or as an asymmetry amount ("Warmth"); first-visit defaults Drive 30 / Bump 30.
