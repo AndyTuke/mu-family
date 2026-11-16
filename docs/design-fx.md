@@ -386,3 +386,123 @@ Slope 1 at `v = 0` on both sides (small signals pass at unity) while the second 
 **Andy decides:** the preset key "Waveshaper" for the valve stage (the menu text could say "Valve" with no other change, but the key must be chosen before release); Sag as the fourth knob (ruled) versus Tone.
 
 **Status:** ruled, not built. Code owned by the main conversation: the numbered edits in section 3, then the tests in section 6.
+
+## Five more inserts: Comb (25), FreqShift (26), Formant (27), Stutter (28), LoFi (29) (ruled 2026-11-16, Ted)
+
+**Why.** Andy approved five more per-voice inserts. All are insert-only. This section settles placement, numbering, every table, the four-knob maps, the sync and no-transport behaviour of Stutter, the real-time rules and the tests, so a coder needs no further decisions. Sections 1, 2 and 5 of "Three new inserts" (own class per effect, `Algorithms/` with `FxUse::Insert`, `makeInsert<A>()`, `...Insert` suffix, finite-input guard, clamped slot reads, 15 ms smoothing snapped at `prepare` and `reset`, no allocation outside `prepare`, denormal flush, reset equals fresh) apply unchanged and are not repeated.
+
+### 1. Files, names, numbers
+```
+mu-core/Audio/FX/Algorithms/
+  CombInsert.h        class mu_audio::CombInsert       insertAlgo 25   preset key "Comb"
+  FreqShiftInsert.h   class mu_audio::FreqShiftInsert  insertAlgo 26   preset key "FreqShift"
+  FormantInsert.h     class mu_audio::FormantInsert    insertAlgo 27   preset key "Formant"
+  StutterInsert.h     class mu_audio::StutterInsert    insertAlgo 28   preset key "Stutter"
+  LoFiInsert.h        class mu_audio::LoFiInsert       insertAlgo 29   preset key "LoFi"
+  HilbertIir.h        struct mu_audio::HilbertIir      shared helper: the all-pass-pair 90 degree network (FreqShift)
+mu-core/Tests/FiveInsertsTests.cpp   (new, listed in Tests/CMakeLists.txt)
+```
+Preset keys are ASCII, no spaces, append-only, never renamed after release. "Comb" does not clash with the filter names `CombPlus` / `CombMinus`: those live in `kFilterTypeNames`, a different table. Menu text may differ from the key and may change freely.
+
+**Edits that must agree** (the `static_assert`s on `kInsertAlgoCount`, `kNumInsertAlgos` and `kInsertMenu` fail the build if one is missed):
+1. `Audio/InsertSlotConfig.h`: `kInsertAlgoCount = 30`; append rows 25..29 to `kInsertAlgoSlots` and `kInsertAlgoDefaults` (section 3); `kInsertSyncSlot`: 25 -> `-1`, 26 -> `-1`, 27 -> `-1`, **28 -> `0`**, 29 -> `-1`; update the "25 rows" comments to 30. Add one name table beside the others: `kStutterDirNames[3] = { "Fwd", "Rev", "Alt" }`.
+2. `Audio/AlgorithmNames.h`: append `"Comb"`, `"FreqShift"`, `"Formant"`, `"Stutter"`, `"LoFi"` (25..29) to `kInsertAlgorithmNames`; menu rows (alphabetical, gaps kept): `{ 25, "Comb", 45 }` (after Clipper 40, before Compressor 50), `{ 27, "Formant", 62 }` (after Fold 60), `{ 26, "Freq Shift", 64 }` (before Gate 65), `{ 29, "Lo-Fi", 95 }` (after Limiter 90), `{ 28, "Stutter", 122 }` (after Soft Clip 120, before Tape Delay 125). Menu names stay short (`MasterColumnFitTests.cpp` measures them).
+3. `Audio/InsertProcessor.h`: `kNumInsertAlgos = 30`; `InsertProcessor.cpp`: five includes and `dispatch[25..29] = add(mu_audio::makeInsert<mu_audio::XInsert>());`.
+4. Nothing per product: the knob driver, menu, master panels, mu-link master FX (`ServerEngine` clamps with `kNumInsertAlgos`), mu-Tant's parameter range and the preset name lookup all read the tables (all mu-core, so `check-core-boundary.ps1` is unaffected).
+5. **Mod targets: no new row.** The knobs are the generic `insert.p1..p4` rows, labelled per algorithm; depth stays a percentage of the knob's range. `check-mod-targets.ps1` and `mu_mod::checks` need no edit.
+6. Tests (section 6). No goldens use these indices; none go stale. `tests.md` (Fred), manuals (Frank), release note (`/notes`) once for the batch.
+
+### 2. Decisions common to the five
+- **No oversampling in any of them.** Comb, FreqShift and Formant are linear (all-pass or low-pass bounded loops); Stutter is a copy; LoFi has no non-linearity. So there is no TapeSat-style halfband latency.
+- **Latency: none reported, none compensated.** Comb, Formant and Stutter add none (Stutter replays audio it already passed; it never looks ahead). FreqShift's all-pass network has phase delay but no look-ahead. LoFi adds up to 2 ms at Wobble 100 and exactly 0 at Wobble 0. Latency test entries (`MixerBlockValueTests.cpp`): Comb, Formant, Stutter and LoFi at Wobble 0: zero; FreqShift: impulse peak within 8 samples; LoFi at Wobble 100: peak within 2.5 ms. Keep the registry check that no algorithm grows `getLatencySamples()`.
+- **Mix.** Comb, FreqShift, Formant and Stutter have Mix in slot 3 (`dry*(1-m) + wet*m`, bit-exact dry at Mix 0, the wet branch skipped). **LoFi has no Mix**: each of its four knobs is an amount that is zero at 0 (Tone is open at 20 kHz), so it is dry/wet by construction. The "has a Mix knob" exemption list in `NewInsertTests.cpp` becomes Tremolo, AutoPan, Gate, Waveshaper, **LoFi**.
+- **Random sources** (Stutter's hit roll, LoFi's drift, hiss and crackle): one xorshift32 per insert, seeded from `setSlotIndex` as Bitcrusher does, restarted in `reset()`, advanced per sample (so output does not depend on block size). Two layers do not produce the same noise; reset equals fresh.
+- **Memory.** Every layer's `InsertProcessor` builds all algorithms in `prepare`, so each buffer is paid by every layer whether or not the algorithm is selected. Allocate for the prepared rate only (never a blind 192 kHz; `prepare` runs again on a rate change). At 192 kHz, two channels: Comb 50 ms (77 kB), LoFi 4 ms (6 kB), Stutter 2 s (3 MB; 0.8 MB at 48 kHz), FreqShift and Formant none. Stutter is the only one worth watching; it is capped at 2 s on purpose and is the first candidate for lazy allocation if the layer count ever makes it matter (design-runtime-counts).
+- **Block size and rate.** Results match within float noise for block sizes 1, 7, 512 at 44.1, 96 and 192 kHz; an algorithm with a buffer shorter than `ns` loops in chunks.
+
+### 3. Knob maps (slot ids fixed from first release; presets store the normalised value, so ranges and skews must not change later)
+Status-bar names are the labels (the shell already reports label and value for every insert knob).
+
+**25 Comb** (input-driven feedback comb resonator; zero latency)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Freq | 20..5000 | Log, dynamic unit | Hz | resonant pitch (delay = sr / Freq) | 220 |
+| 1 | Feedback | -95..95 | Linear | % | loop gain; negative inverts it (odd harmonics only, hollow, an octave lower) | 70 |
+| 2 | Damping | 0..100 | Linear | % | one-pole low-pass in the loop: 0 open (20 kHz), 100 about 800 Hz (exponential map); darker, shorter ring | 30 |
+| 3 | Mix | 0..100 | Linear | % | dry / wet | 50 |
+
+DSP: `y[n] = x[n] + g * damp(y[n-D])`, `wet = y * sqrt(1 - g^2)` (power-normalised: a broadband input keeps about its level whatever the feedback; at resonance the peak rises, bounded at about +16 dB at 95 %). `D = sr/Freq` minus the loop's own fixed delay (one sample plus the damping filter's group delay at the current cutoff), so the pitch is true; read by 3rd-order Lagrange interpolation (`juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Lagrange3rd>` or an equivalent own class), line length `ceil(sr/20) + 8`. Freq (smoothed in the log domain, so a sweep glides) and Feedback are smoothed 15 ms; the damping coefficient is recomputed at block rate. `|g| <= 0.95` and a damping gain <= 1 keep the loop stable at every corner. Loop denormals flushed below 1e-20.
+**Why this is not Karplus (11):** Karplus is a note-and-octave string excited by the input's attack; Comb is a continuous-Hz filter that colours whatever passes through, with negative feedback and a Mix. Karplus is **not changed**.
+**Pitch tracking is not built.** `VoiceParams` carries no note frequency and an on-line detector adds latency and glitches. Tuning to a note is done with a sequence on the Freq knob (every knob is a mod target). "Follow the played note" would be a separate feature (a note-frequency field fed into `InsertProcessor` the way `setTempo` is); it changes the contract, so it goes through design-future first.
+
+**26 FreqShift** (single-sideband frequency shifter; zero latency, not compensated)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Shift | -1000..1000 | Linear | Hz | coarse shift; every partial moves by the same Hz (inharmonic, metallic) | 60 |
+| 1 | Fine | -20..20 | Linear | Hz | added to Shift; slow beating and barber-pole phasing at small values | 0 |
+| 2 | Feedback | 0..80 | Linear | % | wet output back into the input through a fixed 8 kHz one-pole low-pass (rising or falling spiral of repeats) | 0 |
+| 3 | Mix | 0..100 | Linear | % | dry / wet | 50 |
+
+DSP: analytic signal from `HilbertIir` (two all-pass chains of four second-order sections with the published coefficients, Niemitalo, "Hilbert transform with IIR all-pass filters", the 12-pole design, including its one-sample delay on the second chain; the coder follows the reference and the test checks the 90 degree difference). The pair `I`, `Q` is rotated by a quadrature oscillator: `wet = I*cos(phi) - Q*sin(phi)` shifts up; the sign of the `sin` term flips for a negative shift. The phase accumulator is a `double`, wrapped each sample; `cos` and `sin` come from a rotating complex multiplier renormalised each block (no `sin` per sample). Shift + Fine is smoothed 15 ms. A shifter preserves power, so no makeup gain. Feedback <= 0.8 keeps the loop stable. Independent network per channel, one shared oscillator phase.
+**Limits to state in the manual (Frank):** the network is accurate from about 0.002 of the sample rate (about 90 Hz at 44.1 kHz, about 380 Hz at 192 kHz) up to near Nyquist; content below that edge leaks a faint opposite sideband, and content within the shift of Nyquist folds back (cannot be avoided without oversampling; accepted, the inputs are synth voices already filtered).
+**Why this is not RingMod (9):** a ring modulator makes both sum and difference sidebands (symmetric, dissonant); the shifter makes one, so a harmonic note becomes a single inharmonic stack that moves. RingMod is not changed.
+
+**27 Formant** (vowel filter; zero latency)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Vowel | 0..100 | Linear | % | morph across A (0), E (25), I (50), O (75), U (100); in between, the neighbouring vowels' formant frequencies are blended on a log scale | 0 |
+| 1 | Shift | -12..12 | Linear | st | moves all three formants together: up is a smaller, brighter throat, down a larger one | 0 |
+| 2 | Resonance | 0..100 | Linear | % | narrowness of the formant bands (Q 3 at 0, Q 40 at 100, exponential map): breathy and open to nasal and ringing | 40 |
+| 3 | Mix | 0..100 | Linear | % | dry / wet | 100 |
+
+DSP: three parallel band-pass sections (TPT state-variable form, stable under modulation) at the interpolated formants F1, F2, F3, summed with fixed relative gains `{1.0, 0.5, 0.2}`. Table (adult male, Hz; the coder may tune by ear within these neighbourhoods, never the structure): A 800 / 1150 / 2900, E 400 / 1600 / 2700, I 350 / 1700 / 2700, O 450 / 800 / 2830, U 325 / 700 / 2530. `Shift` multiplies all three by `2^(st/12)`; each is then clamped to 60 Hz .. 0.45 * sr. Level: wet scaled by `sqrt(Q / 4) / sqrt(1.0 + 0.25 + 0.04)` so narrow bands do not vanish and wide ones do not boom (the test bounds the pink-noise level change at 6 dB over the knob corners). Vowel, Shift and Resonance are smoothed 15 ms; coefficients are recomputed every 32 samples while any of them moves, at block rate when none does.
+**Why this is not the filter section:** every product's filter is one or two resonant poles; Formant is three peaks in a fixed relationship that move together and morph between named vowels, which no single filter does, and it is the character of the effect (a voice) rather than a tone control. It suits the drone synth and sample layers.
+**Display note for Sid (optional):** Vowel shows as a plain % because the knob display has no letter readout for a Linear knob, and an IntStep with a name table would stop the morph being continuous. If Andy wants the letters shown, that is a small UI addition (a name-by-range table on `SlotConfig`), not a change to this ruling.
+
+**28 Stutter** (tempo-locked repeater; zero latency)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Size | 5..500 | Log, dynamic unit | ms | slice length; with the insert's Sync on, 1..16 sixteenth notes (`kInsertSyncSlot[28] = 0`) | 125 |
+| 1 | Repeat | 0..100 | Linear | % | chance that a slice boundary starts a stutter | 50 |
+| 2 | Direction | 0..2 | IntStep, `kStutterDirNames` | "" | Fwd, Rev, Alt (reverses on every other pass) | 0 (Fwd) |
+| 3 | Mix | 0..100 | Linear | % | dry / wet | 100 |
+
+**How sync works with the existing mechanism, and with no transport.** An insert has only `tempoBpm` (set per block from `InsertProcessor::setTempo`); it has **no transport position and no play flag**, and this ruling does not add them. So Stutter is *tempo-locked, not bar-locked*: with Sync on, the slice length is `n * insertSixteenthSeconds(tempoBpm)` (the same helpers and slot convention as Tremolo and Tape Delay); the clock is a free-running sample counter restarted at `reset()` (layer reset, new preset); a tempo change takes effect at the next slice boundary. With the transport stopped, or in a standalone with no host, the tempo is whatever `setTempo` last received (120 bpm if never set) and the clock keeps running, so Stutter behaves identically with or without a transport; it simply cannot start on a bar line. **Andy decides** whether bar-aligned phase is worth a family change (a transport-position atomic beside `tempo` in `InsertProcessor`, fed by each product's engine, read by Stutter, Tremolo, Auto Pan and Tape Delay): it is cross-product and belongs in design-future first; nothing here makes it harder, because the slice length is one helper (`sliceSamples()`).
+**Slice cap.** At most 2 s (the buffer length), so a long synced step at a slow tempo clamps rather than overruns; the value display is unchanged.
+
+DSP: both channels record continuously into a circular buffer (`ceil(2 * sr) + 8` samples, allocated in `prepare`). A slice boundary comes every `L` samples (`L` = current slice length, rounded, at least 1 ms). At each boundary, **if not already holding**, a seeded roll against `Repeat/100` decides: on a hit, the last `L` samples are frozen as the slice (a read window `[w - L, w)` in the ring, which keeps recording; the window is read only while it is within the buffer) and replayed for **4 periods** (hidden constant), then the insert returns to the live signal and the next boundary rolls again. Repeat 100 % therefore stutters continuously, 0 % never (bit-exact dry, the branch skipped). Direction: Fwd reads the slice forwards each pass, Rev backwards, Alt forwards then backwards. Each pass edge has a 2 ms linear fade (`L/4` for tiny slices) so the loop point does not click. The replay mixes with the dry by Mix; the live signal is replaced only inside a hit. A change of Size or Sync mid-hit takes effect at the next boundary. The decision and the clock are shared by both channels (stereo-linked, so the image does not shift).
+**Why Direction and not Pitch:** a pitch change reads the slice at another speed, so its period no longer matches the grid and the repeat drifts off the tempo; Direction keeps every pass exactly one slice long. **Why no Gate knob:** the edge fades and the fixed 4-period hold already give the gated rhythm, and Repeat is the one probabilistic control; a fifth role does not fit four slots.
+
+**29 LoFi** (vinyl and tape age: wobble, hiss, crackle, tone loss)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Wobble | 0..100 | Linear | % | wow and flutter together: pitch drift; 0 is bit-exact dry with no delay | 25 |
+| 1 | Noise | 0..100 | Linear | % | steady hiss level, 0 to about -30 dBFS (quadratic map: `0.03 * (n/100)^2`) | 0 |
+| 2 | Crackle | 0..100 | Linear | % | random vinyl pops, 0 to about 40 a second (quadratic map on the rate), size random per pop | 0 |
+| 3 | Tone | 500..20000 | Log, dynamic unit | Hz | high-frequency loss (two one-poles, 12 dB/oct); 20 kHz and up bypasses | 6000 |
+
+Order: wobble delay, then Tone, then add hiss and crackle (so Tone dulls the music, not the added noise, as on a worn record). **Wobble** is delay-line pitch modulation: `D = w * 2 ms + w * (1.2 ms * wow(t) + 0.15 ms * flutter(t))` with `w = Wobble/100`; wow is a 0.5 Hz sine summed with a slow seeded random drift (about 0.15 Hz smoothed noise), flutter a 7 Hz sine plus small seeded jitter; the 8 : 1 ratio and the rates are fixed (a separate Wow and Flutter knob needs a fifth slot; **Andy decides** if he would rather give up Crackle or Tone for it). `D` is linearly interpolated (the mild HF loss is on theme), `w` smoothed 15 ms, `D` at least 1 sample, line `ceil(0.004 * sr) + 8`. At `Wobble = 0` the delay is skipped: bit-exact and zero latency; at 100 the centre delay is 2 ms. Pitch deviation at 100 is about +-0.4 % from wow and +-0.6 % from flutter; the coder tunes inside this by ear. **Hiss:** white noise from the seeded generator through a one-pole high-pass at 1 kHz, an independent stream per channel, **added** (level-independent). **Crackle:** per sample a Poisson test (`rand < rate / sr`) fires a pop of random sign and size (0.05..0.5 peak, cube of a uniform so most are small) shaped as a 1.5 ms exponential decay; both channels fire together on 70 % of pops, the rest on one channel (hidden). The noise sources run only while the layer's insert chain runs; they do not self-gate. Peak with all four knobs at maximum stays below 2 for a 1.0 input (tested).
+
+### 4. Real-time rules (additions to the earlier section)
+- No allocation or locks outside `prepare`; buffers are `std::vector<float>` sized in `prepare`; ring indices wrap by comparison, never modulo of a negative.
+- Every `insertSlot(p, n)` read is clamped to the table range; the sync step comes from `insertSyncStepFromNorm`; a non-finite tempo reads as 120 bpm through `insertSixteenthSeconds`.
+- A non-finite input sample becomes 0 before any state; a finite one is clamped to +-1e4 in the recursive stages (Comb, FreqShift feedback, Formant).
+- Denormals: loop and filter states flushed below 1e-20 where they decay to silence (Comb loop, Hilbert chains, formant bands, noise high-pass).
+- `prepare` guards `sr > 0` (falls back to 44100).
+
+### 5. Class shapes
+All five derive `InsertAlgorithmBase`, carry `static constexpr FxUse kUse = FxUse::Insert;`, hold two-channel state in fixed arrays and keep tunables as named `constexpr` values at the top of the class (the hidden numbers above). `HilbertIir` is a plain struct (`prepare(sr)`, `process(x)` returning the pair, `reset()`); the oscillator stays inside `FreqShiftInsert`. Nothing else is shared yet, so nothing goes in `Insert/` and no `mu-core/UI` code is needed (labels, ranges and the Direction names come from `InsertSlotConfig.h`).
+
+### 6. Tests (offline, no listening; `FiveInsertsTests.cpp`)
+Existing lists: `NewInsertTests.cpp` count 30, loops run to `LoFi`, exemption list as in section 2; `MixerBlockValueTests.cpp` latency list (section 2 numbers); the shared corner test (finite, peak bound 8, every knob corner, with and without Sync, 44.1/96/192 kHz, blocks 1/7/512) covers all five. `AlgorithmNameTableTests`, `InsertAlgoTableTests` and `BusInsertTests` need no edit.
+- **Comb:** pitch: white noise through Freq 220 and 1000 Hz at 44.1 and 96 kHz, Feedback 80, Damping 0: the autocorrelation peak sits within 10 cents (a one-sample error would fail it); Feedback -80 resonates at odd multiples only (even partials 12 dB below the odd); Damping 100 shortens the ring (decay time under half of that at 0); Mix 0 untouched; broadband level within 3 dB of the input across Feedback 0..95; Feedback 95 at Freq 20 stays stable (no growth over 10 s of silence after a burst).
+- **FreqShift:** a 1 kHz sine, Shift +200 Hz, Mix 100, at 44.1 and 96 kHz: strongest output at 1200 Hz, the opposite sideband (800 Hz) and the original (1000 Hz) at least 35 dB below it; a negative shift mirrors it; the Hilbert pair's phase difference within 1 degree at 1 kHz and 5 kHz; Mix 0 untouched; Feedback 80 stable and bounded; level preserved within 1 dB; reset equals fresh.
+- **Formant:** the spectrum of white noise shows three peaks within 15 % of the table's F1, F2, F3 for each of A, E, I, O, U (stops at 0, 25, 50, 75, 100 %); 12.5 % lies between A and E; Shift +12 doubles them; Resonance 100 gives a narrower -3 dB width than 0 at F1; pink-noise level change within 6 dB over all vowels and Resonance corners; Mix 0 untouched; sweeping Vowel across its range in 100 ms gives no click (sample-to-sample step bounded).
+- **Stutter:** Repeat 0 untouched; Repeat 100, Fwd, a ramp-then-silence input: after the first boundary the output repeats the last slice four times, then returns to live; slice length matches Size within one sample (free) and `n` sixteenths at 120 bpm (Sync); Rev plays the slice backwards (sample-exact against a reference); Alt alternates; pass edges have no step above the fade bound; with `setTempo` never called and no transport the behaviour is that of 120 bpm; a tempo change takes effect only at the next boundary; the 2 s cap clamps; over 2000 boundaries at Repeat 50 the hit count is within 5 % of half; reset equals fresh; Mix 50 equals the average of dry and Mix 100.
+- **LoFi:** all knobs at 0 with Tone 20000: untouched and zero latency; Wobble 100: impulse peak within 2.5 ms and a 1 kHz sine's measured frequency swings by 0.3 to 1.2 % peak; Noise 100 on silence gives RMS within 2 dB of -34 dBFS; Noise 0 and Crackle 0 on silence is exact zero; Crackle 100 on silence has 25 to 55 pops a second over 20 s (threshold-detected); Tone 1000 cuts an 8 kHz sine by at least 20 dB and leaves 100 Hz within 0.5 dB; output identical across block sizes 1, 7, 512; two slot indices give different noise, the same index the same; reset equals fresh; peak bound as above.
+
+**Do not:** add a Mix to LoFi; add Pitch to Stutter or read a transport inside an insert; build a pitch tracker for Comb; change Karplus, RingMod or Tremolo; put the new files in `Insert/`; give Formant a hidden mode; allocate on the audio thread; rename a preset key once released; add a mod-target row by hand; change a range or skew after release.
+
+**Andy decides:** (1) names: the keys `Comb`, `FreqShift`, `Formant`, `Stutter`, `LoFi` are ruled here ("Vowel" would be a more telling key than "Formant"); the key must be chosen before release; (2) LoFi's single Wobble knob (ruled) versus separate Wow and Flutter by dropping another knob; (3) whether Stutter should be bar-aligned (needs a transport feed, see Stutter); (4) whether Comb should track the played note (a separate feature); (5) a vowel letter readout for Formant (Sid).
+
+**Status:** ruled, not built. Code owned by the main conversation: the numbered edits in section 1, then the classes, then the tests in section 6. Build one at a time in the order 25..29, each with its own test.
