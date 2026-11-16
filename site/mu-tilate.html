@@ -2,14 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>μ-tilate: Loop Slicer | Transwarp Development Project</title>
-  <meta name="description" content="μ-tilate is a loop slicer for Windows. Load a loop, cut it into slices on the transients, arrange the slices on a timeline and match it to your tempo. VST3, CLAP and Standalone. Free to download, with a one-off licence to remove the reminder.">
+  <title>Loop Slicer Plugin, VST3 and CLAP for Windows (In Development) | μ-tilate | Transwarp</title>
+  <meta name="description" content="Loop slicer plugin for Windows (VST3, CLAP and Standalone), in development. Cut a loop into slices on the transients, arrange the slices on a timeline and match it to your tempo.">
   <link rel="canonical" href="https://transwarp.me/mu-tilate">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://transwarp.me/mu-tilate">
-  <meta property="og:title" content="μ-tilate: Loop Slicer | Transwarp Development Project">
-  <meta property="og:description" content="μ-tilate is a loop slicer for Windows. Load a loop, cut it into slices on the transients, arrange the slices on a timeline and match it to your tempo. VST3, CLAP and Standalone. Free to download, with a one-off licence to remove the reminder.">
-  <meta property="og:image" content="https://transwarp.me/mu-tilate_full_screen.png">
+  <meta property="og:title" content="Loop Slicer Plugin, VST3 and CLAP for Windows (In Development) | μ-tilate | Transwarp">
+  <meta property="og:description" content="Loop slicer plugin for Windows (VST3, CLAP and Standalone), in development. Cut a loop into slices on the transients, arrange the slices on a timeline and match it to your tempo.">
+  <meta property="og:image" content="https://transwarp.me/loop-slicer-plugin-vst3-full-window.png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "μ-tilate",
+  "applicationCategory": "MusicApplication",
+  "operatingSystem": "Windows",
+  "description": "Loop slicer plugin for Windows (VST3, CLAP and Standalone), in development. Cut a loop into slices on the transients, arrange the slices on a timeline and match it to your tempo.",
+  "image": "https://transwarp.me/loop-slicer-plugin-vst3-full-window.png",
+  "url": "https://transwarp.me/mu-tilate",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project",
+    "url": "https://transwarp.me/"
+  },
+  "releaseNotes": "https://transwarp.me/mu-tilate-releases"
+}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -316,7 +334,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         <div>
           <a class="rn-pill fade-1" href="mu-tilate-releases.html">Release notes &middot; what&rsquo;s new &rarr;</a>
           <div class="hero-eyebrow fade-1">Loop Slicer</div>
-          <h1 class="hero-title fade-2"><span class="mu">μ</span>-tilate<span class="sub">Cut a loop up. Play it back your way.</span></h1>
+          <h1 class="hero-title fade-2"><span class="mu">μ</span>-tilate<span class="sub">Loop slicer plugin, VST3 and CLAP (in development).</span></h1>
           <p class="hero-sub fade-3">Load a loop, usually drums, and μ-tilate finds the hits and cuts it into slices. Lay the slices out on a timeline in any order. Repeat them, flip them, thin them out, change their pitch, or match the whole loop to your tempo.</p>
           <div class="hero-pills fade-4">
             <span class="pill prod">Auto-slice on transients</span>
@@ -330,7 +348,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <a href="mu-tilate-releases.html" class="btn-secondary btn-soon">Release notes</a>
           </div>
         </div>
-        <div class="hero-visual fade-3"><img src="mu-tilate_full_screen.png" alt="The μ-tilate window: a drum loop cut into sixteen slices, with the same slices laid out on the timeline below and the modulators underneath" width="1172" height="898"></div>
+        <div class="hero-visual fade-3"><img src="loop-slicer-plugin-vst3-full-window.png" alt="The μ-tilate window: a drum loop cut into sixteen slices, with the same slices laid out on the timeline below and the modulators underneath" width="1172" height="898"></div>
       </div>
     </div>
   </section>
@@ -389,7 +407,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
 
       <div class="screenshots-wrap">
         <div class="screenshot-primary">
-          <div class="ss-placeholder"><img src="mu-tilate_full_screen.png" alt="The Sequencer view: the loop waveform, sixteen slices, and the same sixteen slices as blocks on the timeline" loading="lazy"></div>
+          <div class="ss-placeholder"><img src="loop-slicer-plugin-vst3-full-window.png" alt="The Sequencer view: the loop waveform, sixteen slices, and the same sixteen slices as blocks on the timeline" loading="lazy"></div>
           <div class="ss-caption prod-cap">
             <div class="sc-label"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tilate interface</div>
             <h3>See the loop, then rebuild it.</h3>
@@ -397,8 +415,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           </div>
         </div>
         <div class="screenshot-grid" style="grid-template-columns:repeat(2,1fr)">
-          <div class="ss-item"><div class="ss-placeholder"><img src="mu-tilate_slices.png" alt="The Slice view: pitch, filter, amp, effect, play direction, pre-fade and send controls for the selected slice" loading="lazy"></div><div class="ss-item-caption"><strong>Slice view</strong><p>Pick a slice and shape it: pitch, filter, amp, effect, direction and sends.</p></div></div>
-          <div class="ss-item"><div class="ss-placeholder"><img src="mu-tilate_mixer.png" alt="The mixer with eight layer channels, send effects and master" loading="lazy"></div><div class="ss-item-caption"><strong>Mixer</strong><p>The shared mixer with sends, sidechain, inserts and master.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder"><img src="loop-slicer-plugin-slice-editor.png" alt="The Slice view: pitch, filter, amp, effect, play direction, pre-fade and send controls for the selected slice" loading="lazy"></div><div class="ss-item-caption"><strong>Slice view</strong><p>Pick a slice and shape it: pitch, filter, amp, effect, direction and sends.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder"><img src="loop-slicer-plugin-mixer.png" alt="The mixer with eight layer channels, send effects and master" loading="lazy"></div><div class="ss-item-caption"><strong>Mixer</strong><p>The shared mixer with sends, sidechain, inserts and master.</p></div></div>
         </div>
       </div>
     </div>
