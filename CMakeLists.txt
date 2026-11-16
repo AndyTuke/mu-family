@@ -168,7 +168,7 @@ endif()
 
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
-add_subdirectory(mu-control)   # controller drivers, mapping and surface model (INTERFACE library + tests); depends on mu-core only
+add_subdirectory(mu-control)   # controller drivers, mapping and surface model (INTERFACE library + tests; its sources compile into each consumer); depends on mu-core only
 add_subdirectory(mu-clid)
 add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLAP); needs mu-clid's increment_build_number target
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)

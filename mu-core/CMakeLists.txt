@@ -1,9 +1,7 @@
 # mu-core — shared audio/FX/modulation/UI source set across the μ-family.
 #
-# INTERFACE library: sources are compiled in each consuming plugin's target
-# context, where JUCE modules are fully initialised by juce_add_plugin. A
-# STATIC library would need to duplicate JUCE's module setup macros — INTERFACE
-# avoids that entirely.
+# `mu-core` is an INTERFACE target that only carries the source list. That list is compiled once into the STATIC library
+# `mu-core-static` (below), which products link through `mu-core-lib`; JUCE itself is compiled once in `mu-juce`.
 #
 # Consume from a sibling plugin with:
 #     target_link_libraries(mu-tant PRIVATE mu-core)

@@ -1,6 +1,6 @@
 # ControlDesign — a tiny GUI sandbox for iterating on the mu knob style.
 #
-# Not a plugin: it does NOT link the mu-core INTERFACE library (that pulls the whole
+# Not a plugin: it does NOT link mu-core-lib (that pulls the whole
 # plugin stack). Like mu-link, it compiles just the shared design-system sources it
 # needs (MuLookAndFeel + MuTheme) so a style change in MuLookAndFeel shows here
 # immediately, at family parity.

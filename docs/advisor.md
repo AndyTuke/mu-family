@@ -10,7 +10,7 @@ Facts about this repo for the scheduled advisor routines. Each fact names the fi
 - Owner rule: keep JUCE current and use current JUCE APIs, never deprecated ones (`CLAUDE.md`).
 
 **Products and plugin formats**
-- Plugins built on the shared `mu-core` INTERFACE library (`CMakeLists.txt`, `CLAUDE.md`):
+- Plugins built on the shared `mu-core` source list, compiled once into the `mu-core-static` library (`CMakeLists.txt`, `CLAUDE.md`):
   - mu-Clid: VST3, CLAP, Standalone.
   - mu-Tant: VST3, CLAP, Standalone.
   - mu-Toni: VST3, CLAP, Standalone.

@@ -5,7 +5,7 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 ## Monorepo layout
 
 ```
-mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library); includes Link/ (mu-link IPC contract + client) and Control/ (control interfaces, MIDI map, live state)
+mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (compiled once as the `mu-core-static` library; layer / bus / insert counts are runtime, see docs/design-runtime-counts.md); includes Link/ (mu-link IPC contract + client) and Control/ (control interfaces, MIDI map, live state)
 mu-control/     Controller drivers, mapping and surface model (Devices / Driver / Surface / Manager); depends on mu-core, never the reverse
 mu-link/        Local audio receiver + master clock: mu standalones send audio over shared memory, mu-link sums it to one device (see mu-link/CLAUDE.md)
 ControlDesign/  Dev sandbox for control and knob design (not shipped)
@@ -110,7 +110,7 @@ Stage 13: UI completions — Amp FX sends, intra-FX wiring verified
 Closes #17: Amp FX send knobs added to Voice Amp row
 Closes #22: Intra-FX APVTS wiring verified end-to-end
 
-Version: v1.1.972
+Version: v1.2.972
 ```
 
 ## Backlog handling
