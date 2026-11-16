@@ -2,6 +2,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/FX/Algorithms/Adaa1Tanh.h"
 #include "Audio/FX/Algorithms/TapeEmphasis.h"
+#include "Audio/FX/Insert/OverdriveInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
 #include <algorithm>
 #include <cmath>
@@ -12,7 +13,8 @@
 // The Tape Sat insert (insertAlgo 10) and the helpers it shares with Overdrive: the ADAA tanh equals the expression Overdrive used
 // to hold inline, the emphasis pair is an exact inverse, and the insert has even harmonics, compresses highs first, lifts the low
 // end with Head Bump, aliases less than a plain tanh, keeps its level across Drive, stays finite at every rate and block size, and
-// resets to a fresh state. All offline; nothing is listened to.
+// resets to a fresh state. The last tests pin the properties Overdrive (insertAlgo 14) had before it took the shared ADAA tanh,
+// so the refactor is checked end to end. All offline; nothing is listened to.
 struct TapeSatTests : juce::UnitTest
 {
     TapeSatTests() : juce::UnitTest("Tape Sat insert and the shared ADAA / emphasis helpers", "mu-core") {}
@@ -360,6 +362,84 @@ struct TapeSatTests : juce::UnitTest
             }
             expectEquals(mu_ui::kInsertAlgoDefaults[10][0], 30.0f);
             expectEquals(mu_ui::kInsertAlgoDefaults[10][2], 30.0f);
+        }
+
+        // Overdrive after the move to the shared ADAA tanh: the properties the inline version guaranteed, end to end.
+        beginTest("Overdrive: Bias 0 is odd-symmetric, a biased signal leaves no DC, a NaN / Inf burst leaves no trace, reset equals fresh");
+        {
+            auto odParams = [](float drive, float bias)
+            {
+                VoiceParams p;
+                p.insertAlgo = 14;
+                p.insertParam[0] = mu_ui::actualToNorm(drive, 14, 0);
+                p.insertParam[1] = mu_ui::actualToNorm(0.0f,  14, 1);
+                p.insertParam[2] = mu_ui::actualToNorm(bias,  14, 2);
+                p.insertParam[3] = mu_ui::actualToNorm(6000.0f, 14, 3);
+                return p;
+            };
+
+            // Bias 0: flipping the input's sign flips the output exactly (the curve, the DC block and the tone filter are all odd).
+            {
+                const auto in = noise(8192, 41u, 0.6f);
+                std::vector<float> neg(in.size());
+                for (size_t i = 0; i < in.size(); ++i) neg[i] = -in[i];
+                OverdriveInsert a, b;
+                a.prepare(kSR, 512);  b.prepare(kSR, 512);
+                const auto ya = render(a, odParams(70.0f, 0.0f), in);
+                const auto yb = render(b, odParams(70.0f, 0.0f), neg);
+                float worst = 0.0f;
+                for (size_t i = 0; i < ya.size(); ++i) worst = std::max(worst, std::abs(ya[i] + yb[i]));
+                expect(worst < 1.0e-5f, "Bias 0 is not odd-symmetric: worst " + juce::String(worst));
+            }
+
+            // Bias 100: the resting offset and the asymmetry's drift are removed, so a settled sine has no mean.
+            {
+                const int n = (int) kSR;
+                OverdriveInsert a;
+                a.prepare(kSR, 512);
+                const auto y = render(a, odParams(50.0f, 100.0f), sine(n + kSettle, 1000.0, kSR, 0.25f));
+                double mean = 0.0;
+                for (int i = 0; i < n; ++i) mean += (double) y[(size_t) (kSettle + i)];
+                mean /= (double) n;
+                expect(std::abs(mean) < 1.0e-3, "a biased Overdrive leaves a DC offset of " + juce::String(mean, 6));
+                expect(rms(y, kSettle, n) > 0.01, "the biased Overdrive is silent");
+            }
+
+            // A NaN / Inf burst is replaced by silence at the input and must not latch in the ADAA or filter states.
+            {
+                const auto p = odParams(60.0f, 50.0f);
+                auto clean = noise(20000, 43u, 0.5f);
+                std::vector<float> burst;
+                for (int i = 0; i < 12; ++i) burst.push_back(std::numeric_limits<float>::quiet_NaN());
+                for (int i = 0; i < 12; ++i) burst.push_back(std::numeric_limits<float>::infinity());
+                burst.insert(burst.end(), clean.begin(), clean.end());
+                OverdriveInsert a, b;
+                a.prepare(kSR, 512);  b.prepare(kSR, 512);
+                const auto ya = render(a, p, burst);
+                const auto yb = render(b, p, clean);
+                bool finite = true;
+                for (float v : ya) finite = finite && std::isfinite(v);
+                expect(finite, "the burst reached the Overdrive output");
+                float worst = 0.0f;
+                for (int i = 0; i < 256; ++i)
+                    worst = std::max(worst, std::abs(ya[ya.size() - 1 - (size_t) i] - yb[yb.size() - 1 - (size_t) i]));
+                expect(worst < 1.0e-3f, "the burst left a trace in the Overdrive output: " + juce::String(worst));
+            }
+
+            // reset() returns the ADAA, DC-block, tone and smoother state to a fresh instance's.
+            {
+                const auto p = odParams(80.0f, 60.0f);
+                const auto in = noise(8192, 45u, 0.6f);
+                OverdriveInsert used, fresh;
+                used.prepare(kSR, 512);  fresh.prepare(kSR, 512);
+                render(used, p, noise(8192, 46u, 0.9f));
+                used.reset();
+                const auto a = render(used, p, in);
+                const auto b = render(fresh, p, in);
+                int diff = 0;
+                for (size_t i = 0; i < a.size(); ++i) if (a[i] != b[i]) ++diff;
+                expectEquals(diff, 0, "a reset Overdrive differs from a fresh one");
+            }
         }
     }
 };
