@@ -56,3 +56,37 @@ footer .footer-col li a { display: inline-block; padding: 1px 0; }
 @media (max-width: 600px) { footer .footer-inner { grid-template-columns: 1fr; } }
 
 footer .footer-social { flex-wrap: wrap; gap: 8px 16px; }
+
+/* ── Guide / article pages ── */
+.art { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+.art .kicker { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--accent-b); text-transform: uppercase; margin-bottom: 16px; }
+.art h1 { font-family: var(--ff-disp); font-size: clamp(30px,4vw,48px); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 20px; }
+.art h2 { font-family: var(--ff-disp); font-size: clamp(22px,2.6vw,30px); font-weight: 800; letter-spacing: -0.02em; margin: 44px 0 14px; }
+.art p, .art li { font-size: 16px; font-weight: 300; color: var(--text2); line-height: 1.75; }
+.art p { margin-bottom: 16px; }
+.art .lede { font-size: 18px; color: var(--text); }
+.art ul, .art ol { margin: 0 0 18px 22px; }
+.art li { margin-bottom: 6px; }
+.art a:not(.btn-primary):not(.card) { color: var(--accent-b); text-decoration: underline; }
+.art strong { color: var(--text); font-weight: 500; }
+.art code, .art .pat { font-family: var(--ff-mono); font-size: 14px; color: var(--teal-b); }
+.art .pat { display: block; background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 10px 16px; margin: 0 0 8px; letter-spacing: 0.12em; overflow-x: auto; }
+.art figure { margin: 28px 0; }
+.art figure img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border2); display: block; }
+.art figcaption { font-size: 13px; color: var(--text3); margin-top: 8px; }
+.art .tablewrap { overflow-x: auto; margin: 20px 0 28px; }
+.art table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+.art th, .art td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border2); vertical-align: top; color: var(--text2); font-weight: 300; }
+.art th { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text3); font-weight: 400; }
+.art td:first-child { color: var(--text); font-weight: 500; }
+.art .cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0; }
+.art .cardgrid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 20px 0 8px; }
+.art .card { display: block; background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 18px 22px; color: var(--text); }
+.art .card:hover, .art .card:focus-visible { border-color: var(--accent-b); }
+.art .card strong { display: block; font-family: var(--ff-disp); font-size: 17px; margin-bottom: 4px; }
+.art .card span { font-size: 14px; color: var(--text2); font-weight: 300; }
+.art .faq h3 { font-family: var(--ff-disp); font-size: 17px; margin: 22px 0 6px; color: var(--text); }
+.art .note { border-left: 3px solid var(--teal); padding: 4px 0 4px 16px; margin: 20px 0; }
+.art .btn { display: inline-flex; align-items: center; background: var(--accent); color: #fff; font-family: var(--ff-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 13px 26px; border-radius: 4px; text-decoration: none; }
+.art .btn:hover, .art .btn:focus-visible { background: var(--accent-b); }
+.art .btn.alt { background: transparent; border: 1px solid var(--border2); color: var(--text); }
