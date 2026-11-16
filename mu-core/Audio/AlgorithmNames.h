@@ -57,6 +57,9 @@ inline const char* const kInsertAlgorithmNames[] = {
     "Phaser",       // 19
     "PitchDelay",   // 20
     "Tremolo",      // 21
+    "AutoPan",      // 22
+    "Gate",         // 23
+    "Waveshaper",   // 24
     nullptr
 };
 
@@ -246,12 +249,14 @@ struct InsertMenuEntry
 inline constexpr InsertMenuEntry kInsertMenu[] = {
     {  0, "None",        10 },
     {  6, "3-Band EQ",   20 },
+    { 22, "Auto Pan",    25 },
     {  4, "Bitcrusher",  30 },
     { 17, "Chorus",      35 },
     {  5, "Clipper",     40 },
     {  7, "Compressor",  50 },
     { 18, "Flanger",     55 },
     {  3, "Fold",        60 },
+    { 23, "Gate",        65 },
     {  2, "Hard Clip",   70 },
     { 11, "Karplus",     80 },
     {  8, "Limiter",     90 },
@@ -266,6 +271,7 @@ inline constexpr InsertMenuEntry kInsertMenu[] = {
     { 21, "Tremolo",    135 },
     { 12, "Vocoder",    140 },
     { 13, "Vocoder St", 150 },
+    { 24, "Waveshaper", 160 },
 };
 
 static_assert((int) std::size(kInsertMenu) == mu_ui::kInsertAlgoCount, "kInsertMenu must list every insert algorithm once");

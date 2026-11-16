@@ -23,6 +23,9 @@
 #include "Audio/FX/Algorithms/PhaserFx.h"
 #include "Audio/FX/Insert/PitchDelayInsert.h"
 #include "Audio/FX/Insert/TremoloInsert.h"
+#include "Audio/FX/Algorithms/AutoPanInsert.h"
+#include "Audio/FX/Algorithms/GateInsert.h"
+#include "Audio/FX/Algorithms/WaveshaperInsert.h"
 
 InsertProcessor::InsertProcessor()
 {
@@ -68,6 +71,9 @@ InsertProcessor::InsertProcessor()
     dispatch[19] = add(mu_audio::makeInsert<mu_audio::PhaserFx>());
     dispatch[20] = add(std::make_unique<PitchDelayInsert>());
     dispatch[21] = add(std::make_unique<TremoloInsert>());
+    dispatch[22] = add(mu_audio::makeInsert<mu_audio::AutoPanInsert>());
+    dispatch[23] = add(mu_audio::makeInsert<mu_audio::GateInsert>());
+    dispatch[24] = add(mu_audio::makeInsert<mu_audio::WaveshaperInsert>());
 }
 
 void InsertProcessor::prepare(double sampleRate, int blockSize)

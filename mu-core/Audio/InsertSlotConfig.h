@@ -31,7 +31,7 @@ namespace mu_ui {
 inline constexpr int kInsertSlotCount = 4;
 // Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
 // Must equal InsertProcessor::kNumInsertAlgos.
-inline constexpr int kInsertAlgoCount = 22;
+inline constexpr int kInsertAlgoCount = 25;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -71,7 +71,7 @@ inline const char* const kWaveNames[4]     = { "Saw","Square","White","Pink" };
 inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 inline const char* const kTremoloShapeNames[3] = { "Sine","Triangle","Square" };
 
-// Per-algorithm slot table. 22 rows × 4 cols.
+// Per-algorithm slot table. 25 rows × 4 cols.
 //
 // Source order MUST match the index order of InsertProcessor::dispatch[] /
 // mu_audio::kInsertAlgorithmNames so a single integer dispatches the
@@ -212,6 +212,24 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { "Depth", 0.0f, 100.0f, SkewMode::Linear,  "%" },
       { "Shape", 0.0f, 2.0f,   SkewMode::IntStep, "", kTremoloShapeNames, 0 },
       { "Phase", 0.0f, 100.0f, SkewMode::Linear,  "%" } },
+
+    // ── 22 AutoPan ── Rate / Depth / Shape / Centre ───────────────────
+    { { "Rate",   0.1f,    20.0f,  SkewMode::Log,     "Hz" },
+      { "Depth",  0.0f,    100.0f, SkewMode::Linear,  "%" },
+      { "Shape",  0.0f,    2.0f,   SkewMode::IntStep, "", kTremoloShapeNames, 0 },
+      { "Centre", -100.0f, 100.0f, SkewMode::Linear,  "%" } },
+
+    // ── 23 Gate ── Threshold / Range / Attack / Release ───────────────
+    { { "Threshold", -80.0f, 0.0f,    SkewMode::Linear, "dB" },
+      { "Range",     -80.0f, 0.0f,    SkewMode::Linear, "dB" },
+      { "Attack",    0.1f,   50.0f,   SkewMode::Log,    "ms" },
+      { "Release",   5.0f,   2000.0f, SkewMode::Log,    "ms", nullptr, 0, true } },
+
+    // ── 24 Waveshaper ── Drive / Output / Bias / Sag ──────────────────
+    { { "Drive",  0.0f,   100.0f, SkewMode::Linear, "" },
+      { "Output", -24.0f, 0.0f,   SkewMode::Linear, "dB" },
+      { "Bias",   0.0f,   100.0f, SkewMode::Linear, "%" },
+      { "Sag",    0.0f,   100.0f, SkewMode::Linear, "%" } },
 };
 
 // Tempo sync (the insert's own Sync switch, APVTS suffix insSync): which slot turns into sixteenth-note steps when it is on,
@@ -225,6 +243,9 @@ inline constexpr int kInsertSyncSlot[kInsertAlgoCount] = {
     -1,   // 19 Phaser
     1,    // 20 PitchDelay: Time
     0,    // 21 Tremolo   : Rate
+    0,    // 22 AutoPan   : Rate
+    -1,   // 23 Gate
+    -1,   // 24 Waveshaper
 };
 inline bool insertHasSync(int algoIndex) noexcept
 {
@@ -287,6 +308,9 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /*19 Phaser      */ { 0.4f,    80.0f,   40.0f,  50.0f    },
     /*20 PitchDelay  */ { 7.0f,    350.0f,  40.0f,  30.0f    },
     /*21 Tremolo     */ { 4.0f,    60.0f,   0.0f,   0.0f     },
+    /*22 AutoPan     */ { 0.5f,    60.0f,   0.0f,   0.0f     },
+    /*23 Gate        */ { -40.0f,  -60.0f,  1.0f,   150.0f   },
+    /*24 Waveshaper  */ { 30.0f,   0.0f,    30.0f,  30.0f    },
 };
 
 // Convert a normalised 0..1 storage value to the algorithm's actual value

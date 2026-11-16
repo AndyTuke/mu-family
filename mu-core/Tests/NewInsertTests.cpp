@@ -5,7 +5,7 @@
 #include <cmath>
 #include <random>
 
-// The Chorus, Flanger, Phaser, Pitch Delay and Tremolo inserts (algorithms 17..21): finite and bounded output at every corner
+// The Chorus, Flanger, Phaser, Pitch Delay, Tremolo, Auto Pan, Gate and Waveshaper inserts (algorithms 17..24): finite and bounded output at every corner
 // of their four knobs, an untouched signal when the mix (or depth) is zero, the pitch shift lands on the right note, and the
 // tremolo follows the tempo when synced.
 struct NewInsertTests : juce::UnitTest
@@ -14,7 +14,7 @@ struct NewInsertTests : juce::UnitTest
 
     static constexpr double kRate = 48000.0;
     static constexpr int kBlock = 256;
-    enum { Chorus = 17, Flanger = 18, Phaser = 19, PitchDelay = 20, Tremolo = 21 };
+    enum { Chorus = 17, Flanger = 18, Phaser = 19, PitchDelay = 20, Tremolo = 21, AutoPan = 22, Gate = 23, Waveshaper = 24 };
 
     static VoiceParams make(int algo, float s0, float s1, float s2, float s3)
     {
@@ -50,12 +50,12 @@ struct NewInsertTests : juce::UnitTest
     {
         beginTest("the slot tables give each new insert four labelled knobs, and a Mix knob where the effect is wet/dry");
         {
-            expectEquals(mu_ui::kInsertAlgoCount, 22);
-            for (int a = Chorus; a <= Tremolo; ++a)
+            expectEquals(mu_ui::kInsertAlgoCount, 25);
+            for (int a = Chorus; a <= Waveshaper; ++a)
             {
                 for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
                     expect(mu_ui::kInsertAlgoSlots[a][s].label != nullptr, juce::String(mu_audio::kInsertAlgorithmNames[a]) + " slot " + juce::String(s) + " has a label");
-                if (a != Tremolo)   // Tremolo's Depth is its mix
+                if (a != Tremolo && a != AutoPan && a != Gate && a != Waveshaper)   // Depth, Range and Drive are their own dry/wet
                 {
                     bool hasMix = false;
                     for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
@@ -71,7 +71,7 @@ struct NewInsertTests : juce::UnitTest
             std::mt19937 rng(7);
             std::uniform_real_distribution<float> noise(-0.8f, 0.8f);
             const float corners[2] = { 0.0f, 1.0f };
-            for (int a = Chorus; a <= Tremolo; ++a)
+            for (int a = Chorus; a <= Waveshaper; ++a)
                 for (int mask = 0; mask < 16; ++mask)
                     for (int sync = 0; sync < 2; ++sync)
                     {

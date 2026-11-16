@@ -38,6 +38,9 @@
 #include "Audio/FX/Insert/PitchDelayInsert.h"
 #include "Audio/FX/Insert/TremoloInsert.h"
 #include "Audio/FX/Insert/TapeSatInsert.h"
+#include "Audio/FX/Algorithms/AutoPanInsert.h"
+#include "Audio/FX/Algorithms/GateInsert.h"
+#include "Audio/FX/Algorithms/WaveshaperInsert.h"
 #include "Audio/FX/Insert/KarplusStrongInsert.h"
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/InsertProcessor.h"
@@ -1083,6 +1086,7 @@ struct InsertLatencyTests : juce::UnitTest
             TapeDelayInsert a15;
             TapeSpringInsert a16;
             mu_audio::ChorusFx a17; mu_audio::FlangerFx a18; mu_audio::PhaserFx a19; PitchDelayInsert a20; TremoloInsert a21;
+            mu_audio::AutoPanInsert a22; mu_audio::GateInsert a23;
             checkAlgorithm("None", a0);           checkAlgorithm("SoftClip", a1);   checkAlgorithm("HardClip", a2);
             checkAlgorithm("Fold", a3);           checkAlgorithm("Bitcrusher", a4); checkAlgorithm("Clipper", a5);
             checkAlgorithm("EQ", a6);             checkAlgorithm("Compressor/Limiter", a7);
@@ -1093,13 +1097,14 @@ struct InsertLatencyTests : juce::UnitTest
             checkAlgorithm("TapeSpring", a16);
             checkAlgorithm("Chorus", a17);        checkAlgorithm("Flanger", a18);   checkAlgorithm("Phaser", a19);
             checkAlgorithm("PitchDelay", a20);    checkAlgorithm("Tremolo", a21);
+            checkAlgorithm("AutoPan", a22);       checkAlgorithm("Gate", a23);   // the Waveshaper (24) is 2x oversampled and has a bounded latency instead
 
-            // The registry has 22 slots (Compressor and Limiter share one instance); the construction list
+            // The registry has 25 slots (Compressor and Limiter share one instance, the Waveshaper is checked by the step test below); the construction list
             // above must cover every name in the algorithm-name table, so a new algorithm cannot be skipped.
             int named = 0;
             while (mu_audio::kInsertAlgorithmNames[named] != nullptr) ++named;
             expectEquals(named, InsertProcessor::kNumInsertAlgos, "name table and dispatch table agree on the algorithm count");
-            expectEquals(named, 22, "this list constructs 21 classes for 22 slots; a new algorithm means extending it");
+            expectEquals(named, 25, "this list constructs 23 classes for 25 slots (+ the Waveshaper below); a new algorithm means extending it");
         }
 
         beginTest("a step through every insert slot of the real processor shows its first output at sample 0");
@@ -1131,8 +1136,11 @@ struct InsertLatencyTests : juce::UnitTest
                 // Tape Sat runs its saturating stage 2x oversampled with a half-band IIR: a few samples of delay, not reported
                 // or compensated (an insert sits per voice), so a step may start up to 2 samples late.
                 const bool tape = algo == 10;
+                const bool shaper = algo == 24;   // the Waveshaper: the same half-band, so a step starts within 4 samples
                 if (crusher)
                     expect(onset >= 0 && onset <= 64, "Bitcrusher cold-start hold is bounded (" + juce::String(onset) + ")");
+                else if (shaper)
+                    expect(onset <= 4, "Waveshaper delays a step by " + juce::String(onset) + " samples");
                 else if (tape)
                     expect(onset <= 2, "Tape Sat delays a step by " + juce::String(onset) + " samples");
                 else
