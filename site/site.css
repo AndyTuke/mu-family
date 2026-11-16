@@ -90,3 +90,9 @@ footer .footer-social { flex-wrap: wrap; gap: 8px 16px; }
 .art .btn { display: inline-flex; align-items: center; background: var(--accent); color: #fff; font-family: var(--ff-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 13px 26px; border-radius: 4px; text-decoration: none; }
 .art .btn:hover, .art .btn:focus-visible { background: var(--accent-b); }
 .art .btn.alt { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+.art .toc { background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 22px 12px; margin: 24px 0 8px; }
+.art .toc h2 { font-size: 16px; margin: 12px 0 8px; }
+.art .toc ol { columns: 2 260px; margin-bottom: 0; }
+.art.manual h3 { font-family: var(--ff-disp); font-size: 20px; margin: 30px 0 10px; color: var(--text); }
+.art.manual h4 { font-family: var(--ff-disp); font-size: 16px; margin: 22px 0 8px; color: var(--text); }
+.art.manual h2, .art.manual h3, .art.manual h4 { scroll-margin-top: 80px; }

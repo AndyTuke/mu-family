@@ -116,4 +116,36 @@
     <loc>https://transwarp.me/what-is-a-loop-slicer-plugin</loc>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://transwarp.me/mu-clid-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-clid-midi-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-tant-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-toni-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-on-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-tilate-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-tronic-manual</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-link-manual</loc>
+    <priority>0.6</priority>
+  </url>
 </urlset>

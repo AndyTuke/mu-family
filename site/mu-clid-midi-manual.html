@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mu-Clid MIDI Manual: Euclidean MIDI Effect User Guide | Transwarp</title>
+  <meta name="description" content="User guide for mu-Clid MIDI, a free Euclidean rhythm MIDI effect plugin (VST3, CLAP): setting it up in your DAW, the Euclidean panel, logic and MIDI output.">
+  <link rel="canonical" href="https://transwarp.me/mu-clid-midi-manual">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-clid-midi-manual">
+  <meta property="og:title" content="mu-Clid MIDI Manual: Euclidean MIDI Effect User Guide">
+  <meta property="og:description" content="User guide for mu-Clid MIDI, a free Euclidean rhythm MIDI effect plugin (VST3, CLAP): setting it up in your DAW, the Euclidean panel, logic and MIDI output.">
+  <meta property="og:image" content="https://transwarp.me/euclidean-midi-effect-vst3-editor.png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "mu-Clid MIDI Manual: Euclidean MIDI Effect User Guide",
+  "description": "User guide for mu-Clid MIDI, a free Euclidean rhythm MIDI effect plugin (VST3, CLAP): setting it up in your DAW, the Euclidean panel, logic and MIDI output.",
+  "mainEntityOfPage": "https://transwarp.me/mu-clid-midi-manual",
+  "image": "https://transwarp.me/euclidean-midi-effect-vst3-editor.png",
+  "inLanguage": "en-GB",
+  "about": {
+    "@type": "SoftwareApplication",
+    "name": "mu-Clid MIDI",
+    "url": "https://transwarp.me/mu-clid-midi",
+    "applicationCategory": "MusicApplication",
+    "operatingSystem": "Windows"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project",
+    "url": "https://transwarp.me/"
+  },
+  "encodingFormat": "text/html",
+  "associatedMedia": {
+    "@type": "MediaObject",
+    "contentUrl": "https://transwarp.me/manuals/mu-Clid-MIDI-User-Manual.pdf",
+    "encodingFormat": "application/pdf"
+  }
+}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main style="padding-top: 120px; padding-bottom: 100px;">
+    <article class="art manual">
+      <div class="kicker">User manual &middot; Version 1.1</div>
+      <h1>mu-Clid MIDI Manual: Euclidean MIDI Effect User Guide</h1>
+      <p class="lede">mu-Clid MIDI: Euclidean MIDI Effect.</p>
+<p>Prefer a file? <a href="manuals/mu-Clid-MIDI-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-clid-midi.html">mu-Clid MIDI</a> &middot; <a href="mu-clid-midi-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#introduction">Introduction</a></li><li><a href="#what-is-euclidean-sequencing">What is Euclidean Sequencing?</a></li><li><a href="#installation">Installation</a></li><li><a href="#setting-it-up-in-your-daw">Setting It Up in Your DAW</a></li><li><a href="#the-window">The Window</a></li><li><a href="#the-euclidean-panel">The Euclidean Panel</a></li><li><a href="#midi-output">MIDI Output</a></li><li><a href="#saving-and-restoring">Saving and Restoring</a></li><li><a href="#technical-specifications">Technical Specifications</a></li></ol></nav>
+<h2 id="introduction">1. Introduction</h2>
+<p>mu-Clid MIDI is a Euclidean rhythm sequencer that plays other instruments. It is a MIDI effect: it makes no sound of its own, and instead sends a MIDI note every time its rhythm fires. Put it in front of any synth, sampler or drum machine in your DAW and the pattern plays that instrument. It runs as a VST3 plug-in and a CLAP plug-in from Transwarp Development Project. There is no standalone version.</p>
+<p>mu-Clid MIDI is free, with no licence key and no limits. It is the new name of mu-Clid Lite. Your existing projects keep working, and a project saved with mu-Clid Lite opens in mu-Clid MIDI with its rhythm, loop length, note and accent as you left them. If your DAW keeps favourites or effect chains by name, pick the plug-in again under its new name.</p>
+<p>mu-Clid MIDI has its own icon, a glowing orange-red ring around a horned alien face, so you can tell it from mu-Clid at a glance in your plug-in list.</p>
+<p>It plays one rhythm. For up to eight rhythms, each with its own sample and synth voice, mixer and effects, see mu-Clid. The two use the same Euclidean engine, so a rhythm sounds the same pattern in either.</p>
+<figure><img src="manual-images/mu-clid-midi-manual-main-window.webp" alt="The mu-Clid MIDI window: transport bar, rhythm circle, Euclidean panel and the Accent, MIDI Note and Logic controls." width="1100" height="416" loading="lazy"><figcaption>The mu-Clid MIDI window: transport bar, rhythm circle, Euclidean panel and the Accent, MIDI Note and Logic controls.</figcaption></figure>
+<h2 id="what-is-euclidean-sequencing">2. What is Euclidean Sequencing?</h2>
+<p>Euclidean rhythms come from a 2004 paper by Godfried Toussaint, who noticed that an algorithm Euclid wrote down 2,300 years ago for finding the greatest common divisor of two numbers also produces patterns that look strikingly like the rhythms of the world&#x27;s traditional music.</p>
+<p>The idea is simple: given a number of steps and a smaller number of hits, distribute the hits as evenly as possible across the steps. With 16 steps and 4 hits you get a hit every fourth step — a classic four-on-the-floor pattern. With 8 steps and 3 hits the hits cannot divide evenly, so the algorithm spaces them as nearly evenly as it can: hit, rest, rest, hit, rest, rest, hit, rest. That is the Cuban tresillo.</p>
+<p>mu-Clid MIDI gives the rhythm three independent Euclidean generators and combines them with logic: OR for layered patterns, AND for sparse coincidences, XOR for interlocking rhythms. Add rotation (shifting the pattern to start on a different step), padding (forcing silence at the start, end or middle) and an accent layer, and a few simple controls give you a vast range of grooves.</p>
+<h2 id="installation">3. Installation</h2>
+<p>mu-Clid MIDI ships in two formats:</p>
+<ul>
+<li><strong>VST3</strong> &mdash; copy mu-Clid MIDI.vst3 to %ProgramFiles%\Common Files\VST3\</li>
+<li><strong>CLAP</strong> &mdash; copy mu-Clid MIDI.clap to %ProgramFiles%\Common Files\CLAP\</li>
+</ul>
+<p>The installer also removes the old mu-Clid Lite files. After installing, rescan plug-ins in your DAW.</p>
+<h2 id="setting-it-up-in-your-daw">4. Setting It Up in Your DAW</h2>
+<p>How you use a MIDI effect depends on your DAW, but the idea is always the same: the plug-in&#x27;s MIDI output must reach the instrument you want to play.</p>
+<ul>
+<li>Add mu-Clid MIDI as a MIDI effect on a MIDI track, or on the same track as the instrument, ahead of it.</li>
+<li>If your DAW does not allow MIDI effects on an instrument track, put mu-Clid MIDI on its own track and route that track&#x27;s MIDI output to the instrument.</li>
+<li>Press play. mu-Clid MIDI follows your DAW&#x27;s transport, tempo and position, so the pattern stays in time with your project.</li>
+</ul>
+<p>mu-Clid MIDI sends its notes on MIDI channel 1. It is a note generator: it does not use any notes sent into it.</p>
+<h2 id="the-window">5. The Window</h2>
+<p>The window has a transport bar at the top, the Rhythm Circle and Euclidean panel in the middle, a row of controls below them, and a status bar at the bottom that shows the name and value of the control you last touched. A size menu at the top right switches between Normal and Large. There are no presets, mixer or settings pages; your sound design happens in the instrument you are playing, and your pattern is saved with your DAW project.</p>
+<h3 id="transport-bar">Transport Bar</h3>
+<ul>
+<li><strong>mu-Clid MIDI logo</strong> &mdash; click it to open the About panel.</li>
+<li><strong>Play, BPM and Position</strong> &mdash; show your DAW&#x27;s play state, tempo and bar position. They follow the host and cannot be edited here.</li>
+<li><strong>Loop dropdown</strong> &mdash; the master loop: how many steps the entire pattern runs before it starts again. Choices are the infinity symbol (free-running) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length.</li>
+</ul>
+<figure><img src="manual-images/mu-clid-midi-manual-transport-bar.webp" alt="Transport bar." width="1100" height="40" loading="lazy"><figcaption>Transport bar.</figcaption></figure>
+<h3 id="rhythm-circle">Rhythm Circle</h3>
+<p>The Rhythm Circle shows concentric rings, one per generator: Ring A (outermost, purple), Ring B (coral) and the accent ring (amber, dashed). While your DAW plays, the rings rotate so the current step is at the top. Filled steps are hits. Padded steps are drawn in their own colours, so you can see at a glance where a gap came from.</p>
+<h3 id="update-check">Update Check</h3>
+<p>mu-Clid MIDI can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar. Hover over it to see which version is out and which one you have.</p>
+<ul>
+<li>Click the link to open the download page in your web browser. mu-Clid MIDI never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released.</li>
+<li>Right-click the link and choose Hide this notice to hide it for that version without opening the page.</li>
+</ul>
+<p>Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The plug-in compares the answer with its own version on your machine. To switch the check off, click the mu-Clid MIDI logo to open the About card and untick the Check for updates box. With the box unticked, mu-Clid MIDI sends no request at all and shows no link. The box is ticked by default.</p>
+<h2 id="the-euclidean-panel">6. The Euclidean Panel</h2>
+<p>The Euclidean panel has three rows of knobs, named Euclid A, Euclid B and Accent. All three rows have the same controls, in three boxes.</p>
+<p>The first box:</p>
+<ul>
+<li><strong>Steps (1 to 64, default 8)</strong> &mdash; total number of steps in the pattern, including any padding</li>
+<li><strong>Hits (0 to Steps)</strong> &mdash; hits distributed as evenly as possible</li>
+<li><strong>Rotate</strong> &mdash; shifts the pattern left or right by whole steps</li>
+</ul>
+<p>The second box, Pad, forces silence at either end of the pattern. Each knob has a Pad | Mute switch beside it:</p>
+<ul>
+<li><strong>Pre Pad</strong> &mdash; steps of silence at the start of the pattern</li>
+<li><strong>Post Pad</strong> &mdash; steps of silence at the end of the pattern</li>
+</ul>
+<p>The third box, Insert, forces silence inside the pattern, with its own Pad | Mute switch:</p>
+<ul>
+<li><strong>Insert Start</strong> &mdash; the step where the silent section begins, counted from 1. With a Pre Pad of 4 in Pad mode, the first step you can insert at is 5.</li>
+<li><strong>Insert Length (0 to 8)</strong> &mdash; how many steps the silent section lasts.</li>
+</ul>
+<p>What the Pad | Mute switch does: in Pad mode the silent steps are taken out of the pattern, and all the hits are spread over the steps that remain. In Mute mode the pattern stays spread over every step, and any hits that land in the silent steps are silenced. The Status Bar spells out the current setting when you flip a switch.</p>
+<p>Ranges update dynamically: when Steps changes, Hits, Rotate and Insert Start clamp to fit, and the pads and insert can never use more steps than the pattern has.</p>
+<h3 id="logic">Logic</h3>
+<p>The Logic dropdown at the bottom of the window sets how Euclid A and Euclid B combine into one pattern. Its five choices use logic symbols; the Status Bar spells each one out:</p>
+<ul>
+<li><strong>A ∨ B (OR)</strong> &mdash; fires if either A or B fires</li>
+<li><strong>A ∧ B (AND)</strong> &mdash; fires only when both A and B fire on the same step</li>
+<li><strong>A ⊕ B (XOR)</strong> &mdash; fires when exactly one of A or B fires</li>
+<li><strong>A∧¬B (A not B)</strong> &mdash; fires when A fires and B does not</li>
+<li><strong>B∧¬A (B not A)</strong> &mdash; fires when B fires and A does not</li>
+</ul>
+<h3 id="accent-layer">Accent Layer</h3>
+<p>The Accent row has no logic relationship with A or B. When the accent ring fires on the same step as a combined A and B hit, that hit is accented, and is sent with a higher velocity (see MIDI Output).</p>
+<figure><img src="manual-images/mu-clid-midi-manual-euclid-panel.webp" alt="The Euclidean panel with its three rows." width="1100" height="357" loading="lazy"><figcaption>The Euclidean panel with its three rows.</figcaption></figure>
+<h2 id="midi-output">7. MIDI Output</h2>
+<p>Two controls in the row at the bottom of the window set what is sent:</p>
+<ul>
+<li><strong>MIDI Note</strong> &mdash; the note sent on every hit, chosen from a list from C-1 to G9 (middle C is C4). Default C2 (note 36), a common kick-drum note.</li>
+<li><strong>Accent</strong> &mdash; 0 to 100 percent, default 0. It sets how the velocity differs between accented and plain hits. In the lower half of the range, accented hits get louder, from velocity 100 up to 127, while plain hits stay at 100. In the upper half, accented hits stay at 127 and plain hits get softer, down to velocity 75. At 0 every hit is played at velocity 100.</li>
+</ul>
+<p>Each note lasts about 20 milliseconds, which suits drums and plucks. Synths with a long release will ring on after the note ends; set the release in the instrument. mu-Clid MIDI never leaves a note hanging: if you bypass the plug-in while a note is sounding, its note-off is still sent.</p>
+<h2 id="saving-and-restoring">8. Saving and Restoring</h2>
+<p>Everything you set is saved with your DAW project and restored when you open it. You can also automate the controls from your DAW.</p>
+<p>When a project is restored, mu-Clid MIDI first sets every parameter to its default, then applies what was saved. A project therefore never inherits leftovers from the plug-in instance it is loaded into, and unknown or out-of-date entries in a saved project are simply ignored. The rhythm&#x27;s name and colour from an older project are restored too.</p>
+<h2 id="technical-specifications">9. Technical Specifications</h2>
+<ul>
+<li>Formats: VST3, CLAP (Windows). No standalone version, no audio.</li>
+<li>Rhythms: 1</li>
+<li>Steps per generator: 1 to 64</li>
+<li>Output: one MIDI note per hit on channel 1, note 0 to 127, about 20 ms long</li>
+<li>Master loop: free-running or 16 to 256 steps</li>
+</ul>
+<h3 id="hosts-that-do-not-run-an-event-loop">Hosts That Do Not Run an Event Loop</h3>
+<p>mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host that runs its event loop.</p>
+<p>Prefer a file? <a href="manuals/mu-Clid-MIDI-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-clid-midi.html">mu-Clid MIDI</a> &middot; <a href="mu-clid-midi-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="free-vst3-clap-plugins.html">Free VST3 &amp; CLAP plugins</a></li><li><a href="guides.html">Guides</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="mailto:feedback@transwarp.me">Feedback and feature requests</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="prices.js" defer></script>
+  <script src="site.js"></script>
+</body>
+</html>
