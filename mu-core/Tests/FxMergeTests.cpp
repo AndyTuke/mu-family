@@ -173,6 +173,35 @@ struct FxMergeTests : juce::UnitTest
             expect(maxDiff(runSend(c, in), ref) < 1.0e-6f, "chorus send equals ChorusCore");
         }
 
+        beginTest("the flanger and phaser sends are wet-only and equal the bare core with no stereo offset");
+        {
+            mu_audio::FlangerFx f;
+            f.setSendMode(true);
+            f.prepareInner(sr, kBlock);
+            f.setParam("rate", 1.5f); f.setParam("depth", 60.0f); f.setParam("feedback", 50.0f);
+            mu_audio::FlangerCore fc;
+            fc.prepare(sr);
+            mu_audio::FlangerCore::Params fq;
+            fq.rateHz = 1.5f; fq.depth = 0.6f; fq.feedback = 0.5f * 0.95f; fq.stereoOffset = 0.0f;
+            fc.setParams(fq);
+            std::vector<float> fref;
+            for (float x : in) { float l, r; fc.tick(x, x, l, r); fref.push_back(l); }
+            expect(maxDiff(runSend(f, in), fref) < 1.0e-6f, "flanger send equals FlangerCore");
+
+            mu_audio::PhaserFx p;
+            p.setSendMode(true);
+            p.prepareInner(sr, kBlock);
+            p.setParam("rate", 1.5f); p.setParam("depth", 60.0f); p.setParam("stages", 8.0f); p.setParam("feedback", 50.0f);
+            mu_audio::PhaserCore pc;
+            pc.prepare(sr);
+            mu_audio::PhaserCore::Params pq;
+            pq.rateHz = 1.5f; pq.depth = 0.6f; pq.stages = 8; pq.feedback = 0.5f; pq.stereoOffset = 0.0f;
+            pc.setParams(pq);
+            std::vector<float> pref;
+            for (float x : in) { float l, r; pc.tick(x, x, l, r); pref.push_back(l); }
+            expect(maxDiff(runSend(p, in), pref) < 1.0e-6f, "phaser send equals PhaserCore");
+        }
+
         beginTest("the chorus insert's hidden values are three voices and spread 0.5");
         {
             static_assert(mu_audio::ChorusFx::kInsertVoices == 3, "three voices");
