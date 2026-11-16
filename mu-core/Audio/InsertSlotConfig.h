@@ -141,10 +141,10 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
       { },
       { "Freq", 10.0f, 5000.0f, SkewMode::Log, "Hz", nullptr, 0, true } },
 
-    // ── 10 TapeSat ── Drive / Output / — / Tone ───────────────────────
+    // ── 10 TapeSat ── Drive / Output / Head Bump / Tone ───────────────
     { { "Drive",  0.0f,  100.0f, SkewMode::Linear, "" },
       { "Output", -24.0f, 0.0f,  SkewMode::Linear, "dB" },
-      { },
+      { "Head Bump", 0.0f, 100.0f, SkewMode::Linear, "%" },
       { "Tone",   200.0f, 20000.0f, SkewMode::Log, "Hz", nullptr, 0, true } },
 
     // ── 11 Karplus ── Note / Octave / Feedback / LPF ──────────────────
@@ -275,7 +275,7 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /* 7 Compressor  */ { 30.0f,   0.0f,    5.0f,   200.0f   },
     /* 8 Limiter     */ { 30.0f,   0.0f,    5.0f,   200.0f   },
     /* 9 RingMod     */ { 50.0f,   0.0f,    0.0f,   440.0f   },
-    /*10 TapeSat     */ { 0.0f,    0.0f,    0.0f,   20000.0f },
+    /*10 TapeSat     */ { 30.0f,   0.0f,    30.0f,  20000.0f },
     /*11 Karplus     */ { 0.0f,    1.0f,    0.0f,   20000.0f },
     /*12 Vocoder     */ { 0.0f,    0.0f,    1.0f,   1.0f     },
     /*13 VocoderSt   */ { 0.0f,    0.0f,    1.0f,   1.0f     },

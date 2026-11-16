@@ -2,6 +2,7 @@
 
 #include "InsertAlgorithmBase.h"
 #include "Audio/AudioFilters.h"
+#include "Audio/FX/Algorithms/Adaa1Tanh.h"
 #include <cmath>
 
 // insertAlgo = 14. Tube-style overdrive: pre-gain → biased tanh → DC block → tone LP → output trim.
@@ -27,7 +28,8 @@ public:
         toneFilter[1].reset();
         dcIn [0] = dcIn [1] = 0.0f;
         dcOut[0] = dcOut[1] = 0.0f;
-        xPrev[0] = xPrev[1] = 0.0f;
+        adaa[0].reset();
+        adaa[1].reset();
         // Snap the smoothers to their prepare() values so a reset slot ramps in exactly as a fresh one.
         smoothedPreGain.setCurrentAndTargetValue(1.0f);
         smoothedOutGain.setCurrentAndTargetValue(1.0f);
@@ -56,10 +58,6 @@ public:
             for (int ch = 0; ch < nChState; ++ch)
                 toneFilter[ch].prepare(toneHz, (float) currentSampleRate);
 
-        // ADAA's antiderivative of tanh, log(cosh x), with the large-|x| form that cannot overflow.
-        auto ad1Tanh = [](float x) -> float {
-            return std::abs(x) > 12.0f ? std::abs(x) - 0.6931472f : std::log(std::cosh(x));
-        };
         // Sample-major: each smoothed value advances once per sample and every channel uses it.
         auto chans = buf.getArrayOfWritePointers();
         for (int i = 0; i < ns; ++i)
@@ -70,18 +68,10 @@ public:
             const float restingOffset = std::tanh(b);   // what the curve outputs for silence at this bias
             for (int ch = 0; ch < nChState; ++ch)
             {
-                float& xp = xPrev[ch];
                 float in = chans[ch][i];
                 if (! std::isfinite(in)) in = 0.0f;   // a NaN or Inf must not latch in the filter states
                 const float x  = in * pg + b;
-                const float dx = x - xp;
-                // Both points past the knee on the same side: tanh is flat at exactly +-1, and the large-|x| ADAA form
-                // would divide a float rounding error by a tiny dx (noise on a loud low note's flat top).
-                const float sat = (x > 12.0f && xp > 12.0f)    ?  1.0f
-                                : (x < -12.0f && xp < -12.0f)  ? -1.0f
-                                : std::abs(dx) < 1e-4f         ? std::tanh(0.5f * (x + xp))
-                                                               : (ad1Tanh(x) - ad1Tanh(xp)) / dx;
-                xp = x;
+                const float sat = adaa[ch].process(x);
                 const float centred = sat - restingOffset;
                 float& di   = dcIn [ch];
                 float& dout = dcOut[ch];
@@ -103,7 +93,7 @@ private:
     OnePoleLP toneFilter[2];
     float     dcIn [2] = {};
     float     dcOut[2] = {};
-    float     xPrev[2] = {};
+    mu_audio::Adaa1Tanh adaa[2];
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPreGain;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOutGain;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedBias;
