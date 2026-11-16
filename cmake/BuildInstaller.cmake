@@ -1,4 +1,10 @@
 # Invoked at build time by the mu-clid_installer target.
+# The installer packs the Release binaries, so any other configuration (a Debug build of everything) skips it: otherwise a Debug build
+# fails when no Release build exists, or packs stale Release files and replaces the installer in the distribution folder.
+if(NOT BUILD_CONFIG STREQUAL "Release")
+    message(STATUS "mu-Clid installer: skipped (${BUILD_CONFIG} build; it is built with Release)")
+    return()
+endif()
 # Reads build_number.txt after increment_build_number has already run,
 # so the installer filename matches the build number baked into the plugin.
 file(READ "${SOURCE_DIR}/build_number.txt" BUILD_NUM)

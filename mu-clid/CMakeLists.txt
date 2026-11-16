@@ -187,6 +187,7 @@ if(ISCC_EXE)
                 "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
                 "-DDIST_DIR=${MUFAMILY_INSTALLER_DIST}"
                 "-DCMAKE_COMMAND=${CMAKE_COMMAND}"
+                "-DBUILD_CONFIG=$<CONFIG>"
                 -P "${CMAKE_SOURCE_DIR}/cmake/BuildInstaller.cmake"
         COMMENT "Building mu-Clid installer"
         VERBATIM

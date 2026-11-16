@@ -1,5 +1,5 @@
 #pragma once
-#define BUILD_NUMBER 1490
+#define BUILD_NUMBER 1493
 // Live products return MU_VERSION_STRING from getVersionString(), pre-release products MU_VERSION_STRING_PRE.
 // The compiled mu-core library reads neither: it is one library for every product.
 #define MU_VERSION_BASE "1.2"
