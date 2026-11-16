@@ -265,13 +265,26 @@ Pic "The Buses page: three bus units each with two inserts, and the Master." "mi
 Pic "Mixer overlay, channel page 1-8, with the page selector at the top right and the Out selector at the foot of each strip." "mixer.png"
 
 H2 "Insert Effects"
-P "Every layer, every bus and the Master has insert effects. The algorithm dropdown lists None, 3-Band EQ, Bitcrusher, Clipper, Compressor, Fold, Hard Clip, Karplus, Limiter, Overdrive, Ring Mod, Soft Clip, Tape Sat, Vocoder and Vocoder St. Four knobs appear and are labelled to match the algorithm."
+P "Every layer, every bus and the Master has insert effects. The algorithm dropdown lists None, 3-Band EQ, Bitcrusher, Chorus, Clipper, Compressor, Flanger, Fold, Hard Clip, Karplus, Limiter, Overdrive, Phaser, Ring Mod, Soft Clip, Tape Sat, Vocoder and Vocoder St. Four knobs appear and are labelled to match the algorithm."
 H3 "Overdrive"
 P "Overdrive is a warm, tube-style saturation that also adds a little even-harmonic body. Its four knobs:"
 Bullet "Drive (0 to 100, default 0)  -  how hard the signal is pushed. At 0 it passes unchanged."
 Bullet "Output (-24 to 0 dB, default 0 dB)  -  the level after the saturation, to match the loudness before and after."
 Bullet "Bias (0 to 100 percent, default 25)  -  how asymmetrically the signal is clipped. More Bias adds more even harmonics and a thicker sound."
 Bullet "Tone (200 Hz to 20 kHz, default 20 kHz)  -  a low-pass filter on the result. Turn it down to soften the top end."
+
+H3 "Tape Sat"
+P "Tape Sat gives the soft, dense squash of a tape machine. As you turn Drive up, the highs compress and soften first, a little even-harmonic warmth is added, and small signals stay clean. Its four knobs:"
+Bullet "Drive (0 to 100, default 30)  -  how hard the signal is pushed into the tape."
+Bullet "Output (-24 to 0 dB, default 0 dB)  -  the level after the saturation, to match the loudness before and after."
+Bullet "Head Bump (0 to 100 percent, default 30)  -  a gentle lift of up to 4 dB in the low end around 75 Hz, like the bass swell of a tape head. At 0 it is off."
+Bullet "Tone (200 Hz to 20 kHz, default 20 kHz)  -  a low-pass filter on the result. Turn it down to soften the top end."
+
+H3 "Chorus, Flanger and Phaser"
+P "Chorus, Flanger and Phaser are also available as insert effects. They use the same sound as the Effect send of the same name, with a Mix knob to blend with the unprocessed signal. Inserts saved before this change may sound wider and thicker now."
+Bullet "Chorus  -  Rate (default 0.8 Hz), Depth (50 percent), Delay (5 to 30 ms, default 15) and Mix (50 percent). A three-voice chorus spread across the stereo field."
+Bullet "Flanger  -  Rate (default 0.3 Hz), Depth (70 percent), Feedback (-95 to 95 percent, default 50) and Mix (50 percent). Left and right sweep a quarter of a cycle apart."
+Bullet "Phaser  -  Rate (default 0.4 Hz), Depth (80 percent), Feedback (0 to 90 percent, default 40) and Mix (50 percent). Six stages, left and right a quarter of a cycle apart."
 
 H2 "Effects and Master"
 Bullet "Effect  -  Chorus, Flanger, Phaser or Echo. A pure send, with no Mix knob."
