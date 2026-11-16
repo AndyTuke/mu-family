@@ -200,3 +200,77 @@ Port (include and type names only): `AuditMinorsTests.cpp` (`ChorusEffect`/`Phas
 Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 
 **Do not:** make the core blend dry and wet (the phaser insert and send need different blends); give `FXAlgorithmDef` a role field (include cycle); keep the old per-voice delay lines in the core; add the insert's missing send parameters as new insert knobs (four slots is the contract); rename the insert-only classes in bulk.
+
+## Tape saturation rework: insertAlgo 10 TapeSat (ruled 2026-11-16, Ted; not yet built)
+
+**Why.** `TapeSatInsert` today is gain, `tanh`, DC block, one-pole low-pass: a plain soft clip with a tone knob, the same sound as SoftClip and Overdrive (insertAlgo 14, biased-tanh ADAA, the tube-style stage; it stays as it is and this ruling does not copy it). Andy approved a convincing tape model for insert 10. Slot 2 is unused today.
+
+### What real tape does, and what is modelled
+| Behaviour | Real tape | Here |
+|---|---|---|
+| Level-dependent HF saturation: highs run out of headroom first, so loud highs compress and dull | record pre-emphasis (NAB/IEC shelf) before the tape, de-emphasis after | **modelled**: a first-order high shelf before the saturator and its exact inverse after it |
+| Soft, gradual knee, odd harmonics dominate | hysteresis loop | **modelled** by a `tanh` curve, first-order ADAA |
+| Mild even harmonics | bias and magnetisation asymmetry | **modelled**: small fixed offset into the curve, removed again after (0.08 knee units; not a knob) |
+| Low "head bump", a soft rise around 50 to 120 Hz | playback-head gap and wavelength effects | **modelled**, Slot 2, optional |
+| Gentle HF loss | gap, spacing and thickness loss | **emerges** from the emphasis pair around the saturator (more drive, more HF loss), plus the Tone low-pass; no extra fixed filter |
+| Path-dependent hysteresis memory, wow/flutter, noise, crosstalk | | **not modelled** |
+
+**Model chosen: emphasis, saturate, de-emphasis (the classic cheap tape stage).** Jiles-Atherton hysteresis (Chowdhury, "Real-time physical modelling for analog tape machines", DAFx 2019, as in ChowTape, which is GPLv3 and so not reusable here) needs an iterative solver per sample and 2x to 8x oversampling to stay stable and alias-free: roughly 10 to 30 times the cost of this model (estimate, not measured), too heavy for a per-voice insert on every layer. The memoryless saturator between a shelf and its inverse reproduces the audible part (small signals pass flat; big signals lose highs first), adds only a few multiply-adds beyond the curve, and is unconditionally stable.
+
+### Signal path (per channel; state for two channels, as the other inserts)
+1. `x`, a non-finite value replaced by 0 (as Overdrive).
+2. **Pre-emphasis**: first-order high shelf, +9 dB at high frequencies (zero 1.5 kHz, pole 4.2 kHz, bilinear with pre-warp, coefficients set in `prepare` for the rate; valid at 44.1, 96 and 192 kHz). Unity at DC.
+3. Gain `preGain` (smoothed), then add the fixed offset `b = 0.08`.
+4. **Saturator**: `tanh`, first-order ADAA (antiderivative `log(cosh x)`, the large-`|x|` form, small-`dx` fallback, flat-top guard), then subtract the resting offset `tanh(b)`.
+5. **De-emphasis**: the exact inverse of step 2 (numerator and denominator swapped; stable because the shelf zero is inside the unit circle). Small-signal response is therefore flat: the tilt shows only when the saturator is driven.
+6. **Head bump** (only when Slot 2 > 0): the existing `BiquadFilter::setPeak`, 75 Hz, Q 0.9, 0 to +4 dB.
+7. DC block (one-pole high-pass at 20 Hz, as today and in Overdrive).
+8. **Tone**: the existing `OnePoleLP`, bypassed (its state follows the signal) at 19 kHz and above, exactly as Overdrive.
+9. Output gain.
+
+**Drive and level matching.** `preGain = 10^(Drive/100 * 24/20)`, 1x to about 16x (0 to 24 dB), 15 ms linear smoothing. `outGain = 10^(Output/20) / sqrt(preGain)`: the square-root makeup the family already uses (SoftClip, Overdrive). For a tape-level signal (peak 0.25) this keeps the output within about 3 dB over the whole Drive range, so more drive gives denser and duller sound rather than just louder. The test measures it.
+
+**Aliasing.** No oversampling: first-order ADAA only, as Overdrive and SoftClip. Reason: ADAA gives a useful alias cut with no latency and no filter state; 2x oversampling would double the cost and add latency per voice. The de-emphasis after the curve also lowers folded energy that lands in the highs. The pre-emphasis raises the HF level into the curve, which is the worst case for aliasing, so a test checks it. If listening finds it dirty, the fallback is the existing `OversampledProcessor` at 2x for this algorithm only, ruled then.
+
+**CPU (audio thread).** Per sample per channel: two first-order shelves (about 8 multiply-adds), one ADAA step (one `log(cosh)` and a divide, or `tanh` when `dx` is tiny), the DC block, one one-pole, plus the bump biquad when on: about 2 to 3 times today's insert (estimate), well below the Compressor or Vocoder. No allocation (all state is a handful of floats), nothing outside `prepare`. Shelf coefficients are set in `prepare`; bump and Tone at block rate, as Tone is today. Keep the `isfinite` guard.
+
+### Knob map (slot ids unchanged, so saved presets load)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Drive | 0..100 | Linear | "" | `preGain` above | 30 |
+| 1 | Output | -24..0 | Linear | dB | trim | 0 |
+| 2 | **Bump** | 0..100 | Linear | % | head-bump gain, 0 to +4 dB at 75 Hz; 0 skips the biquad | 30 |
+| 3 | Tone | 200..20000 | Log, dynamic unit | Hz | plain low-pass, open at 19 kHz and up; stays a plain low-pass | 20000 |
+
+`kInsertAlgoSlots[10]` slot 2 becomes `{ "Bump", 0.0f, 100.0f, SkewMode::Linear, "%" }`; `kInsertAlgoDefaults[10]` becomes `{ 30, 0, 30, 20000 }` (first visit only; a saved preset keeps its own values, and old presets store slot 2 as 0, which is Bump 0). The old default Drive 0 showed nothing on first selection. Tone keeps its label, range and unit.
+
+**Mod targets: no new row.** Insert knobs are the generic `insert.p1..p4` rows already in every product's table, labelled per algorithm from `kInsertAlgoSlots` (`mu_mod::populateDropdown`), so Bump becomes a target the moment its label exists. Depth stays a percentage of the knob's range. `check-mod-targets.ps1` and `mu_mod::checks` need no edit.
+
+### Class shape and files
+- `Insert/TapeSatInsert.h` is rewritten in place (class name, id 10 and dispatch unchanged; insert-only, so it keeps its `...Insert` name and moves to `Algorithms/` with the rest in the merge's last step).
+- New shared helpers in `mu-core/Audio/FX/Algorithms/` (namespace `mu_audio`):
+  - `Adaa1Tanh.h`: `struct Adaa1Tanh { float process(float x) noexcept; void reset() noexcept; }`, the ADAA tanh with its guards, lifted from `OverdriveInsert.h` (a second user, so it moves to a shared header before a second copy exists). `OverdriveInsert` switches to it in the same step (identical maths; bit-identical output is the check).
+  - `TapeEmphasis.h`: `struct TapeEmphasis { void prepare(double sr); float pre(float) noexcept; float de(float) noexcept; void reset() noexcept; }`, the first-order shelf pair.
+- Reuses `BiquadFilter` and `OnePoleLP` (`Audio/AudioFilters.h`) and `InsertSlotConfig.h`. Nothing new in `mu-core/UI`. No change to design-naming (class names follow the existing `...Insert` rule; helpers are plain nouns).
+
+### Build steps (each builds and runs its tests)
+1. Add `Algorithms/Adaa1Tanh.h`; switch `OverdriveInsert.h` to it; existing Overdrive tests unchanged.
+2. Add `Algorithms/TapeEmphasis.h`.
+3. Rewrite `Insert/TapeSatInsert.h` to the path above; `InsertProcessor.cpp` dispatch untouched.
+4. `InsertSlotConfig.h`: Bump label on row 10 slot 2, defaults row 10, row comment ("Drive / Output / Bump / Tone").
+5. Tests: new `mu-core/Tests/TapeSatTests.cpp`, listed in `mu-core/Tests/CMakeLists.txt`. Product golden renders that use insert 10 are stale on purpose until Andy allows a re-record.
+6. Docs: manual wording (Frank), `tests.md` (Fred), release note.
+
+### Tests (offline, no listening)
+- Even harmonics: 1 kHz sine at Drive 60, Bump 0: 2nd harmonic above the plain-`tanh` reference (the old class) and below the 3rd; odd harmonics still dominate.
+- HF compresses first: 200 Hz and 8 kHz at the same input level: the 8 kHz gain falls at least 3 dB more than the 200 Hz gain between Drive 0 and Drive 100; at -40 dBFS and Drive 30 the response is flat within 0.5 dB from 100 Hz to 10 kHz.
+- Bump: Bump 100 raises 75 Hz by 3 to 5 dB over Bump 0; Bump 0 is bit-identical to the path without the biquad.
+- Aliasing: 9 kHz sine at Drive 100, 44.1 kHz: the strongest folded component is at least 6 dB below the plain-`tanh` reference.
+- Level matching: RMS of a 0.25-peak 1 kHz sine at Output 0 within 3 dB across Drive 0, 25, 50, 75, 100.
+- Stability: finite output, no latched state after a NaN or Inf burst, at 44.1, 96 and 192 kHz, block sizes 1, 7, 512 giving the same result within float noise.
+- Reset: after `reset()` a render is bit-identical to a fresh instance's; settled Drive 0 output has no DC (mean below 1e-4).
+- `InsertDSPSmokeTests` and `InsertAlgoTableTests` (labels present, defaults in range) stay green.
+
+**Do not:** copy Overdrive's variable bias knob (Slot 2 is not bias; the asymmetry is fixed and small); add a Jiles-Atherton solver; add oversampling now; put the helpers in `Insert/`; add a mod-target row by hand; change the slot ids or the Tone range.
+
+**Andy decides:** Slot 2 as head Bump (ruled here) or as an asymmetry amount ("Warmth"); first-visit defaults Drive 30 / Bump 30.
