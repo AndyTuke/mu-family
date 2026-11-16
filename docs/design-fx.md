@@ -293,3 +293,96 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 **Status:** built (row 1818, commit 49339805) without oversampling; the 2x amendment above is the open code change, owned by the main conversation.
 
 **Andy decides:** Slot 2 as head Bump (ruled here) or as an asymmetry amount ("Warmth"); first-visit defaults Drive 30 / Bump 30.
+
+## Three new inserts: Auto Pan (22), Gate (23), Waveshaper (24) (ruled 2026-11-16, Ted)
+
+**Why.** Andy approved three more per-voice inserts. All are insert-only (no send role). This section settles Auto Pan versus Tremolo, placement, numbering, knobs and the real-time rules, so a coder needs no further decisions.
+
+### 1. Auto Pan is its own insert, not a Tremolo mode
+Tremolo (21) uses all four slots (Rate / Depth / Shape / Phase), so a Pan mode would have to take over a slot's meaning (Phase and Pan are different things) or add a hidden mode switch. Tremolo at Phase 100 % already pans, but on a linear law (the two gains always sum to 1, so the centre is 6 dB down) and with no way to place the centre. Auto Pan uses a constant-power law and a Centre knob. Tremolo is **not changed** (its Phase 100 % note stays true). Auto Pan reuses `kTremoloShapeNames` for Shape and the same sync convention, so the two families match; they do not share a class (different law, different state).
+
+### 2. Files and names
+New work goes in `mu-core/Audio/FX/Algorithms/` (the folder design-naming's `Fx` row and the merge section fix for algorithms); nothing new goes in `Insert/`. Insert-only classes keep the `...Insert` suffix and carry `static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;`. They are registered with `mu_audio::makeInsert<A>()`.
+```
+mu-core/Audio/FX/Algorithms/
+  AutoPanInsert.h     class mu_audio::AutoPanInsert    insertAlgo 22
+  GateInsert.h        class mu_audio::GateInsert       insertAlgo 23
+  WaveshaperInsert.h  class mu_audio::WaveshaperInsert insertAlgo 24
+  WaveshaperCurve.h   (optional) the triode curve as free inline functions, so a test can call the curve alone
+mu-core/Tests/NewInsertTests.cpp (extend), new mu-core/Tests/ThreeInsertsTests.cpp (listed in Tests/CMakeLists.txt)
+```
+Each includes `Audio/FX/Insert/InsertAlgorithmBase.h` and `Audio/FX/Algorithms/FxUse.h` (as `ChorusFx.h` does). The legacy `Insert/` folder is only touched by the existing step-6 move.
+
+### 3. Numbers and the edits that must agree
+`kInsertAlgoCount` and `InsertProcessor::kNumInsertAlgos` go 22 to 25; two `static_assert`s (InsertProcessor.h, AlgorithmNames.h) and the `kInsertMenu` assert fail the build if any table is missed. Edits:
+1. `Audio/InsertSlotConfig.h`: `kInsertAlgoCount = 25`; append rows 22, 23, 24 to `kInsertAlgoSlots`, `kInsertAlgoDefaults` and `kInsertSyncSlot` (22 -> `0`, 23 -> `-1`, 24 -> `-1`); update the "22 rows" comments.
+2. `Audio/AlgorithmNames.h`: append `"AutoPan"` (22), `"Gate"` (23), `"Waveshaper"` (24) to `kInsertAlgorithmNames` (the names are the preset keys: **never rename later**); menu rows `{ 22, "Auto Pan", 25 }`, `{ 23, "Gate", 65 }`, `{ 24, "Waveshaper", 160 }` (alphabetical: after 3-Band EQ, between Fold and Hard Clip, after Vocoder St).
+3. `Audio/InsertProcessor.h`: `kNumInsertAlgos = 25`; `InsertProcessor.cpp`: `dispatch[22] = add(mu_audio::makeInsert<mu_audio::AutoPanInsert>());` and likewise 23 and 24, plus the three includes.
+4. Nothing per product. The names table, the menu (`populateInsertMenu`), the knob driver (`InsertSlotUi` reads `kInsertAlgoSlots`), the master insert panels, mu-link's master FX (`ServerEngine` clamps with `kNumInsertAlgos`), mu-Tant's param range and the preset name lookup all read these tables. All of it is in mu-core, so `check-core-boundary.ps1` is unaffected.
+5. **Mod targets: no new row.** The insert knobs are the generic `insert.p1..p4` rows in every product, labelled per algorithm from `kInsertAlgoSlots`, so each new knob is a target the moment its label exists. Depth stays a percentage of the knob's range. The hidden fixed values are constants, not parameters, so `check-mod-targets.ps1` and `mu_mod::checks` need no edit.
+6. Tests: `NewInsertTests.cpp` `expectEquals(kInsertAlgoCount, 25)`, loops run to `Waveshaper`, the "has a Mix knob" exemption becomes Tremolo, AutoPan, Gate, Waveshaper. `MixerBlockValueTests.cpp` `InsertLatencyTests` (instances near line 1085, count check near 1100, zero-delay assertion near 1139): add the three; AutoPan and Gate assert zero latency; Waveshaper gets the same measured-bound entry as TapeSat (impulse peak within 4 samples). `AlgorithmNameTableTests`, `InsertAlgoTableTests` and `BusInsertTests` iterate the tables and need no edit. `tests.md` (Fred), manuals (Frank), release note (`/notes`) once for the batch.
+7. No goldens use these indices yet; none go stale.
+
+### 4. Knob maps (slot ids fixed from first release; presets store the normalised value, so ranges and skews must not change later)
+Status-bar names are the knob labels (the shell already reports label and value for every insert knob; nothing extra to wire).
+
+**22 Auto Pan** (stereo constant-power pan swept by a wave; zero latency)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Rate | 0.1..20 | Log | Hz | LFO rate; with the insert's Sync on, 1..16 sixteenths (`kInsertSyncSlot[22] = 0`, same helpers as Tremolo) | 0.5 |
+| 1 | Depth | 0..100 | Linear | % | how far the wave swings the pan from Centre (100 % reaches full left and right) | 60 |
+| 2 | Shape | 0..2 | IntStep, `kTremoloShapeNames` | "" | Sine / Triangle / Square (square rounded over about 2 ms, as Tremolo) | 0 (Sine) |
+| 3 | Centre | -100..100 | Linear | % | static pan offset; also a plain pan control at Depth 0 | 0 |
+
+DSP: `pan = clamp(centre + depth * w, -1, 1)` with `w` in -1..1 and `centre = Centre/100`. Angle `a = (pan + 1) * pi/4`; `gL = sqrt(2) * cos(a)`, `gR = sqrt(2) * sin(a)`. At pan 0 both gains are exactly 1 (so Depth 0 with Centre 0 leaves the signal bit-exact untouched; a test requires it); full left gives `gL = sqrt(2)`, `gR = 0`. The gains apply to the left and right channels of the stereo input (a balance, not a mono-to-stereo spread); a mono layer (`nCh = 1`) passes through unchanged. One LFO phase for both channels (no Phase knob); the rounded-square smoother is per insert. The LFO phase, sync maths (`insertSyncStepFromNorm`, `insertSixteenthSeconds`, `tempoBpm`) and square rounding follow `TremoloInsert` (a shared `LfoWave.h` helper is welcome the next time either is touched, not required now). Gains are computed per sample from the wave, so the sweep is continuous; the 2 ms square rounding is the only smoothing needed.
+
+**23 Gate** (downward gate, internal stereo-linked detector, no look-ahead; zero latency)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Threshold | -80..0 | Linear | dB | level above which the gate opens | -40 |
+| 1 | Range | -80..0 | Linear | dB | how far the closed gate cuts; 0 = no cut (bit-exact untouched), -80 = fully shut (gain exactly 0) | -60 |
+| 2 | Attack | 0.1..50 | Log | ms | gain rise time on opening | 1 |
+| 3 | Release | 5..2000 | Log, dynamic unit | ms | gain fall time after hold | 150 |
+
+DSP: detector `d = max(|L|, |R|)` through a peak follower (instant rise, 5 ms release; hidden). The gate opens when `d > thr` and closes when `d < thr - 4 dB` (hysteresis, hidden) and a hold of 20 ms (hidden) has run out. `floor = (Range <= -79.9) ? 0 : 10^(Range/20)`; Range 0 skips the multiply entirely. Target gain is 1 (open) or `floor` (closed); the gain moves by a one-pole in the linear domain, Attack time going up and Release time going down, one gain for both channels (stereo-linked, so the image does not shift). Time constants come from the sample rate in `prepare`, at least one sample long. No Mix, no sidechain, no gain-reduction meter (`insertAlgoShowsGainReduction` stays as it is; a Gate meter would be a separate UX decision). Threshold and Range are dB in a Linear skew on purpose (dB is already perceptual, as Output on the other inserts).
+
+**24 Waveshaper** (valve-style: biased triode curve, asymmetric, even harmonics; 2x oversampled)
+| Slot | Label | Range | Skew | Unit | Role | Default |
+|---|---|---|---|---|---|---|
+| 0 | Drive | 0..100 | Linear | "" | input gain, 0 to +30 dB | 30 |
+| 1 | Output | -24..0 | Linear | dB | trim | 0 |
+| 2 | Bias | 0..100 | Linear | % | grid bias: moves the operating point along the curve, more asymmetry and more even harmonics | 30 |
+| 3 | Sag | 0..100 | Linear | % | supply sag: loud passages pull the stage's gain down and it recovers slowly (valve power-supply compression) | 30 |
+
+Why Sag and not Tone in slot 3: Overdrive (14) is already the biased-tanh stage with Drive / Output / Bias / Tone. The Waveshaper's difference is the curve and the dynamics, so it spends its fourth knob on Sag, and does not repeat Overdrive's four labels. Tone can come from the EQ or a second insert.
+
+**Transfer curve (the triode model).** With `v` the biased input:
+- `f(v) = v / (1 + v)` for `v >= 0` (grid-conduction side, soft, limit +1.0)
+- `f(v) = v / (1 - v / 1.5)` for `v < 0` (cut-off side, limit -1.5, reached later)
+
+Slope 1 at `v = 0` on both sides (small signals pass at unity) while the second derivative differs, so there is 2nd harmonic even at Bias 0, the valve signature Overdrive's symmetric tanh lacks. This is a simple Child-Langmuir-style soft-knee rational model, not a Koren fit. Antiderivative if ADAA is needed (see Aliasing): `F(v) = v - ln(1 + v)` for `v >= 0`; `F(v) = -1.5 v - 2.25 ln(1.5 - v) + 2.25 ln 1.5` for `v < 0` (continuous at 0).
+
+**Signal path (per channel).** `x` (non-finite replaced by 0, finite clamped to +-1e4, the TapeSat guard) -> times `preGain = 10^(Drive/100 * 30/20) / (1 + 0.8 * Sag/100 * env)` -> add `bias = Bias/100 * 0.6` -> **2x oversampled**: `f` -> subtract the resting offset `f(bias)` -> back to base rate -> DC block (20 Hz one-pole, as Overdrive and TapeSat) -> times `outGain = 10^(Output/20) / sqrt(preGainNoSag)`. `env` is a follower of `max(|L|,|R|)` times the drive gain, clipped to 4, attack 10 ms, release 150 ms (hidden starting values; the measured tests may retune them); stereo-linked, advanced at the base rate. At Sag 0 the gain is level-independent (a test requires it).
+
+**Aliasing (2x oversampled).** Same ruling as TapeSat (amended 2026-11-16): `juce::dsp::Oversampling<float>`, 1 stage, `filterHalfBandPolyphaseIIR`, owned by the insert and created in `prepare` with the block size it is given (never the FIR `OversampledProcessor`, whose latency the insert chain cannot compensate); `reset()` resets it; long blocks run in chunks; channels beyond two pass through; nothing allocated on the audio thread. Target: 9 kHz sine at Drive 100, 44.1 kHz, strongest folded component at least 6 dB below plain `tanh` at the same gain. The rational curve is less smooth than tanh, so if 2x alone misses the target, add first-order ADAA with the antiderivative above (guards as `Adaa1Tanh.h`) before considering 4x; record the margin in `tests.md`.
+
+**Latency.** Waveshaper adds the halfband group delay (about 4 samples), not reported and not compensated, exactly as TapeSat. Auto Pan and Gate add none and keep the zero-latency assertion; Gate has no look-ahead for that reason.
+
+### 5. Real-time rules for all three
+- No allocation outside `prepare`; no locks; no virtual calls beyond the base-class `process`. State for two channels, fixed-size arrays, as the other inserts.
+- `prepare(sr, block)` guards `sr > 0` (falls back to 44100) and fills every coefficient from the rate; `reset()` returns all state to fresh (LFO phase, gate gain and hold counter, followers, oversampler), so reset-equals-fresh is bit-exact.
+- NaN and Inf: Waveshaper clamps as above; Gate and Auto Pan treat a non-finite sample as 0 before the detector or the gain stage, so a burst cannot latch a follower or the gate. Every `insertSlot(p, n)` value is clamped to its table range inside the algorithm (as Tremolo does).
+- Denormals: the callback runs under `juce::ScopedNoDenormals`; the followers, one-poles and the DC block still flush values below 1e-20 to 0 where they decay to silence.
+- Smoothing: Drive, Output and Bias 15 ms (`juce::SmoothedValue`, snapped at `prepare` and `reset`, as Overdrive); Auto Pan's Centre and Depth 15 ms; Gate's gain smoothing is its own envelope.
+- Finite and bounded output at all knob corners with and without Sync, at 44.1, 96 and 192 kHz and block sizes 1, 7, 512 (extends the existing corner test; peak bound 8 as the others).
+
+### 6. Tests (offline, no listening; `ThreeInsertsTests.cpp`)
+- **Auto Pan:** Depth 0 and Centre 0 untouched (error below 1e-5); constant power (`gL^2 + gR^2 = 2` within 1e-4 across pan); Centre +100 with Depth 0 puts everything on the right and leaves the left silent; left and right levels swing in opposition over one measured LFO period; the square shape has no sample-to-sample step above a bound; Sync gives the expected period at 120 bpm; mono passes through unchanged.
+- **Gate:** a tone 20 dB above Threshold passes within 0.1 dB once the attack has settled; a tone 20 dB below is cut by Range (+-0.5 dB); Range 0 untouched; Range -80 gives exact zeros after release; a signal between Threshold and Threshold - 4 dB does not chatter (state changes bounded); Hold keeps the gate open 20 ms after the level drops; attack and release times within 20 % of the knob on a step; a hard-panned input gets the same gain on both channels (stereo-linked).
+- **Waveshaper:** H2 above the Overdrive reference at the same Drive with Bias 0 (1 kHz sine, Drive 60) and H2 grows with Bias; odd harmonics still present; the curve alone has slope 1 at 0, is continuous across 0 and reaches the stated limits; Sag 100 pulls a loud burst's gain down and it recovers, Sag 0 is level-independent; DC after silence below 1e-4; alias margin as above; latency bound as above; level matching within 4.5 dB across Drive 0 to 100 for a 0.25-peak 1 kHz sine (family standard, as TapeSat); reset equals fresh.
+
+**Do not:** add a Pan mode or a fifth slot to Tremolo; put the new files in `Insert/`; give any of the three a Mix knob (Depth, Range and Drive are their own dry/wet); reuse Overdrive's tanh or its Tone knob in the Waveshaper; add look-ahead to the Gate (latency); rename `"AutoPan"`, `"Gate"` or `"Waveshaper"` once released (they are preset keys); add a mod-target row by hand; change a range or skew after release.
+
+**Andy decides:** the preset key "Waveshaper" for the valve stage (the menu text could say "Valve" with no other change, but the key must be chosen before release); Sag as the fourth knob (ruled) versus Tone.
+
+**Status:** ruled, not built. Code owned by the main conversation: the numbered edits in section 3, then the tests in section 6.
