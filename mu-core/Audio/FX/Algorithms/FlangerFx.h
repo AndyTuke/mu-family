@@ -79,6 +79,9 @@ public:
         if (! core.ready() || nCh <= 0) return;
         FlangerCore::Params q;
         q.rateHz   = juce::jlimit(0.05f, 5.0f, insertSlot(p, 0));
+        // Sync: the rate is one sweep per 1/64 .. 64 sixteenth notes of the tempo (up to 20 Hz at the fast end).
+        if (p.insertSync)
+            q.rateHz = juce::jlimit(0.01f, 20.0f, (float) (1.0 / (mu_ui::rateSyncSixteenthsFromNorm(p.insertParam[0]) * mu_ui::insertSixteenthSeconds(tempoBpm))));
         q.depth    = juce::jlimit(0.0f, 1.0f, insertSlot(p, 1) * 0.01f);
         q.feedback = juce::jlimit(-0.95f, 0.95f, insertSlot(p, 2) * 0.01f);
         q.stereoOffset = kInsertStereoOffset;

@@ -270,8 +270,8 @@ inline constexpr int kInsertSyncSlot[kInsertAlgoCount] = {
     0,    // 15 TapeDelay : Time
     1,    // 16 TapeSpring: Rate
     -1,   // 17 Chorus
-    -1,   // 18 Flanger
-    -1,   // 19 Phaser
+    0,    // 18 Flanger   : Rate
+    0,    // 19 Phaser    : Rate
     1,    // 20 PitchDelay: Time
     0,    // 21 Tremolo   : Rate
     0,    // 22 AutoPan   : Rate
@@ -297,6 +297,42 @@ inline int   insertSyncStepFromNorm(float norm) noexcept
 inline float insertSyncStepToNorm(int step) noexcept   // the middle of the step's band
 {
     return ((float) std::clamp(step, 1, kInsertSyncSteps) - 0.5f) / (float) kInsertSyncSteps;
+}
+// Rate algorithms (Tremolo, Auto Pan) use a wider scale than the delays, whose buffers cap the time: steps 1/64, 1/32, 1/16,
+// then 2, 3 ... 64 sixteenths (four bars). A step's length is given in sixteenth notes (0.25 = a 64th).
+inline constexpr int kRateSyncSteps = 66;
+inline bool insertSyncUsesRateScale(int algoIndex) noexcept { return algoIndex == 18 || algoIndex == 19 || algoIndex == 21 || algoIndex == 22; }
+inline int rateSyncIndexFromNorm(float norm) noexcept
+{
+    return std::clamp((int) std::floor(std::clamp(norm, 0.0f, 1.0f) * (float) kRateSyncSteps), 0, kRateSyncSteps - 1);
+}
+inline float rateSyncIndexToNorm(int index) noexcept   // the middle of the step's band
+{
+    return ((float) std::clamp(index, 0, kRateSyncSteps - 1) + 0.5f) / (float) kRateSyncSteps;
+}
+inline double rateSyncSixteenths(int index) noexcept
+{
+    index = std::clamp(index, 0, kRateSyncSteps - 1);
+    return index == 0 ? 0.25 : index == 1 ? 0.5 : (double) (index - 1);
+}
+inline double rateSyncSixteenthsFromNorm(float norm) noexcept { return rateSyncSixteenths(rateSyncIndexFromNorm(norm)); }
+inline float rateSyncSixteenthsToNorm(double sixteenths) noexcept
+{
+    const int index = sixteenths < 0.375 ? 0 : sixteenths < 0.75 ? 1 : (int) std::lround(sixteenths) + 1;
+    return rateSyncIndexToNorm(index);
+}
+inline const char* rateSyncLabel(int index) noexcept
+{
+    static const char* const names[kRateSyncSteps] = {
+        "1/64", "1/32", "1/16", "2 x 1/16", "3 x 1/16", "4 x 1/16", "5 x 1/16", "6 x 1/16", "7 x 1/16", "8 x 1/16",
+        "9 x 1/16", "10 x 1/16", "11 x 1/16", "12 x 1/16", "13 x 1/16", "14 x 1/16", "15 x 1/16", "16 x 1/16", "17 x 1/16",
+        "18 x 1/16", "19 x 1/16", "20 x 1/16", "21 x 1/16", "22 x 1/16", "23 x 1/16", "24 x 1/16", "25 x 1/16", "26 x 1/16",
+        "27 x 1/16", "28 x 1/16", "29 x 1/16", "30 x 1/16", "31 x 1/16", "32 x 1/16", "33 x 1/16", "34 x 1/16", "35 x 1/16",
+        "36 x 1/16", "37 x 1/16", "38 x 1/16", "39 x 1/16", "40 x 1/16", "41 x 1/16", "42 x 1/16", "43 x 1/16", "44 x 1/16",
+        "45 x 1/16", "46 x 1/16", "47 x 1/16", "48 x 1/16", "49 x 1/16", "50 x 1/16", "51 x 1/16", "52 x 1/16", "53 x 1/16",
+        "54 x 1/16", "55 x 1/16", "56 x 1/16", "57 x 1/16", "58 x 1/16", "59 x 1/16", "60 x 1/16", "61 x 1/16", "62 x 1/16",
+        "63 x 1/16", "64 x 1/16" };
+    return names[std::clamp(index, 0, kRateSyncSteps - 1)];
 }
 // A sixteenth note's length at a tempo, in seconds (a non-finite or absurd tempo reads as 120 bpm).
 inline double insertSixteenthSeconds(double bpm) noexcept

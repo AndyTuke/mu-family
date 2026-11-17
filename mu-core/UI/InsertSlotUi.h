@@ -50,7 +50,7 @@ inline juce::String formatSlotValue(double v, const SlotConfig& cfg)
     }
     if (cfg.skew == SkewMode::IntStep)
         return juce::String((int) std::round(v));
-    return juce::String(v, 1);
+    return juce::String(v, (cfg.skew == SkewMode::Log && cfg.maxVal <= 100.0f) ? 2 : 1);
 }
 
 // Compose the displayed label including unit. dynamicUnit knobs flip Hz↔kHz
@@ -105,7 +105,10 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     k.setVisible(true);
 
     // Range + skew on the underlying slider so drag feel matches storage skew.
+    // A low-range log knob (a 0.05..5 Hz rate) needs fine steps: 0.1 steps made its first notch jump to 0.2 Hz.
+    const bool fineLog = cfg.skew == SkewMode::Log && cfg.maxVal <= 100.0f;
     const double step = (cfg.skew == SkewMode::IntStep) ? 1.0
+                      : fineLog ? 0.01
                       : ((cfg.maxVal - cfg.minVal) > 100.0 ? 1.0 : 0.1);
     k.setRange(cfg.minVal, cfg.maxVal, step);
     if (cfg.skew == SkewMode::Log && cfg.minVal > 0.0f && cfg.maxVal > cfg.minVal)
@@ -129,7 +132,9 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     const bool stepped = tempoSynced && kInsertSyncSlot[algoIndex] == slotIndex;
     if (stepped)
         k.getSlider().textFromValueFunction = [algoIndex, slotIndex](double v) -> juce::String {
-            return juce::String(insertSyncStepFromNorm(actualToNorm((float) v, algoIndex, slotIndex))) + " x 1/16";
+            const float norm = actualToNorm((float) v, algoIndex, slotIndex);
+            return insertSyncUsesRateScale(algoIndex) ? juce::String(rateSyncLabel(rateSyncIndexFromNorm(norm)))
+                                                      : juce::String(insertSyncStepFromNorm(norm)) + " x 1/16";
         };
 
     // Snap the value (actual scale).
@@ -146,7 +151,8 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
         float norm = actualToNorm((float) v, algoIndex, slotIndex);
         if (stepped)   // the knob rests on the middle of its step
         {
-            norm = insertSyncStepToNorm(insertSyncStepFromNorm(norm));
+            norm = insertSyncUsesRateScale(algoIndex) ? rateSyncIndexToNorm(rateSyncIndexFromNorm(norm))
+                                                      : insertSyncStepToNorm(insertSyncStepFromNorm(norm));
             k.setValue((double) normToActual(norm, algoIndex, slotIndex), juce::dontSendNotification);
         }
         onWriteNorm(norm);

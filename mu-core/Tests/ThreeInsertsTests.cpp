@@ -177,7 +177,7 @@ struct ThreeInsertsTests : juce::UnitTest
             fx.prepare(kSR, 512);
             fx.tempoBpm = 120.0;
             auto p = params(AutoPan, 1.0f, 100.0f, 0.0f, 0.0f);
-            p.insertParam[0] = mu_ui::insertSyncStepToNorm(4);
+            p.insertParam[0] = mu_ui::rateSyncSixteenthsToNorm(4.0);
             p.insertSync = true;
             const auto o = render2(fx, p, constant(96000, 1.0f), constant(96000, 1.0f));
             int up = 0;

@@ -133,14 +133,25 @@ struct NewInsertTests : juce::UnitTest
 
         beginTest("Tremolo with Sync follows the tempo: four sixteenths at 120 bpm is a 2 Hz pulse");
         {
-            // Rate slot 0 holds the step: step 4 sits in band 3 of 16, its middle is (3 + 0.5) / 16.
-            auto p = make(Tremolo, mu_ui::insertSyncStepToNorm(4), 1.0f, 0.0f, 0.0f);
+            // Rate slot 0 holds the step on the rate scale (1/64, 1/32, 1/16, then 2..64 sixteenths): four sixteenths.
+            auto p = make(Tremolo, mu_ui::rateSyncSixteenthsToNorm(4.0), 1.0f, 0.0f, 0.0f);
             p.insertSync = true;
             auto out = run(p, 4.0, [](int) { return 0.5f; }, 120.0);
             int rises = 0;
             for (size_t i = 1; i < out.size(); ++i)
                 if (out[i - 1] < 0.25f && out[i] >= 0.25f) ++rises;
             expect(rises >= 7 && rises <= 9, "pulses in 4 s: " + juce::String(rises));
+        }
+
+        beginTest("the rate sync scale runs 1/64, 1/32, 1/16, then 2 to 64 sixteenths, and every step round-trips through its knob position");
+        {
+            expect(mu_ui::rateSyncSixteenths(0) == 0.25 && mu_ui::rateSyncSixteenths(1) == 0.5 && mu_ui::rateSyncSixteenths(2) == 1.0, "first three steps");
+            expect(mu_ui::rateSyncSixteenths(3) == 2.0 && mu_ui::rateSyncSixteenths(mu_ui::kRateSyncSteps - 1) == 64.0, "then up in sixteenths to four bars");
+            for (int i = 0; i < mu_ui::kRateSyncSteps; ++i)
+                expect(mu_ui::rateSyncIndexFromNorm(mu_ui::rateSyncIndexToNorm(i)) == i
+                       && mu_ui::rateSyncIndexFromNorm(mu_ui::rateSyncSixteenthsToNorm(mu_ui::rateSyncSixteenths(i))) == i,
+                       "step " + juce::String(i) + " round-trips");
+            expect(mu_ui::insertSyncUsesRateScale(Tremolo) && mu_ui::insertSyncUsesRateScale(AutoPan) && ! mu_ui::insertSyncUsesRateScale(PitchDelay), "only the rate inserts use it");
         }
 
         beginTest("a square Tremolo at full depth reaches silence between pulses");

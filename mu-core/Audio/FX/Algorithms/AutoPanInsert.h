@@ -44,7 +44,7 @@ public:
         float rate = juce::jlimit(0.1f, 20.0f, finiteOr(insertSlot(p, 0), 0.5f));
         if (p.insertSync)
         {
-            const int n = mu_ui::insertSyncStepFromNorm(p.insertParam[0]);
+            const double n = mu_ui::rateSyncSixteenthsFromNorm(p.insertParam[0]);
             rate = (float) (1.0 / (n * mu_ui::insertSixteenthSeconds(tempoBpm)));
         }
         const float depth  = juce::jlimit(0.0f, 1.0f,  finiteOr(insertSlot(p, 1), 60.0f) * 0.01f);
