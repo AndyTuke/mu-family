@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mu-Tant Manual: Wavetable Drone Synth User Guide | Transwarp</title>
+  <meta name="description" content="User guide for mu-Tant, a free wavetable drone synth plugin (VST3, CLAP, Standalone): oscillators, FM and ring modulation, the gate sequencer, modulators and mixer.">
+  <link rel="canonical" href="https://transwarp.me/mu-tant-manual">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-tant-manual">
+  <meta property="og:title" content="mu-Tant Manual: Wavetable Drone Synth User Guide">
+  <meta property="og:description" content="User guide for mu-Tant, a free wavetable drone synth plugin (VST3, CLAP, Standalone): oscillators, FM and ring modulation, the gate sequencer, modulators and mixer.">
+  <meta property="og:image" content="https://transwarp.me/wavetable-drone-synth-vst3-full-window.png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "mu-Tant Manual: Wavetable Drone Synth User Guide",
+  "description": "User guide for mu-Tant, a free wavetable drone synth plugin (VST3, CLAP, Standalone): oscillators, FM and ring modulation, the gate sequencer, modulators and mixer.",
+  "mainEntityOfPage": "https://transwarp.me/mu-tant-manual",
+  "image": "https://transwarp.me/wavetable-drone-synth-vst3-full-window.png",
+  "inLanguage": "en-GB",
+  "about": {
+    "@type": "SoftwareApplication",
+    "name": "mu-Tant",
+    "url": "https://transwarp.me/mu-tant",
+    "applicationCategory": "MusicApplication",
+    "operatingSystem": "Windows"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project",
+    "url": "https://transwarp.me/"
+  },
+  "encodingFormat": "text/html",
+  "associatedMedia": {
+    "@type": "MediaObject",
+    "contentUrl": "https://transwarp.me/manuals/mu-Tant-User-Manual.pdf",
+    "encodingFormat": "application/pdf"
+  }
+}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main style="padding-top: 120px; padding-bottom: 100px;">
+    <article class="art manual">
+      <div class="kicker">User manual &middot; Version 1.1</div>
+      <h1>mu-Tant Manual: Wavetable Drone Synth User Guide</h1>
+      <p class="lede">mu-Tant: Wavetable Drone Synthesiser.</p>
+<p>Prefer a file? <a href="manuals/mu-Tant-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-tant.html">mu-Tant</a> &middot; <a href="mu-tant-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#introduction">Introduction</a></li><li><a href="#the-drone-concept">The Drone Concept</a></li><li><a href="#installation">Installation</a></li><li><a href="#interface-overview">Interface Overview</a></li><li><a href="#transport-bar">Transport Bar</a></li><li><a href="#voice-sidebar">Voice Sidebar</a></li><li><a href="#voice-header">Voice Header</a></li><li><a href="#oscillators-osc-1-and-osc-2">Oscillators (OSC 1 and OSC 2)</a></li><li><a href="#cross-modulation-x-mod-and-noise">Cross-Modulation (X-MOD) and Noise</a></li><li><a href="#source-levels">Source Levels</a></li><li><a href="#dual-filter">Dual Filter</a></li><li><a href="#insert-effect">Insert Effect</a></li><li><a href="#gate-editor">Gate Editor</a></li><li><a href="#modulators">Modulators</a></li><li><a href="#mixer">Mixer</a></li><li><a href="#presets">Presets</a></li><li><a href="#settings">Settings</a></li><li><a href="#connecting-to-mu-link">Connecting to mu-link</a></li><li><a href="#signal-flow">Signal Flow</a></li><li><a href="#tips-and-workflow">Tips and Workflow</a></li><li><a href="#technical-specifications">Technical Specifications</a></li><li><a href="#design-decisions-not-in-mu-tant">Design Decisions (Not in mu-Tant)</a></li></ol></nav>
+<h2 id="introduction">1. Introduction</h2>
+<p>mu-Tant is a wavetable drone synthesiser from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application.</p>
+<p>mu-Tant is a drone instrument, not a note instrument. Each of up to eight independent voices runs two wavetable oscillators continuously - the oscillators never start or stop. Instead of triggering notes, you sculpt a continuously evolving tone: a drawable gate pattern chops rhythmic bursts out of the drone, dual multi-mode filters shape it, and a per-voice modulator bank warps pitch, timbre, and filter over time.</p>
+<p>mu-Tant shares its interface shell, modulator engine, mixer, and FX rack with its sibling mu-Clid. The difference is the engine: where mu-Clid triggers samples on Euclidean hits, mu-Tant sustains wavetable drones shaped by a drawn gate.</p>
+<p>Every feature is available to everyone: all eight voices, the full gate editor and preset saving. mu-Tant is free to download and use, with every feature, and a one-off £20 licence removes the licence reminder (see Supporting mu-Tant).</p>
+<h3 id="who-is-this-for">Who Is This For?</h3>
+<p>mu-Tant is for sound designers and producers who work with evolving pads, drones, textures, and generative ambient material. It is equally at home in a DAW session - fully automatable and synchronised to host transport - or as a standalone instrument for live performance and sketching.</p>
+<figure><img src="manual-images/mu-tant-manual-main-window.webp" alt="The mu-Tant window: transport bar, voice sidebar, voice editor, gate editor and modulator panel." width="1100" height="697" loading="lazy"><figcaption>The mu-Tant window: transport bar, voice sidebar, voice editor, gate editor and modulator panel.</figcaption></figure>
+<h2 id="the-drone-concept">2. The Drone Concept</h2>
+<p>A traditional synthesiser is silent until you press a key; the note starts on key-down and ends on key-up. mu-Tant inverts this. Its oscillators are free-running - they are always producing sound. What you hear is shaped not by note triggers but by three things working together:</p>
+<ul>
+<li>The gate - a drawn pattern of attack/decay shapes that opens and closes a volume gate, carving rhythm out of the continuous tone.</li>
+<li>The modulators - up to eight per voice, slowly (or quickly) warping pitch, wavetable position, filter cutoff, and cross-modulation.</li>
+<li>The dual filter - two independent multi-mode filters in series or parallel, each able to resonate, comb, or shelve the evolving spectrum.</li>
+</ul>
+<p>Because nothing ever retriggers from zero, mu-Tant excels at sounds that breathe and shift continuously - the gate adds rhythm without the choppiness of a re-struck note.</p>
+<h2 id="installation">3. Installation</h2>
+<h3 id="plug-in-files">Plug-in Files</h3>
+<p>mu-Tant ships in three formats:</p>
+<ul>
+<li><strong>VST3</strong> &mdash; copy mu-Tant.vst3 to %ProgramFiles%\Common Files\VST3\</li>
+<li><strong>CLAP</strong> &mdash; copy mu-Tant.clap to %ProgramFiles%\Common Files\CLAP\</li>
+<li><strong>Standalone</strong> &mdash; run mu-Tant.exe from any location</li>
+</ul>
+<h3 id="content-folder">Content Folder</h3>
+<p>On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\TDP\muTant\ with sub-folders for presets (full preset files, .muTant), voices (single-voice preset files, .muPattern) and your own wavetables. You can ask mu-Tant to start from your own preset: tick Save as Default in the Save window, and that preset is loaded when mu-Tant starts and whenever you press New.</p>
+<h3 id="supporting-mu-tant">Supporting mu-Tant</h3>
+<p>mu-Tant is free to download and use, and every feature works for everyone. A copy without a licence shows a polite reminder each time it loads. A one-off licence for £20 removes the reminder: after you pay, a licence key is sent by email from Lemon Squeezy, our payment provider, and entering the key removes the reminder for good. The key changes nothing else; mu-Tant works the same with or without it.</p>
+<p>A copy without a key shows a polite &#x27;Support mu-Tant&#x27; window every time you load mu-Tant: each new instance in your DAW, and each time the standalone app starts. It has three buttons:</p>
+<ul>
+<li><strong>Maybe later</strong> &mdash; closes the window for that instance and carries on. It appears again the next time you load mu-Tant.</li>
+<li><strong>Enter licence key</strong> &mdash; opens the &#x27;Enter licence key - mu-Tant&#x27; panel, where you type in your key.</li>
+<li><strong>Get a licence</strong> &mdash; opens the checkout page in your web browser. A licence is a one-off payment of £20, and a key is emailed to you.</li>
+</ul>
+<p>The reminder cannot be switched off without a licence. To bring the window back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel.</p>
+<p>To enter your key, click Enter licence key in the Support window, or click the mu-Tant logo to open the About panel and click Enter a key. In the &#x27;Enter licence key - mu-Tant&#x27; panel (it reads &#x27;Enter your licence key to remove the support reminder. Everything works either way.&#x27;), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Get a licence to open the checkout page in your web browser. mu-Tant needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear.</p>
+<p>A licensed copy shows &#x27;Thank you for supporting mu-Tant.&#x27; in the About panel.</p>
+<p>Once activated, mu-Tant checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days.</p>
+<p>If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-Tant content folder.</p>
+<figure><img src="manual-images/mu-tant-manual-support-prompt.webp" alt="Support mu-Tant window with its three buttons." width="1100" height="697" loading="lazy"><figcaption>Support mu-Tant window with its three buttons.</figcaption></figure>
+<figure><img src="manual-images/mu-tant-manual-about-panel.webp" alt="About panel showing the Support and Enter a key buttons." width="420" height="320" loading="lazy"><figcaption>About panel showing the Support and Enter a key buttons.</figcaption></figure>
+<h2 id="interface-overview">4. Interface Overview</h2>
+<p>The mu-Tant window is divided into four regions:</p>
+<ul>
+<li><strong>Transport Bar (top)</strong> &mdash; playback, BPM, presets, mixer, and settings</li>
+<li><strong>Voice Sidebar (left)</strong> &mdash; one item per active voice, plus an Add button</li>
+<li><strong>Voice Editor (centre)</strong> &mdash; oscillators, noise, cross-mod, filters, effects, gate editor, and modulators for the selected voice</li>
+<li><strong>Mixer overlay</strong> &mdash; opened from the transport bar, replacing the editor</li>
+<li><strong>Status Bar (bottom)</strong> &mdash; the name, value and unit (ms, s, Hz, kHz, %, dB, semitones, cents, octaves or a note name) of the control you last touched, with a small Support link at the right-hand end. When a newer version is available, an Update available link appears beside Support (see Update Check in the Settings chapter)</li>
+</ul>
+<p>The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it. In the standalone application an Options button at the top left of the window opens the audio and MIDI device settings.</p>
+<figure><img src="manual-images/mu-tant-manual-main-window.webp" alt="The voice editor regions." width="1100" height="697" loading="lazy"><figcaption>The voice editor regions.</figcaption></figure>
+<h2 id="transport-bar">5. Transport Bar</h2>
+<p>Controls from left to right:</p>
+<ul>
+<li><strong>mu-Tant logo</strong> &mdash; click to open the About panel, where you can also support mu-Tant or enter a key</li>
+<li><strong>Play / Stop</strong> &mdash; in DAW mode follows the host transport and BPM, even while the plug-in is bypassed; in standalone starts and stops playback. Locked while an external MIDI clock controls play (see MIDI Clock Sync). While stopped, the gate is closed (silent); press Play to hear the gated drone, or use the gate Bypass to audition the raw tone.</li>
+<li><strong>BPM display</strong> &mdash; read-only in DAW mode; editable in standalone. Tempo runs from 20.0 to 300.0 BPM with one decimal (for example 127.5; whole tempos show .0). Click the up or down arrow to step one whole BPM and keep the fraction (127.5 becomes 128.5); Shift+click steps a tenth. Double-click to type a value such as 127.5 or 127,5; a value outside the range is clamped to it. The same field appears in Settings. Locked, and showing the clock&#x27;s tempo to a tenth, while an external MIDI clock sets the tempo. The clock drives both the gate patterns and the modulators.</li>
+<li><strong>Clock lamp</strong> &mdash; standalone only. Replaces the Tap button and sits between the BPM display and the Position readout, and appears only while MIDI clock sync is on with Messages set to Clock only or Clock + Transport (it is hidden with Transport only, and when Source is Internal). Dim amber means waiting for clock, green means locked to the clock, red means the clock was lost and the transport has stopped. The lamp stays steady; it never blinks. Hover over it to read its state in the status bar. See MIDI Clock Sync.</li>
+<li><strong>Tap button</strong> &mdash; standalone only. Takes the place of the Clock lamp whenever the lamp is not shown (the internal clock, or MIDI clock sync set to Transport only), so you see Tap or the lamp, never both. Tap it in time with the beat to set the tempo: it needs two taps, averages your last four intervals, and starts a new count if you pause for more than two seconds. The result is rounded to a tenth of a BPM, kept within 20 to 300, and written into the BPM field.</li>
+<li><strong>Nudge buttons (− and +)</strong> &mdash; standalone only. Two small buttons just right of the Position readout. Hold − to run the groove 4 % slower, or + to run it 4 % faster, to line up with another player by ear. Let go and the set tempo returns exactly; the BPM field never changes. Under an external MIDI clock, holding a button shifts the groove against the clock by that amount, and the shift stays until the next Start.</li>
+<li><strong>Position</strong> &mdash; bar, beat, and sixteenth readout (e.g. 3.2.1). In DAW mode it follows the host&#x27;s position, even while the plug-in is bypassed, and counts in the host&#x27;s time signature: in 3/4 a bar has three beats, in 7/8 it has seven eighth-note beats, and the last number is the sixteenth within the beat. Bar 1 starts where the host&#x27;s bar 1 starts, so a pickup bar is counted correctly. The standalone counts in the time signature chosen in Settings (4/4 by default). The time signature only changes the readout; mu-Tant&#x27;s gate patterns and modulator loop lengths still treat a bar as four beats.</li>
+<li><strong>Loop dropdown</strong> &mdash; the master loop. Choices are the infinity symbol (none) or 16 to 256 steps in steps of 16. A counter beside it shows the current step and the loop length, for example 1 / 64.</li>
+<li><strong>Swap dropdown</strong> &mdash; beside the Loop group, labelled Swap:. Chooses when a queued preset change takes effect: Master loop (at the end of the master loop), Voice loop (at the end of the voice&#x27;s own loop) or Bar (at the next bar line). It is saved with the preset. Hover over it to read its description in the status bar.</li>
+<li><strong>Preset dropdown / New / Save</strong> &mdash; load and save full .muTant presets. New loads your default preset (see Content Folder) after asking whether to discard unsaved changes.</li>
+<li><strong>Settings (gear) icon</strong> &mdash; opens the Settings overlay.</li>
+<li><strong>Perf button</strong> &mdash; standalone only. Sits between the Settings icon and the Mixer button and turns on Performance mode (also Ctrl+P). See Performance Mode in the Presets chapter.</li>
+<li><strong>Mixer button</strong> &mdash; opens the mixer overlay. The label changes to Sequencer while the mixer is open.</li>
+</ul>
+<figure><img src="manual-images/mu-tant-manual-transport-bar.webp" alt="Transport Bar — full width view." width="1100" height="26" loading="lazy"><figcaption>Transport Bar — full width view.</figcaption></figure>
+<h2 id="voice-sidebar">6. Voice Sidebar</h2>
+<p>The sidebar shows one item per active voice (up to eight). Each item displays a miniature spectrum animation driven by the voice&#x27;s post-insert audio, the voice colour, and the voice name. Click an item to select that voice for editing.</p>
+<p>The + Voice button at the bottom creates a new voice with default settings and the next unused palette colour (maximum eight; the button is disabled at eight). Voices can be reordered by dragging. To remove a voice use the Delete (×) button in the voice header - a confirmation is required, and the last voice cannot be removed.</p>
+<p>Each voice automatically receives a distinct palette colour that appears on its sidebar item, header bar, and the sub-panel borders inside the editor, and follows the voice through reorder and delete operations.</p>
+<figure><img src="manual-images/mu-tant-manual-sidebar.webp" alt="Voice Sidebar with a voice selected." width="90" height="870" loading="lazy"><figcaption>Voice Sidebar with a voice selected.</figcaption></figure>
+<h2 id="voice-header">7. Voice Header</h2>
+<p>At the top of the voice editor:</p>
+<ul>
+<li><strong>Name</strong> &mdash; click the name to rename the voice.</li>
+<li><strong>Voice preset dropdown</strong> &mdash; load a single voice from a .muPattern file in the Voices folder.</li>
+<li><strong>Clip strip</strong> &mdash; eight numbered pads that store and recall versions of this voice (see Clips in the Presets chapter).</li>
+<li><strong>Save</strong> &mdash; saves this voice as a .muPattern file.</li>
+<li><strong>Reset (circular arrow) / Delete (×)</strong> &mdash; reset to defaults / remove the voice (both confirm first). Reset also clears the voice&#x27;s clips, and its confirmation then says so.</li>
+</ul>
+<p>Just below the header, the Root and Scale dropdowns set the shared tonal centre for this voice (see Oscillators).</p>
+<h2 id="oscillators-osc-1-and-osc-2">8. Oscillators (OSC 1 and OSC 2)</h2>
+<p>Both oscillators run simultaneously and are free-running - their phases never reset. The result is a continuously evolving tone rather than a triggered note.</p>
+<h3 id="shared-tonal-centre">Shared Tonal Centre</h3>
+<p>Both oscillators share the same Root (C to B) and Scale, set in the two dropdowns under the voice header. The available scales are Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Pentatonic Major, Pentatonic Minor, Blues, and Chromatic. The root and scale define the harmonic space both oscillators move within.</p>
+<h3 id="per-oscillator-controls">Per-Oscillator Controls</h3>
+<p>Each oscillator has a wavetable selector plus six knobs:</p>
+<ul>
+<li><strong>Oct (-3 to +3 octaves)</strong> &mdash; octave offset from the base note</li>
+<li><strong>Semi (-12 to +12)</strong> &mdash; scale-degree offset (integer steps through the scale)</li>
+<li><strong>Fine (plus or minus 100 cents)</strong> &mdash; off-scale detune</li>
+<li><strong>PEnv (plus or minus 24 semitones)</strong> &mdash; pitch-envelope depth: how far the gate editor&#x27;s PITCH layer shifts this oscillator&#x27;s pitch</li>
+<li><strong>Pos (0 to 255)</strong> &mdash; wavetable frame position; morphs through the table</li>
+<li><strong>Level</strong> &mdash; how loud this oscillator is going into the filters (see Source Levels)</li>
+</ul>
+<p>Modulating Semi with a stepped modulator snaps cleanly between scale notes (integer jumps). Modulating Semi with a smooth modulator glides through frequency space, passing through off-scale pitches for a glissando effect.</p>
+<h3 id="wavetables">Wavetables</h3>
+<p>Each oscillator&#x27;s wavetable selector chooses the waveform set it morphs through with the Pos knob. mu-Tant uses the Serum/Vital 2048-samples-per-frame format internally, and offers three sources in the dropdown:</p>
+<ul>
+<li><strong>Built-in tables</strong> &mdash; a set of procedural factory tables, automatable by index. Their names are short so they fit the selector, for example Basic and Pulse.</li>
+<li><strong>Wavetables folder</strong> &mdash; drop .wav wavetables into Documents\TDP\muTant\Wavetables (sub-folders become categories) and they appear under their own headings; selected by path so they survive preset reload.</li>
+<li><strong>Load .wav…</strong> &mdash; import any Serum/Vital-format wavetable .wav from disk; the path is saved with the preset.</li>
+</ul>
+<p>The Pos knob (and its modulation) sweeps smoothly through the frames of whichever table is selected.</p>
+<figure><img src="manual-images/mu-tant-manual-oscillators.webp" alt="OSC 1 and OSC 2 panels showing the wavetable selector and the six knobs, with the Root and Scale dropdowns above." width="1100" height="87" loading="lazy"><figcaption>OSC 1 and OSC 2 panels showing the wavetable selector and the six knobs, with the Root and Scale dropdowns above.</figcaption></figure>
+<h2 id="cross-modulation-x-mod-and-noise">9. Cross-Modulation (X-MOD) and Noise</h2>
+<p>X-MOD has two independent lanes that run in parallel. Osc 2 is always the modulator; Osc 1 is the carrier. Each lane has one knob plus a mode switch.</p>
+<h3 id="lane-a-phase-index">Lane A - Phase / Index</h3>
+<p>The Index knob sets the modulation amount; the mode switch picks how it is applied:</p>
+<ul>
+<li><strong>FM</strong> &mdash; true frequency modulation (Osc 2 modulates Osc 1&#x27;s frequency; rich, can drift pitch at high index)</li>
+<li><strong>PM</strong> &mdash; phase modulation (the default; classic DX-style FM that stays in tune)</li>
+<li><strong>TZFM</strong> &mdash; through-zero FM (cleaner, in-tune spectra at high index - the bell that doesn&#x27;t go sour)</li>
+</ul>
+<p>Two toggles sit alongside: Sync (hard-sync - Osc 1&#x27;s wrap resets Osc 2&#x27;s phase, adding a formant-like edge) and Fdbk (feedback - Osc 1&#x27;s output also modulates Osc 2, for grittier, more chaotic tones).</p>
+<h3 id="lane-b-amplitude-multiply">Lane B - Amplitude / Multiply</h3>
+<p>The Depth knob is bipolar with a centre detent at OFF; the sign flips the modulator phase. The mode switch picks how it is applied:</p>
+<ul>
+<li><strong>AM</strong> &mdash; amplitude modulation: the carrier stays present and gains sidebands (tremolo-like at low rates)</li>
+<li><strong>RM</strong> &mdash; ring modulation: at full depth the carrier is suppressed, leaving sum-and-difference tones (clangorous, inharmonic)</li>
+<li><strong>SSB</strong> &mdash; single-sideband frequency shift: the Depth knob becomes a shift amount (up to plus or minus 2 kHz, sign sets direction), sliding every partial by a fixed number of Hz for inharmonic, shimmering drones</li>
+</ul>
+<p>Switching a lane&#x27;s mode keeps the knob value, so you can audition FM/PM/TZFM (or AM/RM/SSB) as a smooth A/B.</p>
+<h3 id="noise">Noise</h3>
+<p>A separate noise source (White or Pink) mixes in via the NOISE panel. The NOISE panel holds the noise type dropdown and, to its right, the noise Level knob.</p>
+<h2 id="source-levels">10. Source Levels</h2>
+<p>Each sound source has its own Level knob at the right-hand end of its panel, setting the balance before the filters:</p>
+<ul>
+<li><strong>OSC 1 Level</strong> &mdash; level of oscillator 1 (dB)</li>
+<li><strong>OSC 2 Level</strong> &mdash; level of oscillator 2 (dB)</li>
+<li><strong>NOISE Level</strong> &mdash; level of the noise source (dB; default -60 dB, off)</li>
+</ul>
+<p>The voice&#x27;s overall output level into its mixer channel is set by the channel fader in the mixer overlay (and is available as the Level modulation destination).</p>
+<h2 id="dual-filter">11. Dual Filter</h2>
+<p>mu-Tant has two independent filters per voice - Filter 1 (top row) and Filter 2 (bottom row). Each is the full mu-core multi-mode filter with identical controls:</p>
+<ul>
+<li><strong>Type</strong> &mdash; sixteen algorithms: LP 6 / 12 / 24, HP 6 / 12 / 24, BP 12 / 24, Notch, Notch 24, AP 12, Comb +, Comb -, Peak, Lo Shelf, Hi Shelf</li>
+<li><strong>Drive (0 to 100 percent)</strong> &mdash; pre-filter valve saturation (asymmetric tanh) for harmonic warmth before the filter</li>
+<li><strong>Cutoff (20 Hz to 20 kHz)</strong> &mdash; log-scaled; clamped safely below Nyquist so the filter is stable at any sample rate</li>
+<li><strong>Resonance (0 to 100 percent)</strong> &mdash; Q / feedback</li>
+<li><strong>FEnv (plus or minus 1)</strong> &mdash; filter-envelope depth: how far the gate editor&#x27;s FILT layer sweeps this filter&#x27;s cutoff</li>
+<li><strong>Low Cut (20 Hz to 20 kHz)</strong> &mdash; post-filter 4-pole high-pass; clears subsonic build-up at high resonance</li>
+</ul>
+<h3 id="series-parallel-routing">Series / Parallel Routing</h3>
+<p>The round purple button between the two filter rows sets how the filters combine. Click it to toggle; the icon animates a 90-degree rotation between two states:</p>
+<ul>
+<li><strong>Two horizontal lines</strong> &mdash; Parallel: both filters process the input and their outputs are mixed (two signal paths running side by side)</li>
+<li><strong>Two vertical lines</strong> &mdash; Series: the signal passes through Filter 1, then into Filter 2 (one chain)</li>
+</ul>
+<p>A freshly added second filter defaults to an 8 kHz cutoff so it is audible immediately. To hear Filter 2&#x27;s effect over a dark Filter 1 tone, set its cutoff below Filter 1&#x27;s content.</p>
+<figure><img src="manual-images/mu-tant-manual-filter-xmod.webp" alt="X-MOD, Filter and Effects boxes: the two filter rows, the series/parallel routing button and the insert effect." width="1100" height="105" loading="lazy"><figcaption>X-MOD, Filter and Effects boxes: the two filter rows, the series/parallel routing button and the insert effect.</figcaption></figure>
+<h2 id="insert-effect">12. Insert Effect</h2>
+<p>The EFFECTS box is the per-voice insert effect, placed after the gate (oscillators, then filters, then gate, then insert, then mixer). Select an algorithm from the dropdown; its four parameter knobs relabel to match. Available algorithms: None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Saturation, Overdrive, Karplus, Chorus, Flanger, Phaser, Vocoder, and Vocoder Stereo. Tape Saturation gives the soft squash of a tape machine: Drive pushes the signal in (the highs compress and soften first), Output sets the level, Head Bump adds up to 4 dB of low-end lift around 75 Hz, and Tone darkens the result. Chorus, Flanger and Phaser sound like the Effect send of the same name, with a Mix knob. Insert parameters P1 to P4 are available as modulation destinations. The Clipper shows a gain-reduction meter like the Compressor. Time, rate and cutoff knobs give more of their travel to the short and low settings, so fine adjustments there are easier; this includes the time and rate knobs of the Effect, Delay and Reverb.</p>
+<h2 id="gate-editor">13. Gate Editor</h2>
+<p>The gate editor is the heart of mu-Tant&#x27;s rhythmic character. It occupies the full-width band below the voice panel and chops rhythmic bursts out of the otherwise-continuous drone.</p>
+<h3 id="layers">Layers</h3>
+<p>Three layers, toggled by the GATE, FILT, and PITCH buttons:</p>
+<ul>
+<li><strong>GATE</strong> &mdash; shapes amplitude. Envelope value 0 is silent, 1 is full level.</li>
+<li><strong>FILT</strong> &mdash; shapes filter cutoff. 0 is 20 Hz (closed), 1 is the base cutoff (open). Depth set by each filter&#x27;s FEnv knob.</li>
+<li><strong>PITCH</strong> &mdash; shifts oscillator pitch. 0 is no shift, 1 is the full PEnv depth above the base Semi. Depth set per oscillator by the PEnv knobs.</li>
+</ul>
+<p>The inactive layers are drawn as ghosts at 20 percent opacity so you can align layers visually.</p>
+<h3 id="grid-controls">Grid Controls</h3>
+<ul>
+<li><strong>Bypass</strong> &mdash; passes the raw drone through without gating, for auditioning the oscillator/filter sound while designing a patch.</li>
+<li><strong>Bars (1 to 16)</strong> &mdash; the pattern length in bars. The view window is always two bars wide; a scrollbar below the grid scrolls smoothly through longer patterns. All three layers share the same length.</li>
+<li><strong>Grid</strong> &mdash; the cell subdivision: 1/4, 1/8, 1/16 (default), or 1/32.</li>
+<li><strong>Gap</strong> &mdash; forces a silence tail at the end of every envelope region. At 0 percent the envelope fills the full region; at 50 percent it completes in the first half and the second half is silent.</li>
+</ul>
+<h3 id="toolbox">Toolbox</h3>
+<p>Three tools in the header, drawn as small icons:</p>
+<ul>
+<li><strong>Pencil</strong> &mdash; click an empty cell to draw a one-cell envelope; drag the start/end grab handles (bottom corners) to extend a region</li>
+<li><strong>Eraser</strong> &mdash; click an envelope to delete it</li>
+<li><strong>Reverse</strong> &mdash; click an envelope to flip its attack and decay</li>
+</ul>
+<h3 id="envelope-shape">Envelope Shape</h3>
+<p>Each envelope covers a contiguous region of cells and has an attack/decay shape:</p>
+<ul>
+<li><strong>Top handle (the peak point)</strong> &mdash; drag horizontally to move where within the region the peak falls. Far left is instant attack (pure decay); far right is slow attack with no decay. Snaps to the grid; hold ALT for fine placement.</li>
+<li><strong>Attack bend handle (mid-point on the rising line)</strong> &mdash; drag vertically to bow the attack.</li>
+<li><strong>Decay bend handle (mid-point on the falling line)</strong> &mdash; drag vertically to bow the decay.</li>
+</ul>
+<p>A new envelope defaults to instant attack with a linear decay - the classic gate sound.</p>
+<h3 id="audio-behaviour">Audio Behaviour</h3>
+<ul>
+<li><strong>Stopped</strong> &mdash; silent (gate closed)</li>
+<li><strong>Playing, empty pattern</strong> &mdash; silent (nothing drawn passes)</li>
+<li><strong>Playing, has envelopes</strong> &mdash; per-sample envelope evaluation</li>
+<li><strong>Bypass on</strong> &mdash; raw drone passes regardless of play state</li>
+</ul>
+<figure><img src="manual-images/mu-tant-manual-gate-editor.webp" alt="Gate editor with the GATE layer selected." width="1100" height="159" loading="lazy"><figcaption>Gate editor with the GATE layer selected.</figcaption></figure>
+<h2 id="modulators">14. Modulators</h2>
+<p>Each voice has eight independent modulators (Mod A through Mod H) plus a Matrix tab - the same shared engine as mu-Clid. Each voice has its own modulator bank.</p>
+<p>Each modulator has a Mode dropdown (Stepped bar-graph or Smooth drawable curve), a Polarity switch (Uni 0 to +1, or Bi -1 to +1), and a loop length (a note-value dropdown times an integer multiplier, independent of any pattern length). A playhead line shows the current loop position. In Smooth mode the curve is a smooth line through each point that never swings past its neighbours; click to add a node, drag to move, ALT-click a segment to bend it, right-click to remove. In Stepped mode, drag bars up or down. A dice button randomises the current modulator&#x27;s values without changing its shape.</p>
+<p>Add destinations with the + Target button; the assignments are shown one at a time, so step through them with the up and down arrows and the counter at the right; each assignment has a bipolar depth (-100 to +100 percent) and a source-side curve. mu-Tant modulation destinations include: Osc 1/2 Octave, Semi, Fine, Position, and Pitch Env; Osc 1/2 and Noise levels; Filter 1 and Filter 2, each with Cutoff, Resonance, Drive, Low Cut, and Env Depth; the voice Level; X-Mod Index, Depth, and SSB shift; and Insert P1 to P4. When a knob is a destination, an arc around it shows the live modulated value.</p>
+<p>The Matrix tab lists every assignment across all eight modulators in one table.</p>
+<figure><img src="manual-images/mu-tant-manual-modulators.webp" alt="Modulator panel with the Stepped editor and the target list." width="1100" height="289" loading="lazy"><figcaption>Modulator panel with the Stepped editor and the target list.</figcaption></figure>
+<h2 id="mixer">15. Mixer</h2>
+<p>Click the Mixer button in the transport bar to open the mixer overlay. Each voice occupies one channel strip; to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid.</p>
+<p>Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host&#x27;s sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order. A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard. The Effect send is named after the effect currently chosen (for example Chorus). The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters.</p>
+<p>The faders use a rectangular cap like a small knob, with a pointer line across its middle that marks the level, running in a groove that lights up from the bottom to the cap. Every fader in the mixer looks and works the same way. In the Status Bar the mixer&#x27;s Pan, Send and Sidechain knobs, the Level fader, the Mute and Solo buttons and the Effect and Delay switches all show their name and value as you use them. The sidechain Attack and Release start at 0 and can go down to 0.</p>
+<figure><img src="manual-images/mu-tant-manual-mixer.webp" alt="Mixer overlay with voice channels, FX returns, and master." width="1100" height="697" loading="lazy"><figcaption>Mixer overlay with voice channels, FX returns, and master.</figcaption></figure>
+<figure><img src="manual-images/mu-tant-manual-mixer-fader.webp" alt="Mixer fader with the knob-style cap and lit groove." width="160" height="150" loading="lazy"><figcaption>Mixer fader with the knob-style cap and lit groove.</figcaption></figure>
+<h2 id="presets">16. Presets</h2>
+<h3 id="full-presets-mutant">Full Presets (.muTant)</h3>
+<p>Full presets save the entire plugin state - all voices, modulators, gate patterns, mixer, and FX - to Documents\TDP\muTant\Presets. Load from the transport dropdown, which is grouped by category; the preset browser shows each preset&#x27;s category and description. Save with the Save button: enter a name, an optional description and a category, and tick Save as Default to make it the preset that loads at startup and when you press New. If saving fails (for example a full disk) mu-Tant shows an error message and never leaves a half-written preset.</p>
+<p>Presets and saved DAW projects store each setting&#x27;s real value, and choices by name, so a future update that changes a knob&#x27;s range cannot change a saved sound. When a preset, a voice preset or a saved session is loaded, any setting it does not contain is set to its default.&quot;</p>
+<h3 id="per-voice-presets-mupattern">Per-Voice Presets (.muPattern)</h3>
+<p>Each voice can be saved and loaded independently to Documents\TDP\muTant\Voices, including its oscillator, filter, insert, and level settings, all three gate layers (GATE / FILT / PITCH), and modulator assignments. Use the voice header dropdown and Save button.</p>
+<h3 id="clips">Clips</h3>
+<p>A clip is a stored copy of one voice&#x27;s current state, ready to recall in a moment while the music plays. Every voice has up to eight clips. They sit in the Clip strip in the voice&#x27;s header, between the voice-preset dropdown and the Save button: the word Clip followed by pads numbered 1 to 8. Use clips to prepare variations of a voice and switch between them in time.</p>
+<p>Each pad is lit in the voice&#x27;s own colour:</p>
+<ul>
+<li><strong>Bright and steady</strong> &mdash; the clip that is playing.</li>
+<li><strong>Dim</strong> &mdash; a clip is stored here and is available.</li>
+<li><strong>Unlit, with just its number</strong> &mdash; the pad is empty.</li>
+<li><strong>Pulsing</strong> &mdash; the clip is queued and will start at the next swap point.</li>
+<li><strong>Flashing on and off</strong> &mdash; the playing clip belongs to a muted voice.</li>
+</ul>
+<p>How to use the pads:</p>
+<ul>
+<li>Click a stored pad to launch it. If playback is running, the clip waits for the next swap point (set with the Swap dropdown) and the pad pulses until it starts; when playback is stopped it starts at once. Clicking another stored pad while one is waiting replaces the waiting clip.</li>
+<li>Click the playing pad to mute the voice. Click it again to unmute. If another clip is waiting, the click cancels the wait instead and the playing clip carries on.</li>
+<li>Click an empty pad to store the voice&#x27;s current state there. Nothing is lost, so there is no question. The new clip becomes the playing one.</li>
+<li>Shift + click any pad to store the voice&#x27;s current state in it. If the pad holds a different clip from the one playing, mu-Tant asks you to confirm with Replace. Storing over the playing clip, to update it after a tweak, needs no confirmation.</li>
+<li>Right-click a pad (or Ctrl + click) to open a small menu with Store here and Clear. Clear is available only on a stored pad and asks you to confirm. Clearing the playing clip leaves the voice playing as it is; no pad is lit afterwards.</li>
+</ul>
+<p>Turning a knob changes only the voice that is playing, not the stored clip. To keep a tweak, store it again with Shift + click. Recalling a clip replaces any changes you have not stored, without asking.</p>
+<p>Resetting a voice with Reset also clears its clips; the confirmation then reads This also clears its clips. Deleting a voice removes its clips with it. Clips are saved with full presets (.muTant) and with your DAW session or standalone state. Clips are not saved in single-voice .muPattern files.</p>
+<p>In Performance mode the Clip strip cannot be clicked, but it keeps moving so you can see what the control surface is doing.</p>
+<figure><img src="manual-images/mu-tant-manual-clip-strip.webp" alt="Clip strip at the right end of the Voice Panel header: pad 3 is the playing clip, pad 1 is queued and pulsing, pad 2 holds a stored clip, and pads 4 to 8 are empty." width="495" height="36" loading="lazy"><figcaption>Clip strip at the right end of the Voice Panel header: pad 3 is the playing clip, pad 1 is queued and pulsing, pad 2 holds a stored clip, and pads 4 to 8 are empty.</figcaption></figure>
+<h3 id="performance-mode-standalone">Performance Mode (Standalone)</h3>
+<p>Performance mode turns the standalone app into a locked gig view. The screen shows the preset that is playing, exactly as normal, but you cannot change anything with the mouse or keyboard. Only a connected control surface (set up through MIDI mapping) switches presets and voices. Performance mode is not available in the VST3 or CLAP plug-in.</p>
+<p>Performance mode plays a performance: a saved list of up to eight full presets, stored as a .muPerformance file in the Performances folder inside your content folder. You make, edit and choose performances in the Performance chooser.</p>
+<h4 id="the-performance-chooser">The Performance Chooser</h4>
+<p>Open the chooser from the Performances entry at the bottom of the preset dropdown in the Transport Bar, from the Performances button in the footer of the Preset Browser, or by clicking the Perf button (or pressing Ctrl+P) when no performance has been chosen yet. You can only open it while Performance mode is off.</p>
+<ul>
+<li>On the left is the list of your saved performances. Click one to open it. The list scrolls.</li>
+<li>On the right are the eight places in the performance. Each row shows its number, the preset name, which product the preset is for, and buttons. An empty row has a + Preset button. A filled row has Replace, Up, Down and Remove: Replace picks a different preset, Up and Down move the preset in the order, and Remove empties the place.</li>
+<li>A preset whose file can no longer be found stays in its place with a red lamp and the word missing. Replace it or remove it.</li>
+<li>New starts an empty performance. Load opens a .muPerformance file that you choose from disk into the list; it never saves anything. Save stores the performance under a name and an optional description. Rename changes its name. Delete removes the saved file after asking you to confirm. Saving under the name of another performance asks before it overwrites.</li>
+<li>Use makes this performance the one that Performance mode plays, then closes the chooser. It does not change the preset that is playing now. If the performance is new or has changes you have not saved, Use saves it first (a new one asks for a name). Use is unavailable while the performance has no presets.</li>
+<li>While you have unsaved changes the title shows the name followed by (unsaved). Closing the chooser, clicking New, or opening another saved performance then asks Discard unsaved changes? Choose Discard to lose the changes, or cancel to keep working.</li>
+</ul>
+<p>To fill a place, click + Preset or Replace. The Preset Browser opens in pick mode: its Load button reads Pick, and the Performances button is hidden. Select a preset and click Pick (or double-click it) to put it in the place and return to the chooser with your other edits kept. Close returns to the chooser without picking. The browser lists presets for this product only.</p>
+<figure><img src="manual-images/mu-tant-manual-performance-chooser.webp" alt="Performance chooser with a new performance holding four presets in places 1 to 4, and the New, Load, Save, Rename, Delete and Use buttons. The list of saved performances on the left stays empty until you save one." width="1100" height="697" loading="lazy"><figcaption>Performance chooser with a new performance holding four presets in places 1 to 4, and the New, Load, Save, Rename, Delete and Use buttons. The list of saved performances on the left stays empty until you save one.</figcaption></figure>
+<h4 id="entering">Entering</h4>
+<p>Click the Perf button (or press Ctrl+P). The preset that is playing carries on. Any open window, such as the Preset Browser, Mixer or Settings, closes without saving. If no performance has been chosen yet, the Performance chooser opens instead and the mode stays off.</p>
+<h4 id="what-you-see">What You See</h4>
+<ul>
+<li>The Perf button lights in the app colour and its label changes to LIVE, and a thin lit line runs along the bottom of the Transport Bar.</li>
+<li>The preset dropdown, New and Save are replaced by a step indicator: a display showing the position and name of the playing preset (for example 3/8 Bassline), followed by a dimmed next preset when there is room, and a row of eight lamps. A bright lamp is the playing preset, a dim lamp is an available preset, a pulsing lamp is the preset queued to start, and an unlit lamp is an empty place. A red lamp marks a preset whose file is missing.</li>
+<li>When the control surface queues a switch, the playing preset stays on screen until the switch lands. The queued lamp pulses, an orange SWP badge appears, the display shows the queued preset in pulsing text, and the status bar reads Queued followed by the preset. All of this clears when the switch happens or is cancelled. The switch lands at the point set by the Swap dropdown.</li>
+<li>In the sidebar, the Add button is replaced by a read-only indicator such as Layer 3/5. The screen follows the control surface: selecting a voice on the surface shows that voice on screen.</li>
+<li>Nothing dims or changes colour; knobs, meters and the playhead keep moving, so you can see what the surface is doing.</li>
+</ul>
+<h4 id="leaving">Leaving</h4>
+<p>Press and hold the Perf button for one second. The button fills from left to right while you hold, and the status bar reads Hold to leave Performance mode. Let go early to stay in the mode. A plain click does nothing, so you cannot leave by accident. When you leave, the normal controls come back.</p>
+<figure><img src="manual-images/mu-tant-manual-performance-transport.webp" alt="Transport Bar in Performance mode: the Perf button lit and reading LIVE, the step indicator with its row of eight lamps, and the lit line along the edge of the bar." width="1100" height="31" loading="lazy"><figcaption>Transport Bar in Performance mode: the Perf button lit and reading LIVE, the step indicator with its row of eight lamps, and the lit line along the edge of the bar.</figcaption></figure>
+<h2 id="settings">17. Settings</h2>
+<p>Click the gear icon to open the Settings overlay. Everything fits on one screen, in two columns, under two headings. Click Close to return.</p>
+<p>General (left column):</p>
+<ul>
+<li><strong>Audio, Master Vol</strong> &mdash; overall output level</li>
+<li><strong>Display, Size</strong> &mdash; Medium or Large window. Reopen the app for the label fonts to rescale fully.</li>
+<li><strong>Transport, Tempo</strong> &mdash; internal clock, 20.0 to 300.0 BPM with one decimal, also editable from the transport BPM field</li>
+<li><strong>Time Signature (standalone)</strong> &mdash; in Settings under General, Transport: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars.</li>
+<li><strong>Updates, Check for updates</strong> &mdash; a tick box, ticked by default. Whether the app checks once a day for a newer version (see Update Check below).</li>
+</ul>
+<p>MIDI (right column):</p>
+<ul>
+<li><strong>MIDI Clock, Source (standalone)</strong> &mdash; Internal, or MIDI In to follow an external MIDI clock, with a Sync Offset to compensate for audio latency (see below).</li>
+<li><strong>Note Mode, Mode</strong> &mdash; Free or Note (see Note Mode).</li>
+<li><strong>MIDI Program Change</strong> &mdash; the Voice Presets and Full Presets buttons open the tables that map incoming program-change messages to presets (see below).</li>
+</ul>
+<p>A Contact Support link at the bottom of the page is there when you need help. The Settings page also has a Send Feedback link (feedback@transwarp.me) beside Contact Support.</p>
+<figure><img src="manual-images/mu-tant-manual-settings.webp" alt="Settings overlay open over the main window." width="1100" height="697" loading="lazy"><figcaption>Settings overlay open over the main window.</figcaption></figure>
+<h3 id="update-check">Update Check</h3>
+<p>mu-Tant can tell you when a newer version is available. Once a day it asks the transwarp.me website for the latest version number. When a newer version exists, a small Update available link appears at the right of the Status Bar, beside the Support link. Hover over it to see which version is out and which one you have.</p>
+<ul>
+<li>Click the link to open the download page in your web browser. mu-Tant never downloads or installs anything itself. The link then stays hidden for that version and comes back only when a still newer one is released.</li>
+<li>Right-click the link and choose Hide this notice to hide it for that version without opening the page.</li>
+<li>The link never appears in Performance mode.</li>
+</ul>
+<p>Privacy: the check is a plain request for a public file. It sends nothing about you: no name, no identifier, no version number and no details of your computer. As with any request to a website, the site can see your internet (IP) address, as it would if you opened the page in a browser. The app compares the answer with its own version on your machine. To switch the check off, open Settings and, under General, untick the Check for updates box. With the box unticked, mu-Tant sends no request at all and shows no link. The box is ticked by default.</p>
+<h3 id="midi-clock-sync-standalone">MIDI Clock Sync (Standalone)</h3>
+<p>When running as a standalone application, mu-Tant can follow an external MIDI clock from a drum machine, groovebox, or DAW. First choose the MIDI input that carries the clock in the standalone&#x27;s MIDI settings. Selecting the input does not turn sync on by itself. To follow the clock, open Settings and, in the MIDI Clock section, set Source to MIDI In; set it back to Internal to turn sync off and ignore any incoming clock. A Messages choice appears, which decides what mu-Tant takes from the clock:</p>
+<ul>
+<li><strong>Clock only</strong> &mdash; you start and stop mu-Tant with its own Play button, but the tempo and beat follow the clock&#x27;s ticks. The BPM field is locked and shows the clock&#x27;s tempo. The clock&#x27;s Start and Stop messages are ignored.</li>
+<li><strong>Transport only</strong> &mdash; the clock&#x27;s Start, Continue, and Stop messages control playback (Start restarts from bar 1, Continue carries on from where it stopped), but mu-Tant plays at the tempo in its own BPM field and ignores the clock&#x27;s ticks. The Play button is locked.</li>
+<li><strong>Clock + Transport</strong> &mdash; the clock runs everything. Its Start, Continue, and Stop messages start and stop playback, and its ticks set the tempo and the beat. The first clock after Start counts as the downbeat, so your steps line up closely with the external device. The Play button and BPM field are locked.</li>
+</ul>
+<p>With Clock + Transport or Transport only, mu-Tant also follows Song Position Pointer messages. If you stop the external sequencer, move its playhead, and press Continue, mu-Tant picks up from the new position instead of where it stopped.</p>
+<p>With Clock only or Clock + Transport, a Clock lamp appears in the transport bar, between the BPM display and the Position readout. It shows the state of the incoming clock and stays steady in every state; it never blinks:</p>
+<ul>
+<li><strong>Dim amber</strong> &mdash; Waiting for clock. Sync is on, but no clock pulses have arrived yet, or the master device is stopped and sending nothing.</li>
+<li><strong>Green</strong> &mdash; Locked. mu-Tant is following the clock. Hover over the lamp and the status bar shows the tempo, for example &quot;Locked at 120 BPM&quot;.</li>
+<li><strong>Red</strong> &mdash; Lost. The clock pulses stopped arriving for about a quarter of a second while the master was playing, for example because a cable came loose or the master device was switched off. mu-Tant stops the transport, and the status bar shows &quot;MIDI Clock: Lost, transport stopped&quot; once, without you having to hover. When the pulses come back, mu-Tant carries on by itself.</li>
+</ul>
+<p>The lamp is hidden with Transport only, because the clock&#x27;s ticks are not used, and whenever Source is Internal. The BPM display works as before: it is locked and shows the clock&#x27;s tempo while the clock sets the tempo.</p>
+<p>Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Tant play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Tant remembers the setting between sessions.</p>
+<figure><img src="manual-images/mu-tant-manual-clock-lamp.webp" alt="Transport bar with MIDI clock sync switched on and no clock arriving yet: the Clock lamp sits dim amber (waiting) between the BPM display and the Position readout." width="760" height="40" loading="lazy"><figcaption>Transport bar with MIDI clock sync switched on and no clock arriving yet: the Clock lamp sits dim amber (waiting) between the BPM display and the Position readout.</figcaption></figure>
+<h3 id="note-mode">Note Mode</h3>
+<p>By default (Free) mu-Tant ignores MIDI notes: the drone plays all the time and the gate follows the transport. Setting Note Mode, Mode to Note turns mu-Tant into a keyboard instrument: the drone is silent until you hold a key, and fades out (in about 8 milliseconds) when you release the last one. While a key is held, every voice is transposed so its tonal centre (the Root) sits on the note you are holding, and the scale, oscillator and modulation settings still apply on top. With several keys held, the most recently pressed one sounds. The gate pattern keeps running on the transport as usual.</p>
+<h3 id="midi-program-change-to-preset">MIDI Program Change to Preset</h3>
+<p>mu-Tant can load presets from incoming MIDI program-change messages. On channels 1 to 8 a program change loads the matching .muPattern into that voice slot; on channel 9 it loads a full .muTant preset. While playing, the change is staged and applied seamlessly at the next loop boundary (hot-swap). Configure the mappings with the Voice Presets and Full Presets buttons in Settings, under MIDI Program Change.</p>
+<h2 id="connecting-to-mu-link">18. Connecting to mu-link</h2>
+<p>mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, the mu-Tant standalone application connects to it automatically — mu-Tant&#x27;s audio is summed into mu-link&#x27;s mix and its transport locks to mu-link&#x27;s master clock. The plug-in versions are unaffected; only the standalone connects, because in a DAW the host already owns the clock and audio device.</p>
+<h3 id="how-to-connect">How to Connect</h3>
+<ul>
+<li><strong>Launch mu-link, then launch mu-Tant standalone</strong> &mdash; in either order. Within about a second the mu-Tant title bar shows &#x27;mu-link connected&#x27;.</li>
+<li>mu-Tant&#x27;s audio now plays through mu-link&#x27;s output device, summed with any other connected mu apps, and appears as a channel in mu-link&#x27;s client strip with its own level, pan, mute, and solo.</li>
+<li>mu-Tant&#x27;s gate and modulators follow mu-link&#x27;s clock: mu-link is the tempo master, and its Play/Stop and tempo drive mu-Tant. Use mu-link&#x27;s transport (not mu-Tant&#x27;s) while connected.</li>
+<li>Quit mu-link and mu-Tant instantly reverts to its own audio device and internal transport — no restart needed.</li>
+<li><strong>MIDI in</strong> &mdash; the controllers you enabled in the standalone&#x27;s MIDI settings still reach mu-Tant while it is connected, so program changes still load presets. For now they arrive roughly 85 milliseconds late, which is under a tenth of a second. Incoming MIDI clock is not followed while connected, because mu-link sets the tempo; to sync to external gear, connect its clock to mu-link instead.</li>
+</ul>
+<p>This lets you run mu-Tant, mu-Clid, and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock. See the mu-link User Manual for the full picture.</p>
+<h2 id="signal-flow">19. Signal Flow</h2>
+<p>Osc 1 and Osc 2 are combined with FM / AM / Ring cross-modulation and optional hard Sync, summed with the Noise source, then passed through the dual filter (series: Filter 1 into Filter 2; parallel: Filter 1 plus Filter 2 mixed). The result passes through the gate (GATE layer amplitude, FILT layer cutoff sweep, PITCH layer pitch shift), then the per-voice insert, then into the voice&#x27;s mixer channel. The mixer routes channel strips through the Effect / Delay / Reverb sends to the master and out.</p>
+<h2 id="tips-and-workflow">20. Tips and Workflow</h2>
+<ul>
+<li>Starting from silence: press Play, then draw at least one cell on the GATE layer - an empty gate produces no sound.</li>
+<li>Auditioning the raw drone: press Bypass in the gate editor to hear the uncut oscillator/filter tone.</li>
+<li>Dual-filter character: set Filter 1 to Comb + and Filter 2 to LP 24 in Series for a tuned resonator rolled off by a smooth low-pass; or use Parallel with a low-pass on one side and a high-pass on the other to carve a band.</li>
+<li>Layered pads: add several voices with different Semi offsets (e.g. 0, 2, 4 for a triad in the scale) and staggered gate patterns.</li>
+<li>Filter morphing: draw a slow attack / fast decay on the FILT layer and set FEnv to 1.0 - the filter opens slowly then snaps closed on each gate event.</li>
+<li>FM drones: set Lane A to PM (or FM), raise the Index knob to 60 to 80 percent, and modulate Osc 2 Semi with a stepped sequencer - each step adds a new FM timbre as Osc 2&#x27;s ratio changes.</li>
+<li>Long evolving patterns: set Bars to 8 or 16 and scroll through the pattern, combining sparse GATE hits with a slowly drifting Smooth modulator on Filter Cutoff.</li>
+</ul>
+<h2 id="technical-specifications">21. Technical Specifications</h2>
+<ul>
+<li>Formats: VST3, CLAP, Standalone (Windows)</li>
+<li>Voices: up to 8 simultaneous, each with two wavetable oscillators plus a noise source</li>
+<li>Cross-modulation: 2-lane X-Mod - phase/index (FM/PM/TZFM) with Sync and Feedback, plus amplitude (AM / RM / SSB frequency shift)</li>
+<li>Filters: two per voice (series or parallel), 16 algorithms each</li>
+<li>Filter types: LP / HP at 6, 12, 24 dB per octave; BP 12 / 24; Notch 12 / 24; AP 12; Comb + / Comb -; Peak; Lo Shelf; Hi Shelf</li>
+<li>Insert effects: 14 plus None (Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat, Overdrive, Karplus, Vocoder, Vocoder Stereo)</li>
+<li>Gate editor: 1 to 16 bar patterns, three layers (GATE / FILT / PITCH), subdivisions 1/4 to 1/32</li>
+<li>Modulators per voice: 8 (smooth LFO or stepped), plus a matrix view</li>
+<li>Full preset format: .muTant (XML). Per-voice preset format: .muPattern (XML)</li>
+<li>Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)</li>
+</ul>
+<h3 id="hosts-that-do-not-run-an-event-loop">Hosts That Do Not Run an Event Loop</h3>
+<p>mu plugins need the host to run its normal event loop, as every ordinary DAW does. A few headless or offline-only renderers do not. In those, changes made by MIDI or a controller, MIDI program changes, and preset loads made while playing may not take effect until the host runs its event loop. If you hit this, load presets while the transport is stopped, or render with a host that runs its event loop.</p>
+<h2 id="design-decisions-not-in-mu-tant">22. Design Decisions (Not in mu-Tant)</h2>
+<ul>
+<li>No amplitude envelope - the gate stage does this job.</li>
+<li>No triggered notes - oscillators run continuously and a key press never restarts them. MIDI notes only matter in Note Mode, where a held key opens the drone and sets its pitch (see Note Mode). MIDI program change loads presets - see Settings.</li>
+<li>No user audio samples - oscillators use wavetables only, though you can import your own Serum/Vital-format wavetable .wav files (see Wavetables).</li>
+<li>No granular - pure wavetable synthesis.</li>
+</ul>
+<p>Prefer a file? <a href="manuals/mu-Tant-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-tant.html">mu-Tant</a> &middot; <a href="mu-tant-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="free-vst3-clap-plugins.html">Free VST3 &amp; CLAP plugins</a></li><li><a href="guides.html">Guides</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="mailto:feedback@transwarp.me">Feedback and feature requests</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="prices.js" defer></script>
+  <script src="site.js"></script>
+</body>
+</html>

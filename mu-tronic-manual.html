@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mu-Tronic Manual: Standalone Live Performance Rig User Guide | Transwarp</title>
+  <meta name="description" content="User guide for mu-Tronic, a free standalone live performance rig that hosts up to 16 sequencer and synth layers: slots, buses, scenes, presets and mixer.">
+  <link rel="canonical" href="https://transwarp.me/mu-tronic-manual">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-tronic-manual">
+  <meta property="og:title" content="mu-Tronic Manual: Standalone Live Performance Rig User Guide">
+  <meta property="og:description" content="User guide for mu-Tronic, a free standalone live performance rig that hosts up to 16 sequencer and synth layers: slots, buses, scenes, presets and mixer.">
+  <meta property="og:image" content="https://transwarp.me/standalone-performance-rig-full-window.png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "mu-Tronic Manual: Standalone Live Performance Rig User Guide",
+  "description": "User guide for mu-Tronic, a free standalone live performance rig that hosts up to 16 sequencer and synth layers: slots, buses, scenes, presets and mixer.",
+  "mainEntityOfPage": "https://transwarp.me/mu-tronic-manual",
+  "image": "https://transwarp.me/standalone-performance-rig-full-window.png",
+  "inLanguage": "en-GB",
+  "about": {
+    "@type": "SoftwareApplication",
+    "name": "mu-Tronic",
+    "url": "https://transwarp.me/mu-tronic",
+    "applicationCategory": "MusicApplication",
+    "operatingSystem": "Windows"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Transwarp Development Project",
+    "url": "https://transwarp.me/"
+  },
+  "encodingFormat": "text/html",
+  "associatedMedia": {
+    "@type": "MediaObject",
+    "contentUrl": "https://transwarp.me/manuals/mu-Tronic-User-Manual.pdf",
+    "encodingFormat": "application/pdf"
+  }
+}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main style="padding-top: 120px; padding-bottom: 100px;">
+    <article class="art manual">
+      <div class="kicker">User manual &middot; Version 1.1</div>
+      <h1>mu-Tronic Manual: Standalone Live Performance Rig User Guide</h1>
+      <p class="lede">mu-Tronic: Performance Unit.</p>
+<p>Prefer a file? <a href="manuals/mu-Tronic-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-tronic.html">mu-Tronic</a> &middot; <a href="mu-tronic-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+<nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#introduction">Introduction</a></li><li><a href="#installation">Installation</a></li><li><a href="#interface-overview">Interface Overview</a></li><li><a href="#transport-bar">Transport Bar</a></li><li><a href="#slots-and-the-layer-sidebar">Slots and the Layer Sidebar</a></li><li><a href="#adding-a-layer">Adding a Layer</a></li><li><a href="#the-layers">The Layers</a></li><li><a href="#scenes-and-clips">Scenes and Clips</a></li><li><a href="#modulators-2">Modulators</a></li><li><a href="#mixer">Mixer</a></li><li><a href="#presets">Presets</a></li><li><a href="#settings">Settings</a></li><li><a href="#connecting-to-mu-link">Connecting to mu-link</a></li><li><a href="#tips-and-workflow">Tips and Workflow</a></li><li><a href="#technical-specifications">Technical Specifications</a></li></ol></nav>
+<h2 id="introduction">1. Introduction</h2>
+<p>mu-Tronic is a performance unit from Transwarp Development Project. It is a standalone application: there is no VST3 or CLAP version. mu-Tronic is free to download and use, with every feature, and a one-off £30 licence removes the licence reminder (see Supporting mu-Tronic).</p>
+<p>mu-Tronic starts empty. It has sixteen layer slots, shown eight at a time on two pages. Into each slot you put one layer, chosen from the instruments of the other mu apps: a Rhythm from mu-Clid, a Pattern from mu-Tant, an Arp from mu-Toni, a Phrase from mu-Tilate (a loop slicer), or one of mu-On&#x27;s seven engines (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord). A layer in mu-Tronic is the same instrument you know from its own app, with the same controls, modulators and presets. Mix and match as you like: sixteen layers, any combination.</p>
+<p>Around the layers is the family you may know from the other apps: the same mixer, effects, modulators, presets and transport bar. mu-Tronic adds three buses to the mixer, so you can group layers and process the group, and scenes, so you can change the clip on every layer with one press.</p>
+<p>Because mu-Tronic hosts several instruments at once, it can stand in for mu-link as a performance tool: one window, one tempo, one mix.</p>
+<h3 id="the-layer-types">The Layer Types</h3>
+<ul>
+<li>Rhythm (from mu-Clid)  -  a Euclidean sample rhythm. It can also send MIDI notes instead of sound.</li>
+<li>Pattern (from mu-Tant)  -  a wavetable drone with a gate pattern.</li>
+<li>Arp (from mu-Toni)  -  a generative arpeggiator.</li>
+<li>Phrase (from mu-Tilate)  -  a loop slicer: one audio loop cut into slices at its hits, played by a timeline sequencer.</li>
+<li>Kick, Bass, Hat, Snare, FM Perc and Chord (from mu-On)  -  a 909-style drum, bass, percussion or chord sound with its own row of up to 64 steps (16 by default).</li>
+<li>Rumble (from mu-On)  -  a long, dark tail made from another layer&#x27;s sound, usually a Kick.</li>
+</ul>
+<p>Each of these is described in the manual of the app it comes from. This manual covers what is different in mu-Tronic.</p>
+<figure><img src="manual-images/mu-tronic-manual-main-window.webp" alt="The mu-Tronic window: transport bar, layer sidebar with scene pads and page switch, a Bass layer of mu-On in the main area, with its OSC/AMP, Filter, Insert, Layer, Step and Steps boxes and a Stepped modulator below." width="1100" height="843" loading="lazy"><figcaption>The mu-Tronic window: transport bar, layer sidebar with scene pads and page switch, a Bass layer of mu-On in the main area, with its OSC/AMP, Filter, Insert, Layer, Step and Steps boxes and a Stepped modulator below.</figcaption></figure>
+<h2 id="installation">2. Installation</h2>
+<p>mu-Tronic is a standalone application. Run mu-Tronic.exe from any location.</p>
+<p>On first launch mu-Tronic creates a content folder at %USERPROFILE%\Documents\TDP\muTronic\. Full mu-Tronic presets (.muTronic) are kept there. Layer presets are not: mu-Tronic reads and writes the preset folders of the other apps (see Presets), so install the apps whose layers you want to use, or at least keep their folders.</p>
+<p>An Options button at the top left of the window opens the audio and MIDI device settings: the audio output, and the MIDI inputs and outputs (see MIDI In and Out).</p>
+<h3 id="supporting-mu-tronic">Supporting mu-Tronic</h3>
+<p>mu-Tronic is free to download and use, and every feature works for everyone. A copy without a licence shows a polite reminder each time it loads. A one-off licence for £30 removes the reminder: after you pay, a licence key is sent by email from Lemon Squeezy, our payment provider, and entering the key removes the reminder for good. The key changes nothing else; mu-Tronic works the same with or without it.</p>
+<p>A copy without a key shows a polite &#x27;Support mu-Tronic&#x27; window every time you load mu-Tronic: each new instance in your DAW, and each time the standalone app starts. It has three buttons:</p>
+<ul>
+<li><strong>Maybe later</strong> &mdash; closes the window for that instance and carries on. It appears again the next time you load mu-Tronic.</li>
+<li>Enter licence key  -  opens the &#x27;Enter licence key - mu-Tronic&#x27; panel, where you type in your key.</li>
+<li><strong>Get a licence</strong> &mdash; opens the checkout page in your web browser. A licence is a one-off payment of £30, and a key is emailed to you.</li>
+</ul>
+<p>The reminder cannot be switched off without a licence. To bring the window back at any time, click the Support link at the right of the Status Bar, or the Support button in the About panel.</p>
+<p>To enter your key, click Enter licence key in the Support window, or click the mu-Tronic logo to open the About panel and click Enter a key. In the &#x27;Enter licence key - mu-Tronic&#x27; panel (it reads &#x27;Enter your licence key to remove the support reminder. Everything works either way.&#x27;), paste your key into the Licence key box and click Activate (or press Return). If you do not have a key yet, click Get a licence to open the checkout page in your web browser. mu-Tronic needs an internet connection the first time, to register the key. One key can be used on up to 5 machines. When the key is accepted the panel shows a confirmation and closes, the About panel thanks you for your support, and the Support window and Support link no longer appear.</p>
+<p>A licensed copy shows &#x27;Thank you for supporting mu-Tronic.&#x27; in the About panel.</p>
+<p>Once activated, mu-Tronic checks your key with the server now and then when it starts. If you are offline at that moment it carries on working as normal for up to 30 days.</p>
+<p>If activation fails, the panel tells you why. Check that you pasted the whole key and that you are online, then try again. A key that has already been used on 5 machines needs one of them released first; use Contact Support at the bottom of the Settings page. If the computer has no internet connection at all, the licence key panel shows a machine code at the bottom. Send that code to Contact Support and you can be sent an offline licence file for that computer, to place in the mu-Tronic content folder.</p>
+<h2 id="interface-overview">3. Interface Overview</h2>
+<p>The mu-Tronic window is divided into these regions:</p>
+<ul>
+<li>Transport Bar (top)  -  playback, BPM, presets, settings, performance mode and mixer</li>
+<li>Layer Sidebar (left)  -  eight slots at a time, the scene pads and the page switch</li>
+<li>Layer Editor (centre)  -  the header, the controls and the modulators of the selected layer</li>
+<li>Mixer overlay  -  opened from the transport bar, replacing the editor</li>
+<li>Status Bar (bottom)  -  the name and value of the control you last touched, a Support link (until a licence key is entered), and the CPU readout at the right-hand end</li>
+</ul>
+<p>The window has two sizes, Medium and Large, chosen in Settings (Display, Size). Everything scales with it.</p>
+<p>The main area takes the colour of the selected layer&#x27;s type: purple for Rhythm, green for Pattern, blue for Arp and Phrase, and yellow for the seven mu-On layers. The transport bar, sidebar, mixer and settings keep mu-Tronic&#x27;s own ice-white and steel.</p>
+<p>Every control reports to the Status Bar: touch any knob, drop-down, switch or button and the bar shows its name and value, so you always see what you last changed.</p>
+<h3 id="cpu-readout">CPU Readout</h3>
+<p>At the right-hand end of the Status Bar, mu-Tronic shows CPU followed by a percentage. It is how hard the audio engine is working, with all sixteen layers, the buses and the effects counted. The figure is the worst moment of the last second, because it is the brief spike that causes clicks. The number turns amber from 70 percent and red from 90 percent. If it goes red, remove a layer or a heavy effect. The readout stays visible in Performance mode.</p>
+<h2 id="transport-bar">4. Transport Bar</h2>
+<p>The transport bar is the same as in the other mu apps. From left to right:</p>
+<ul>
+<li>mu-Tronic logo  -  click to open the About panel.</li>
+<li>Play / Stop  -  starts and stops every layer together. Locked while an external MIDI clock controls play.</li>
+<li>BPM display  -  tempo from 20.0 to 300.0 BPM with one decimal. Click the arrows to step one whole BPM (Shift+click steps a tenth). Double-click to type a value. Locked while an external MIDI clock sets the tempo.</li>
+<li>Clock lamp or Tap button  -  the lamp shows the state of an incoming MIDI clock (dim amber waiting, green locked, red lost); Tap sets the tempo from your taps. You see one or the other, never both.</li>
+<li>Nudge buttons (- and +)  -  hold to run the groove 4 percent slower or faster to line up by ear; the set tempo returns when you let go.</li>
+<li>Position  -  bar, beat and sixteenth readout.</li>
+<li>Preset dropdown / New / Save  -  load and save full .muTronic presets. The dropdown also holds the Import and Performances entries (see Presets).</li>
+<li>Settings (gear) icon  -  opens Settings.</li>
+<li>Perf button  -  turns on Performance mode (also Ctrl+P). See Performance Mode.</li>
+<li>Mixer button  -  opens the mixer. The label changes to Sequencer while the mixer is open.</li>
+</ul>
+<figure><img src="manual-images/mu-tronic-manual-transport-bar.webp" alt="Transport Bar - full width view." width="1100" height="34" loading="lazy"><figcaption>Transport Bar - full width view.</figcaption></figure>
+<h2 id="slots-and-the-layer-sidebar">5. Slots and the Layer Sidebar</h2>
+<p>mu-Tronic has sixteen slots, numbered 1 to 16. The sidebar shows eight of them at a time. Each item shows the slot number, a small picture of the layer&#x27;s type with a letter on it, and the layer&#x27;s colour. A new mu-Tronic holds no layers at all: every slot is empty, and the first thing you see is the layer chooser (see Adding a Layer).</p>
+<ul>
+<li>Select  -  click an item to select that slot. The selected slot is outlined and shown in the main area.</li>
+<li>Empty slots  -  shown with a + sign. They stay in the list, so the slots never move or renumber.</li>
+<li>Colour  -  each layer has its own colour. Within one page no two layers share a colour; slot 1 and slot 9 may both be red.</li>
+<li>Reorder  -  drag an item onto another slot on the same page to swap the two. Dragging onto an empty slot moves the layer there. The layer keeps its mixer strip, clips, modulators and colour. Moving a layer to the other page is not yet possible.</li>
+<li>Delete  -  the Delete (x) button in the layer header empties the slot, after a confirmation. No other slot moves. The layer&#x27;s mixer strip, clips and modulators go with it.</li>
+<li>Names  -  every layer has a name that you can change: click the name in the layer header and type. The default is the type and the slot number, for example Kick 3 or Rhythm 12. Delete the text to return to the default. Names are saved, and they appear in the mixer and in the sidechain lists.</li>
+</ul>
+<figure><img src="manual-images/mu-tronic-manual-sidebar.webp" alt="Layer Sidebar with a mix of layer types, one selected, empty slots shown with a plus sign." width="84" height="836" loading="lazy"><figcaption>Layer Sidebar with a mix of layer types, one selected, empty slots shown with a plus sign.</figcaption></figure>
+<h3 id="pages">Pages</h3>
+<p>The page switch sits at the foot of the sidebar, under the engraved word Page. Click 1 for slots 1 to 8 or 2 for slots 9 to 16. You can also press Page Up and Page Down to move between pages; they stop at the first and last page. The keys work when no text box is being edited. While the mixer is open they change the mixer&#x27;s page instead.</p>
+<p>Switching page selects the slot at the same position on the new page, so slot 3 goes to slot 11. Selecting a slot on the other page by any other route also switches the page to follow it.</p>
+<h3 id="scene-pads">Scene Pads</h3>
+<p>Above the page switch is the Scene block: eight numbered pads in two columns. Each pad launches clip n on every layer that stores one, across both pages. See Scenes and Clips.</p>
+<h2 id="adding-a-layer">6. Adding a Layer</h2>
+<p>Select an empty slot and the main area shows the layer chooser, titled Add a layer to slot n. It is a set of cards, one for each layer type:</p>
+<ul>
+<li>mu-Clid  -  Rhythm: Euclidean sample rhythm.</li>
+<li>mu-Tant  -  Pattern: wavetable drone, gate pattern.</li>
+<li>mu-Toni  -  Arp: generative arpeggiator.</li>
+<li>mu-Tilate  -  Phrase: loop slicer with a timeline sequencer.</li>
+<li>mu-On  -  a framed group of seven cards: Kick (909 kick drum), Bass (bass line), Hat (hi-hat), Snare (snare), Rumble (rumble tail from a kick), FM Perc (FM toms and percussion) and Chord (a chord player for dub-techno stabs).</li>
+</ul>
+<p>The cards run in that order: the four products first, then the mu-On group. Click a card, or its Add button, to put that layer in the slot. The new layer starts from the default for its type (see Presets). The status bar confirms with Added followed by the layer&#x27;s name.</p>
+<p>You can also load a layer preset into an empty slot: open the preset dropdown in the layer header and choose any layer preset. The slot takes the type of the preset you chose.</p>
+<p>Rumble works on the sound of another layer, called its Source. A new Rumble listens to the first Kick layer if there is one. If there is no Kick yet, the Rumble is added with no Source and the status bar says Source needed: add a Kick layer. Choose a Source in the Rumble&#x27;s own Source dropdown. A Rumble can listen to any other layer that is not a Rumble.</p>
+<figure><img src="manual-images/mu-tronic-manual-chooser.webp" alt="The layer chooser for an empty slot: four product cards (mu-Clid, mu-Tant, mu-Toni and mu-Tilate) and the mu-On group of seven engine cards (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord)." width="1100" height="843" loading="lazy"><figcaption>The layer chooser for an empty slot: four product cards (mu-Clid, mu-Tant, mu-Toni and mu-Tilate) and the mu-On group of seven engine cards (Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord).</figcaption></figure>
+<h2 id="the-layers">7. The Layers</h2>
+<p>A layer in mu-Tronic has the controls of its type, in the same place as in the app it comes from. See that app&#x27;s manual for the details of each control. This chapter lists what is different in mu-Tronic.</p>
+<h3 id="the-layer-header">The Layer Header</h3>
+<p>The strip across the top of the layer editor holds:</p>
+<ul>
+<li>Layer colour dot and a small type tag naming the app the layer comes from: mu-Clid, mu-Tant, mu-Toni, mu-Tilate or mu-On.</li>
+<li>Layer name  -  click to edit.</li>
+<li>Layer preset dropdown  -  lists the layer presets for this layer&#x27;s type only (see Presets). An empty slot lists every type.</li>
+<li>Notes In  -  for Arp and Pattern layers only. See below.</li>
+<li>Clip strip  -  eight numbered pads. See Scenes and Clips. A Rumble layer has no clip strip.</li>
+<li>Save  -  saves the layer as a layer preset of its type.</li>
+<li>Reset (circular arrow) / Delete (x)  -  reset the layer to its defaults, or empty the slot. Both ask first. Reset also clears the layer&#x27;s clips.</li>
+</ul>
+<h3 id="notes-in-midi-channel-per-layer">Notes In (MIDI channel per layer)</h3>
+<p>Arp and Pattern layers can be played from a MIDI keyboard. Each of these layers has its own Notes In setting in the header, so different layers can listen to different channels. Choose Omni (every channel, the default) or Channel 1 to Channel 16. The setting is saved with the layer and with the full preset. Loading a layer preset or a clip never changes it, because it describes your MIDI setup rather than the sound. A Pattern layer shows the control in Free mode too; it takes effect when you switch that layer to Note mode. Rhythm, Phrase and the mu-On layers do not read notes and show no Notes In control.</p>
+<h3 id="rhythm">Rhythm</h3>
+<ul>
+<li>The Save button opens the same Save Rhythm Preset card as in mu-Clid: Name, Description, Category and Embed sample in file. Tick Embed sample in file if you will open the preset on another computer.</li>
+<li>A new Rhythm layer starts with no sample if its default sample cannot be found, and shows the normal empty sample bar (drop a sample here or click to browse). A Missing warning appears only for a sample that a loaded preset or saved session names and that has gone.</li>
+<li>A Rhythm set to send MIDI instead of sound makes no audio. Its mixer strip is drawn dimmed. The notes go out through the MIDI output device chosen in the standalone&#x27;s settings.</li>
+</ul>
+<h3 id="pattern">Pattern</h3>
+<p>On the Root and Scale row, at the right, is a MIDI switch with two choices, Free and Note. In Free, the drone plays on its own. In Note, it sounds while a key is held, at the key&#x27;s pitch. Each Pattern layer has its own setting; it is saved with the layer but is not part of a layer preset. Free is the default.</p>
+<h3 id="phrase">Phrase</h3>
+<p>A Phrase layer is mu-Tilate&#x27;s loop slicer. Load a loop into the layer; mu-Tilate finds the hits in it, cuts the loop into slices at those points, and its timeline sequencer places the slices as blocks so you can rearrange, repeat, reverse or thin out the loop. The layer has its own sound controls, mixer strip and modulators like every other layer. Loops are taken from mu-Tilate&#x27;s own sample folder and are shared with it, never copied. See the mu-Tilate manual for the loop editor, the slices and the timeline.</p>
+<h3 id="mu-on-layers-kick-bass-hat-snare-fm-perc-and-chord">mu-On Layers (Kick, Bass, Hat, Snare, FM Perc and Chord)</h3>
+<p>These are mu-On&#x27;s engines, each with its own row of steps. Because the layer is one of them, there is no Engine selector: to change the sound family, empty the slot and add a different layer. The Layer box holds this layer&#x27;s own Length, Speed, Play Mode, Swing and Accent. Right-click a knob that has a locked value on the selected step and choose Remove p-lock to remove the lock. The step row shows 16 steps at a time; click a step to turn it on or off, right-click for an accent.</p>
+<p>A row can be up to 64 steps long. Under the row, Prev and Next show the previous or next sixteen steps, a label such as Page 2 / 4 says where you are, and the Length control in the Layer box (1 to 128, default 16) sets how many steps the row plays before it starts again. Speed (1/4 to 1/64, with triplets; default 1/16) sets how long each step lasts, and Play Mode chooses Forwards, Backwards or Random; Play Mode is a modulation target. Use its arrows to change it by one, or double-click it and type a number. Steps past the Length are shaded with diagonal hatching and do not play; they keep their settings if you lengthen the row again. A tie that crosses a page edge shows as a short stub at the start of the next page. If you shorten the row past the selected step, the selection moves back to the last step, so the Step panel always edits a step you can see. The Layer box is narrow, leaving room for a wide Steps box. Paging and Length work the same way as in mu-On.</p>
+<h4 id="the-step-panel">The Step Panel</h4>
+<p>These layers share mu-On&#x27;s Step panel, which edits the selected step (the one you last clicked). Everything in it belongs to that one step.</p>
+<ul>
+<li>Prob and Level (knobs)  -  Prob is the chance that the step plays, 0 to 100 percent (default 100). Level is the step&#x27;s own volume, 0 to 100 percent (default 100).</li>
+<li>Plays on Loop  -  let a step play only on some loops of a longer cycle, where a loop is one pass through the whole row. Length (1 to 8, default 1) is how many loops make the cycle. Loops is a drop-down where you tick which of them the step plays on; its box shows the ticked loops, or All, or None.</li>
+<li>Repeat, Rate and Fade  -  repeat the step&#x27;s note quickly, like a roll. Repeat (0 to 16, default 0 = off) is how many extra hits follow the first, Rate is the time between hits, and Fade shapes their level: Flat, Out 50, Out, In 50 or In.</li>
+<li>Condition  -  a rule the step must also pass: Always play (the default), Play on Fill, Play if previous played, or Play if previous didn&#x27;t play.</li>
+</ul>
+<p>Fill is a press-and-hold button under the step rows. While you hold it, steps set to Play on Fill play; let go and they stop. Fill is also a modulation target, so a modulator can press it for you. A Chord step has Prob, Plays on Loop and Condition but no Level, Repeat, Rate or Fade. Details are in the mu-On manual.</p>
+<h4 id="sound-panels">Sound Panels</h4>
+<ul>
+<li>Bass  -  two panels, OSC/AMP (oscillator, sub and amp envelope) and Filter, which has its own attack, decay, sustain and release envelope.</li>
+<li>Filters  -  Kick, Hat, Snare and FM Perc have a Filter panel, and the Bass and Chord have filters of their own. All offer the same sixteen filter types.</li>
+<li>Hat tune link  -  a lamp under the Hat&#x27;s Cl.Tune and Op.Tune. When on, the two tune knobs move together.</li>
+</ul>
+<p>The insert knobs in each layer show a live arc when a modulator is moving them.</p>
+<h3 id="rumble">Rumble</h3>
+<p>Rumble has an envelope and a Source dropdown instead of a step row. The envelope curve shows a baseline, level lines at 25, 50 and 75 percent, and beat lines that follow its loop length.</p>
+<h3 id="effect-send-names">Effect Send Names</h3>
+<p>The mixer&#x27;s Effect return is named after its algorithm, for example Chorus or Echo. The Effect send knob in each layer, and the modulation target for it, carry the same name.</p>
+<h3 id="modulators">Modulators</h3>
+<p>Every layer has its own modulators exactly as in its own app. A Step panel&#x27;s Fill button is a target too. Modulators can only move the controls of their own layer. See the manual of the layer&#x27;s app.</p>
+<h2 id="scenes-and-clips">8. Scenes and Clips</h2>
+<h3 id="clips">Clips</h3>
+<p>A clip is a stored copy of one layer&#x27;s current state, ready to recall while the music plays. Every layer, except Rumble, has up to eight clips in the Clip strip in its header: the word Clip followed by pads numbered 1 to 8. A clip is saved in the layer&#x27;s own type, so it carries that type with it.</p>
+<p>Each pad is lit in the layer&#x27;s colour:</p>
+<ul>
+<li>Bright and steady  -  the clip that is playing.</li>
+<li>Dim  -  a clip is stored here.</li>
+<li>Unlit, with just its number  -  the pad is empty.</li>
+<li>Pulsing  -  the clip is queued and will start at the next bar.</li>
+<li>Flashing on and off  -  the playing clip belongs to a muted layer.</li>
+</ul>
+<p>How to use the pads:</p>
+<ul>
+<li>Click a stored pad to launch it. While playing it waits for the next bar and the pad pulses; when stopped it starts at once.</li>
+<li>Click the playing pad to mute the layer; click again to unmute.</li>
+<li>Click an empty pad to store the layer&#x27;s current state there.</li>
+<li>Shift+click any pad to store the current state in it. If the pad holds a different clip from the one playing, mu-Tronic asks you to confirm with Replace.</li>
+<li>Right-click a pad (or Ctrl+click) for a menu with Store here, Copy, Cut, Paste and Clear. Copy and Cut put the clip on a clipboard; Paste puts it in another pad, or in a pad of another layer of the same type, and asks first if the pad already holds a clip. Paste is greyed, with the reason in its text, when nothing has been copied or the copied clip is for a different layer type.</li>
+</ul>
+<p>Auto-save: by default, edits you make to a layer while one of its clips is playing are written back into that clip a moment after you stop moving the control, so the clip you launch next time is the one you left. Switch this off with Auto-save clip edits in Settings (General, Clips); with it off, turning a knob changes only the playing layer, not the stored clip, and you keep a tweak by storing it again with Shift+click. Auto-save does nothing in Performance mode. Resetting a layer clears its clips; deleting a layer removes them with it. Clips are saved with the full preset and your session, but not in layer presets. A clip of a different layer type is never launched: the status bar says that the clip is for a different layer type.</p>
+<h3 id="scenes">Scenes</h3>
+<p>A scene launches clip n on every layer at once. It replaces the Scene buttons of mu-link. The eight Scene pads sit in the sidebar, under the layers and above the page switch, and they always act on all sixteen slots, whichever page you are looking at.</p>
+<ul>
+<li>Click pad n to launch clip n on every layer that has a clip n. Layers that have no clip n, empty slots, and layers whose clip n belongs to a different type keep playing as they are.</li>
+<li>All the layers switch together, at the next bar line.</li>
+<li>A pad is unlit when no layer stores that clip, dim when at least one does, bright when every layer that stores it is playing it, and pulsing while any layer is waiting to start it.</li>
+<li>The status bar reads Clip n on N layers when a scene launches, or Clip n is empty when no layer has that clip.</li>
+</ul>
+<p>In Performance mode the pads cannot be clicked, but they keep moving so that you can see what the control surface is doing.</p>
+<figure><img src="manual-images/mu-tronic-manual-scene-pads.webp" alt="The Scene pads and page switch at the foot of the sidebar, with scene 1 playing and scene 3 queued." width="84" height="163" loading="lazy"><figcaption>The Scene pads and page switch at the foot of the sidebar, with scene 1 playing and scene 3 queued.</figcaption></figure>
+<figure><img src="manual-images/mu-tronic-manual-clip-strip.webp" alt="Clip strip at the right of the layer header: pad 3 is the playing clip, pad 1 is queued, pad 2 holds a stored clip, the others are empty." width="495" height="36" loading="lazy"><figcaption>Clip strip at the right of the layer header: pad 3 is the playing clip, pad 1 is queued, pad 2 holds a stored clip, the others are empty.</figcaption></figure>
+<h2 id="modulators-2">9. Modulators</h2>
+<p>Each layer has eight independent modulators (Mod A to Mod H) plus a Matrix tab, the same shared engine as the other mu apps, in the lower part of the layer editor. Each has a Stepped or Smooth mode, a polarity, a loop length, and its own targets with a depth from -100 to +100 percent. Which controls can be targets depends on the layer&#x27;s type; see that app&#x27;s manual.</p>
+<figure><img src="manual-images/mu-tronic-manual-modulators.webp" alt="Modulator panel with the Stepped editor and the target list." width="1065" height="330" loading="lazy"><figcaption>Modulator panel with the Stepped editor and the target list.</figcaption></figure>
+<h2 id="mixer">10. Mixer</h2>
+<p>Click the Mixer button in the transport bar to open the mixer. It is the same shared mixer and effects rack as the other mu apps, with room for sixteen channels and three buses. The mixer has its own page selector at the top right: 1-8, 9-16 and Buses. When you open the mixer it shows the page that the sidebar is on; after that the two pages are independent, so you can adjust a bus while the editor stays on a layer. Page Up and Page Down move between the channel pages while the mixer is open; click Buses to reach the bus page.</p>
+<h3 id="channel-strips">Channel Strips</h3>
+<p>Each slot has a channel strip with a fader and meter, pan, mute and solo, sidechain ducking (source, amount, attack and release) and Effect, Delay and Reverb sends. The strip shows the layer&#x27;s name in its colour. An empty slot&#x27;s strip is dimmed but can still be set. A Rhythm layer set to send MIDI has a dimmed strip, because it makes no sound.</p>
+<p>The sidechain source list holds all the other layers by slot and name, the External input, and the buses. A layer can duck from any other layer.</p>
+<h3 id="out-main-or-a-bus">Out: Main or a Bus</h3>
+<p>At the foot of each channel strip, the Out selector chooses where the channel goes: Main (the master output, the default), Bus 1, Bus 2 or Bus 3. A channel set to a bus shows the bus name lit. The channel&#x27;s sends to the Effect, Delay and Reverb returns do not depend on its Out setting. A bus always goes to Main. A bus cannot be routed to another bus.</p>
+<h3 id="the-buses-page">The Buses Page</h3>
+<p>Click Buses in the mixer&#x27;s page selector. The page shows three bus units, then the Master. Each bus unit is a strip with its own insert column beside it, built like the Master:</p>
+<ul>
+<li>Name  -  Bus 1, Bus 2 or Bus 3.</li>
+<li>Sidechain  -  the same source, amount, attack and release as a channel. A bus can duck from any layer and from any earlier bus (Bus 2 can use Bus 1; Bus 3 can use Bus 1 and Bus 2), never from itself or a later bus.</li>
+<li>Sends  -  Effect, Delay and Reverb sends, as on a channel, taken after the bus fader.</li>
+<li>Pan, fader with meter, level readout, mute and solo.</li>
+<li>Insert 1 and Insert 2  -  two insert effects, in that order, with the same list of algorithms and four knobs each as the Master inserts.</li>
+</ul>
+<p>The three FX returns appear on both channel pages and are unaffected by which page you view. The Effect, Delay and Reverb rows below the strips are the same on every page.</p>
+<figure><img src="manual-images/mu-tronic-manual-mixer-buses.webp" alt="The Buses page: three bus units each with two inserts, and the Master." width="1100" height="843" loading="lazy"><figcaption>The Buses page: three bus units each with two inserts, and the Master.</figcaption></figure>
+<figure><img src="manual-images/mu-tronic-manual-mixer.webp" alt="Mixer overlay, channel page 1-8, with the page selector at the top right and the Out selector at the foot of each strip." width="1100" height="843" loading="lazy"><figcaption>Mixer overlay, channel page 1-8, with the page selector at the top right and the Out selector at the foot of each strip.</figcaption></figure>
+<h3 id="insert-effects">Insert Effects</h3>
+<p>Every layer, every bus and the Master has insert effects. The algorithm dropdown lists None, 3-Band EQ, Bitcrusher, Chorus, Clipper, Compressor, Flanger, Fold, Hard Clip, Karplus, Limiter, Overdrive, Phaser, Ring Mod, Soft Clip, Tape Sat, Vocoder and Vocoder St. Four knobs appear and are labelled to match the algorithm.</p>
+<h4 id="overdrive">Overdrive</h4>
+<p>Overdrive is a warm, tube-style saturation that also adds a little even-harmonic body. Its four knobs:</p>
+<ul>
+<li>Drive (0 to 100, default 0)  -  how hard the signal is pushed. At 0 it passes unchanged.</li>
+<li>Output (-24 to 0 dB, default 0 dB)  -  the level after the saturation, to match the loudness before and after.</li>
+<li>Bias (0 to 100 percent, default 25)  -  how asymmetrically the signal is clipped. More Bias adds more even harmonics and a thicker sound.</li>
+<li>Tone (200 Hz to 20 kHz, default 20 kHz)  -  a low-pass filter on the result. Turn it down to soften the top end.</li>
+</ul>
+<h4 id="tape-sat">Tape Sat</h4>
+<p>Tape Sat gives the soft, dense squash of a tape machine. As you turn Drive up, the highs compress and soften first, a little even-harmonic warmth is added, and small signals stay clean. Its four knobs:</p>
+<ul>
+<li>Drive (0 to 100, default 30)  -  how hard the signal is pushed into the tape.</li>
+<li>Output (-24 to 0 dB, default 0 dB)  -  the level after the saturation, to match the loudness before and after.</li>
+<li>Head Bump (0 to 100 percent, default 30)  -  a gentle lift of up to 4 dB in the low end around 75 Hz, like the bass swell of a tape head. At 0 it is off.</li>
+<li>Tone (200 Hz to 20 kHz, default 20 kHz)  -  a low-pass filter on the result. Turn it down to soften the top end.</li>
+</ul>
+<h4 id="chorus-flanger-and-phaser">Chorus, Flanger and Phaser</h4>
+<p>Chorus, Flanger and Phaser are also available as insert effects. They use the same sound as the Effect send of the same name, with a Mix knob to blend with the unprocessed signal. Inserts saved before this change may sound wider and thicker now.</p>
+<ul>
+<li>Chorus  -  Rate (default 0.8 Hz), Depth (50 percent), Delay (5 to 30 ms, default 15) and Mix (50 percent). A three-voice chorus spread across the stereo field.</li>
+<li>Flanger  -  Rate (default 0.3 Hz), Depth (70 percent), Feedback (-95 to 95 percent, default 50) and Mix (50 percent). Left and right sweep a quarter of a cycle apart.</li>
+<li>Phaser  -  Rate (default 0.4 Hz), Depth (80 percent), Feedback (0 to 90 percent, default 40) and Mix (50 percent). Six stages, left and right a quarter of a cycle apart.</li>
+</ul>
+<h3 id="effects-and-master">Effects and Master</h3>
+<ul>
+<li>Effect  -  Chorus, Flanger, Phaser or Echo. A pure send, with no Mix knob.</li>
+<li>Delay  -  a Time dropdown (Free, 1/32, 1/16, 1/8 or 1/4), Feedback, Spread and Dirt.</li>
+<li>Reverb  -  Room, Hall, Plate or Spring, with Size, Decay, Pre-delay, Diffusion, Damp, Mod and Dirt. A pure send.</li>
+<li>Master  -  the master strip has two inserts, Insert 1 and Insert 2, that the summed output passes through in that order.</li>
+</ul>
+<p>A row of buttons at the top right (Peak, VU, K-12, K-14) chooses the metering standard.</p>
+<h2 id="presets">11. Presets</h2>
+<h3 id="full-presets-mutronic">Full Presets (.muTronic)</h3>
+<p>A full preset saves the whole of mu-Tronic: every slot&#x27;s layer, its settings, clips and name, the mixer, the buses and the effects. Presets are kept in Documents\TDP\muTronic\Presets. Load from the transport bar&#x27;s dropdown. Save with the Save button: enter a name, an optional description and a category, and tick Save as Default to make it the preset that loads at startup and when you press New. Loading a preset shows page 1 with slot 1 selected. While the transport is playing, a loaded preset waits and takes over at the next bar.</p>
+<h3 id="layer-presets-and-where-they-live">Layer Presets and Where They Live</h3>
+<p>mu-Tronic does not keep a separate set of layer presets. Each layer type reads and writes the preset folder of the app it comes from, in the shared Documents\TDP folder. A layer you save in mu-Tronic appears in the original app, and the other way round.</p>
+<ul>
+<li>Rhythm  -  Documents\TDP\muClid\Rhythms, files ending .muRhythm.</li>
+<li>Pattern  -  Documents\TDP\muTant\Voices, files ending .muPattern.</li>
+<li>Arp  -  Documents\TDP\muToni\Arps, files ending .muArp.</li>
+<li>Phrase  -  Documents\TDP\muTilate\Phrases, files ending .muPhrase.</li>
+<li>Kick, Bass, Hat, Snare, Rumble, FM Perc and Chord  -  Documents\TDP\muOn\Tracks, files ending .muTrack. A .muTrack file knows which engine it is for, so a Kick preset shows only in Kick slots.</li>
+</ul>
+<p>In a slot that holds a layer, the layer preset dropdown lists only presets of that layer&#x27;s type (for example only .muArp files in an Arp slot). To use a preset of another type, choose it in an empty slot. Presets from the other apps&#x27; factory and user folders both appear.</p>
+<h3 id="defaults-for-new-layers">Defaults for New Layers</h3>
+<p>A layer added from the chooser starts from the default of its own app: the file named _default in that app&#x27;s layer preset folder (for example _default.muArp in the Arps folder), which the app writes when you tick Save as Default in a layer preset. If there is no such file the layer starts from the built-in defaults. So a default you set in mu-Toni is the Arp you get in mu-Tronic.</p>
+<h3 id="import-product-preset">Import Product Preset</h3>
+<p>You can bring a whole preset from another mu app into mu-Tronic. Open the transport bar&#x27;s preset dropdown and choose Import product preset... in the Import section. A file chooser opens, filtered to .muClid, .muTant, .muToni and .muOn files. Choose one.</p>
+<ul>
+<li>The layers of the preset are laid into the free slots, in order, starting from the first empty slot. Each layer keeps its settings, name, mixer strip (level, pan, mute, sends and sidechain) and, for a Pattern layer, the tonal centre if you have no Pattern yet.</li>
+<li>Slots that already hold a layer are never touched. If the preset has more layers than there are free slots, nothing is imported and the status bar reads Needs n free slots, m free.</li>
+<li>Solo is never imported, so it cannot silence the layers already in mu-Tronic. A sidechain or Rumble Source that pointed at another layer of the preset follows that layer to its new slot.</li>
+<li>The preset&#x27;s global effects, master settings, clips and layer colours are ignored. mu-Tronic keeps its own.</li>
+<li>On success the status bar reads Imported n layers from followed by the preset&#x27;s name. If the file cannot be read, nothing is imported and the status bar says so.</li>
+</ul>
+<p>Presets saved by an old version of mu-On that predates its variable layer count cannot be imported.</p>
+<h3 id="performance-mode">Performance Mode</h3>
+<p>Performance mode turns mu-Tronic into a locked gig view. The screen shows what is playing, but you cannot change anything with the mouse or keyboard. A connected control surface switches presets and layers, and the screen follows it. A performance is a saved list of up to eight full presets, stored as a .muPerformance file in the Performances folder in your content folder.</p>
+<h4 id="the-performance-chooser">The Performance Chooser</h4>
+<p>Open the chooser from the Performances entry at the bottom of the transport bar&#x27;s preset dropdown, or by clicking the Perf button (or pressing Ctrl+P) when no performance has been chosen yet. On the left is the list of saved performances; on the right are the eight places. Each place has a + Preset button (empty) or Replace, Up, Down and Remove buttons (filled). A preset whose file is missing shows a red lamp. New starts an empty performance; Load opens a .muPerformance file; Save stores it under a name; Rename and Delete do what they say. Use makes this performance the one that Performance mode plays.</p>
+<h4 id="entering-and-leaving">Entering and Leaving</h4>
+<p>Click the Perf button or press Ctrl+P. The button lights and reads LIVE, and the preset dropdown and New and Save are replaced by a step indicator with a row of eight lamps. Everything is locked, including the sidebar&#x27;s page switch, the scene pads, the mixer and Settings, but they keep moving so that you can see what the surface is doing. To leave, press and hold the Perf button for one second. A plain click does nothing, so you cannot leave by accident.</p>
+<figure><img src="manual-images/mu-tronic-manual-performance-transport.webp" alt="Transport Bar in Performance mode: the Perf button lit and reading LIVE, the step indicator and its row of eight lamps." width="1100" height="34" loading="lazy"><figcaption>Transport Bar in Performance mode: the Perf button lit and reading LIVE, the step indicator and its row of eight lamps.</figcaption></figure>
+<h2 id="settings">12. Settings</h2>
+<p>Click the gear icon to open Settings. Click Close to return.</p>
+<p>General:</p>
+<ul>
+<li>Audio, Master Vol  -  overall output level.</li>
+<li>Display, Size  -  Medium or Large window.</li>
+<li>Transport, Tempo and Time signature  -  the internal clock&#x27;s tempo, and the time signature that the Position readout counts in.</li>
+<li>Clips, Auto-save clip edits  -  a tick box, ticked by default. Whether edits to a playing clip are saved into it (see Clips).</li>
+<li>Updates, Check for updates  -  a tick box. When ticked, mu-Tronic asks the transwarp.me website once a day for the latest version number and shows an Update available link in the status bar when there is a newer one. It sends nothing about you. Untick to switch the check off.</li>
+</ul>
+<p>MIDI:</p>
+<ul>
+<li>MIDI Clock, Source  -  Internal, or MIDI In to follow an external MIDI clock. A Messages choice (Clock only, Transport only, Clock + Transport) and a Sync offset appear. They work as in the other mu apps.</li>
+<li>MIDI Program Change  -  buttons that open the tables mapping incoming program-change messages to presets.</li>
+</ul>
+<p>At the foot of Settings, Contact Support opens the support page in your web browser. The Settings page also has a Send Feedback link (feedback@transwarp.me) beside Contact Support.</p>
+<p>Notes In is not in Settings: each Arp and Pattern layer has its own, in the layer header.</p>
+<h2 id="connecting-to-mu-link">13. Connecting to mu-link</h2>
+<p>mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, mu-Tronic connects to it automatically. Its audio is summed into mu-link&#x27;s mix and its transport locks to mu-link&#x27;s master clock.</p>
+<h3 id="how-to-connect">How to Connect</h3>
+<ul>
+<li>Launch mu-link, then launch mu-Tronic, in either order. Within about a second the mu-Tronic title bar shows mu-link connected.</li>
+<li>mu-Tronic&#x27;s audio plays through mu-link&#x27;s output device, summed with any other connected mu apps.</li>
+<li>mu-link is the tempo master. Use mu-link&#x27;s Play/Stop and tempo while connected.</li>
+<li>Quit mu-link and mu-Tronic reverts to its own audio device and internal transport, with no restart.</li>
+</ul>
+<p>Because mu-Tronic holds up to sixteen layers itself, you often do not need mu-link at all. Use mu-link when you want to combine mu-Tronic with other apps or with outboard gear. See the mu-link User Manual for the full picture.</p>
+<h2 id="tips-and-workflow">14. Tips and Workflow</h2>
+<ul>
+<li>Starting out: add a Kick to slot 1 and a Bass to slot 2, press Play, and turn on a few steps.</li>
+<li>Rumble: add a Kick, then a Rumble, which listens to the Kick by default.</li>
+<li>Group the drums: send the Kick, Hat and Snare to Bus 1 and put a Compressor in Bus 1&#x27;s Insert 1 to glue them.</li>
+<li>Pump the bass: in the Bass layer&#x27;s channel strip, set the sidechain source to your Kick.</li>
+<li>Prepare variations: store clip 1 on every layer as your first section, change things, and store clip 2. Then use the Scene pads to switch the whole set at the next bar.</li>
+<li>Bring in an old idea: use Import product preset to pull a whole mu-Clid or mu-On preset into the free slots.</li>
+<li>Keep an eye on the CPU readout as you add layers.</li>
+</ul>
+<h2 id="technical-specifications">15. Technical Specifications</h2>
+<ul>
+<li>Format: Standalone (Windows). No VST3 or CLAP. Free to download and use with every feature; a one-off £30 licence removes the licence reminder.</li>
+<li>Layers: 16 slots on two pages of 8, starting empty</li>
+<li>Layer types: Rhythm, Pattern, Arp, Phrase, Kick, Bass, Hat, Snare, Rumble, FM Perc, Chord</li>
+<li>Mixer: 16 channel strips, 3 buses with 2 inserts each, Effect / Delay / Reverb returns, master with 2 inserts</li>
+<li>Insert effects: 14 plus None, on every layer, bus and the master</li>
+<li>Clips: 8 per layer (none for Rumble), with copy, cut, paste and auto-save; scenes 1 to 8</li>
+<li>Modulators per layer: 8, plus a matrix view</li>
+<li>Full preset format: .muTronic. Layer presets: .muRhythm, .muPattern, .muArp, .muPhrase, .muTrack (shared with the other apps)</li>
+<li>Import: .muClid, .muTant, .muToni, .muOn full presets</li>
+<li>Third-party libraries: JUCE, Signalsmith Reverb (MIT)</li>
+</ul>
+<p>Prefer a file? <a href="manuals/mu-Tronic-User-Manual.pdf">Download the manual as a PDF</a>. Back to <a href="mu-tronic.html">mu-Tronic</a> &middot; <a href="mu-tronic-releases.html">release notes</a> &middot; <a href="guides.html">all guides</a>.</p>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="free-vst3-clap-plugins.html">Free VST3 &amp; CLAP plugins</a></li><li><a href="guides.html">Guides</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="mailto:feedback@transwarp.me">Feedback and feature requests</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="prices.js" defer></script>
+  <script src="site.js"></script>
+</body>
+</html>

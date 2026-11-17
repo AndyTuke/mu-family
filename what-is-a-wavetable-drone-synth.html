@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Is a Wavetable Drone Synth? A Plain-English Guide | Transwarp</title>
+  <meta name="description" content="What is a wavetable drone synth? How wavetable oscillators, FM and a gate sequencer turn a constant tone into rhythm, and a free VST3 and CLAP drone synth to try.">
+  <link rel="canonical" href="https://transwarp.me/what-is-a-wavetable-drone-synth">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/what-is-a-wavetable-drone-synth">
+  <meta property="og:title" content="What Is a Wavetable Drone Synth? A Plain-English Guide | Transwarp">
+  <meta property="og:description" content="What is a wavetable drone synth? How wavetable oscillators, FM and a gate sequencer turn a constant tone into rhythm, and a free VST3 and CLAP drone synth to try.">
+  <meta property="og:image" content="https://transwarp.me/wavetable-drone-synth-vst3-full-window.png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "headline": "What is a wavetable drone synth?",
+      "description": "What is a wavetable drone synth? How wavetable oscillators, FM and a gate sequencer turn a constant tone into rhythm, and a free VST3 and CLAP drone synth to try.",
+      "mainEntityOfPage": "https://transwarp.me/what-is-a-wavetable-drone-synth",
+      "author": {
+        "@type": "Organization",
+        "name": "Transwarp Development Project"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Transwarp Development Project",
+        "url": "https://transwarp.me/"
+      },
+      "dateModified": "2026-11-16",
+      "image": "https://transwarp.me/wavetable-drone-synth-vst3-full-window.png"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is there a free wavetable drone synth plugin?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "mu-Tant is free to download as VST3, CLAP and standalone for Windows. Every feature works; a one-off licence is optional and removes the licence reminder."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the difference between a drone synth and a normal synth?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A normal synth plays a note when you press a key. A drone synth plays all the time, and you shape it with filters, modulation and a gate pattern."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); text-transform: none; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 200px repeat(6,1fr); gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+</style>
+  <style>
+    [aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+    [aria-disabled="true"]:hover { box-shadow: none !important; transform: none !important; }
+  </style>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="nav-links">
+      <div class="nav-dd">
+        <button class="nav-dd-btn" type="button" aria-haspopup="true" aria-expanded="false">Products <span class="caret">▾</span></button>
+        <div class="nav-menu"><div class="nm-list">
+          <a href="mu-clid.html" class="nm nm-clid"><span class="nm-name"><span class="mu-d">μ</span>-clid</span><span class="nm-tag ">Licence <span data-price="mu-clid">£20</span></span><span class="nm-desc">Euclidean rhythm sequencer</span></a>
+          <a href="mu-tant.html" class="nm nm-tant"><span class="nm-name"><span class="mu-d">μ</span>-tant</span><span class="nm-tag ">Licence <span data-price="mu-tant">£20</span></span><span class="nm-desc">Wavetable drone sequencer</span></a>
+          <a href="mu-toni.html" class="nm nm-toni"><span class="nm-name"><span class="mu-d">μ</span>-toni</span><span class="nm-tag ">Licence <span data-price="mu-toni">£20</span></span><span class="nm-desc">Generative arpeggiator</span></a>
+          <a href="mu-on.html" class="nm nm-on"><span class="nm-name"><span class="mu-d">μ</span>-on</span><span class="nm-tag ">Licence <span data-price="mu-on">£20</span></span><span class="nm-desc">909-style groove sequencer</span></a>
+          <a href="mu-tilate.html" class="nm nm-tilate"><span class="nm-name"><span class="mu-d">μ</span>-tilate</span><span class="nm-tag ">Licence <span data-price="mu-tilate">£20</span></span><span class="nm-desc">Loop slicer</span></a>
+          <a href="mu-clid-midi.html" class="nm nm-midi"><span class="nm-name"><span class="mu-d">μ</span>-clid MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Euclidean MIDI effect</span></a>
+          <a href="mu-toni-midi.html" class="nm nm-toni-midi"><span class="nm-name"><span class="mu-d">μ</span>-toni MIDI</span><span class="nm-tag free">Free</span><span class="nm-desc">Arpeggiator MIDI effect</span></a>
+          <a href="mu-link.html" class="nm nm-link"><span class="nm-name"><span class="mu-d">μ</span>-link</span><span class="nm-tag free">Free</span><span class="nm-desc">Sync hub and performance mixer</span></a>
+          <a href="mu-tronic.html" class="nm nm-tronic"><span class="nm-name"><span class="mu-d">μ</span>-tronic</span><span class="nm-tag ">Licence <span data-price="mu-tronic">£30</span></span><span class="nm-desc">A performance instrument for live play</span></a>
+        </div></div>
+      </div>
+      <a href="index.html#live">Live</a>
+      <a href="index.html#pricing">Pricing</a>
+      <a href="index.html#community">Community</a>
+      <a href="download.html" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <main style="padding-top: 120px; padding-bottom: 100px;">
+    <article class="art">
+      <div class="kicker">Guide · Synths</div>
+      <h1>What is a wavetable drone synth?</h1>
+<p class="lede">A drone synth makes a sound that never stops. A wavetable drone synth does it with wavetable oscillators, so the tone can change shape while it holds.</p>
+<h2>Wavetable, in plain words</h2>
+<p>A wavetable oscillator stores a row of different waveforms and lets you glide between them. Move the position and the sound shifts from soft and round to bright and buzzy, without changing pitch.</p>
+<h2>Drone, in plain words</h2>
+<p>A drone is a held note or chord that sits underneath everything else. It is the base of ambient, dark techno, industrial and a lot of film music. Left alone it can get dull, so the interest comes from slow movement: filters opening, oscillators detuning, modulators drifting.</p>
+<h2>Adding a rhythm</h2>
+<p>Some drone synths add a gate sequencer, a step pattern that opens and closes the sound. The drone keeps running, but you hear it in pulses, with a different filter and pitch on each step. That is the idea behind mu-Tant: two wavetable oscillators with FM and ring modulation between them, cut into rhythm by an envelope gate sequencer of up to 16 bars.</p>
+<h2>Good for</h2>
+<ul><li>Pads and beds that evolve slowly.</li><li>Pulsing basslines that are really a held tone.</li><li>Sound design and textures.</li></ul><figure><img src="wavetable-drone-synth-vst3-full-window.png" alt="The mu-Tant wavetable drone synth plugin with two oscillators, mixer, modulators and gate sequencer" loading="lazy"><figcaption>mu-Tant: a free wavetable drone synth for VST3 and CLAP.</figcaption></figure><div class="cta"><a class="btn" href="mu-tant.html">See mu-Tant, the free drone synth</a><a class="btn alt" href="free-vst3-clap-plugins.html">All free plugins</a></div>
+<section class="faq"><h2>Questions people ask</h2><h3>Is there a free wavetable drone synth plugin?</h3><p>mu-Tant is free to download as VST3, CLAP and standalone for Windows. Every feature works; a one-off licence is optional and removes the licence reminder.</p><h3>What is the difference between a drone synth and a normal synth?</h3><p>A normal synth plays a note when you press a key. A drone synth plays all the time, and you shape it with filters, modulation and a gate pattern.</p></section>
+    </article>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="fb-logo">Transwarp</div>
+          <div class="fb-sub">Development Project</div>
+          <p>Indie audio plugin development from Bath, UK. Building the <span class="mu-d">μ</span>-series: creative instruments for electronic music producers, made for the DAW and for the stage.</p>
+        </div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Release notes</h4><ul><li><a href="mu-clid-releases.html"><span class="mu-d">μ</span>-clid</a></li><li><a href="mu-tant-releases.html"><span class="mu-d">μ</span>-tant</a></li><li><a href="mu-toni-releases.html"><span class="mu-d">μ</span>-toni</a></li><li><a href="mu-on-releases.html"><span class="mu-d">μ</span>-on</a></li><li><a href="mu-tilate-releases.html"><span class="mu-d">μ</span>-tilate</a></li><li><a href="mu-clid-midi-releases.html"><span class="mu-d">μ</span>-clid MIDI</a></li><li><a href="mu-toni-midi-releases.html"><span class="mu-d">μ</span>-toni MIDI</a></li><li><a href="mu-link-releases.html"><span class="mu-d">μ</span>-link</a></li><li><a href="mu-tronic-releases.html"><span class="mu-d">μ</span>-tronic</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="download.html">Download</a></li><li><a href="index.html#pricing">Pricing</a></li><li><a href="index.html#community">Community</a></li><li><a href="free-vst3-clap-plugins.html">Free VST3 &amp; CLAP plugins</a></li><li><a href="guides.html">Guides</a></li><li><a href="contact.html">Contact</a></li><li><a href="https://github.com/AndyTuke/mu-family">Source (GPLv3)</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="mailto:feedback@transwarp.me">Feedback and feature requests</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="prices.js" defer></script>
+  <script src="site.js"></script>
+</body>
+</html>
