@@ -5,7 +5,9 @@ Ship a complete release of the mu-family. **Only run when the owner explicitly a
 1. Reconfigure: `cmake -B build` (Release builds stay local; nothing is deployed).
 2. Build Debug (bumps the number), then Release (reuses it):
    `cmake --build build --config Debug && cmake --build build --config Release`
-   - Run builds through the **Bash tool** so the artifact/warning/deploy hooks fire. Heavy build → run in background.
+   - Heavy build → run in background. Use the **PowerShell tool** (Git Bash turns `/m` into `M:/` and the build silently does nothing); confirm the exit code.
+   - Build the whole configuration, never single format targets, then `pwsh tests/scripts/check-release-set.ps1` (and `-Config Debug`) must PASS before step 2. Expected set is in `/build`.
+   - Before dispatching CI also confirm `.github/workflows/release.yml` still builds and packages every format in that set; after CI finishes, list the assets of the new GitHub release (`gh release view <tag> --json assets`) and check all 9 zips are there (mu-Clid, mu-Clid-MIDI, mu-Toni-MIDI, mu-Tant, mu-Toni, mu-On, mu-Tilate, mu-Tronic, mu-Link) before telling the site to link them.
    - Release ≤ last Debug always; a higher Release aborts with FATAL_ERROR — surface it, don't work around.
    - If exe versions look stale, build the explicit format targets (see `/build`).
 3. Read the final number from `mu-core/BuildNumber.h`.
