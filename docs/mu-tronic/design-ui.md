@@ -429,6 +429,14 @@ Name "μ-tronic" per [design-ui-family.md section 9](../design-ui-family.md#9-pl
 - Do not put the MIDI channel in Settings, show it on a layer that ignores notes, or let a clip or layer preset change it.
 - Do not add the CPU readout to the TransportBar or hide it in Performance mode.
 
+## 4.10 Master key and scale (ruled 2026-11-19)
+
+mu-Tronic has none today. It gets one **master** pair, global across the 16 slots, set with the shared `mu_ui::KeyScaleSelector` ([design-ui-family.md section 6.8](../design-ui-family.md#68-key-and-scale-selector-ruled-2026-11-19)).
+
+- **Where:** the shell `TransportBar`, as an opt-in component with its width, the pattern of `setLoopSection(component, width)` (new `setKeyScale(component, width)`), beside the tempo (BPM / Tap) so the two global musical settings sit together. Caption "Key" engraved to its left; the LCD is `kTonalRootW + kTonalScaleW` wide. The coder measures the bar at Medium; if it does not fit without shrinking Nudge or the loop section, report the shortfall with a screenshot and Andy chooses what gives way (no local shrinking).
+- **Wording and status:** Key / Scale as in 6.8; saved with the project (new APVTS ids `root` and `scale`, the names mu-Tant and mu-On already use).
+- **Layers follow it.** Tonal layers (Pattern, Arp, Track) read the master, so a slot never disagrees with the bar. A layer's own Key / Scale control is **hidden** in a slot (mu-Tant's row keeps its right-aligned Note mode selector; mu-Toni's top row closes the gap). Provisional, see section 10.
+
 ## 10. Questions for Andy
 
 Answered 2026-10-15 (kept for the record): product colour = ice-white; main area painted in the layer's type colour = yes; layer names editable and saved = yes; Launchpad page buttons = top-row 5 and 6; scenes = yes; bus count and inserts = three buses, two inserts; plugin or Standalone = Standalone only; licensing = free; pages = two of eight, flexible; engines = every mu-On engine is a chooser choice; preset folders = shared.
@@ -439,3 +447,4 @@ Open (each has a recommendation that stands if Andy does not reply):
 2. **Buses as sidechain sources** and bus-to-bus routing (5.3, 5.4). Recommendation: not in version 1 (processing order); channels only.
 3. **Scene gesture on the Launchpad** (3.4a): hold the logo button (CC 99) and press a column pad. Only becomes a question if the logo press cannot be read on the hardware, in which case the fallback is hold-button-7 (ruled in 3.4a). Needs the logo hardware check first.
 4. **Four or more buses later** (5.4): needs a layout choice then (narrower insert column or a second bus sub-page). Not needed now.
+5. **Master key and scale** (4.10): do all layers always follow it, or may a slot opt out (a "Follow master" toggle, default on)? Recommendation: always follow in version 1; a per-layer override is a later, separate ruling. And is the TransportBar the right home?

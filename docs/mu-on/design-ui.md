@@ -92,3 +92,7 @@ One engine, an **Algorithm** dropdown of eight voices, **one fixed set of ten kn
 Names are plain (no "FM" prefix: the engine and folder say it). The three-tom kit is the Low, Mid and High Tom presets on three tracks.
 
 **Do not.** Rename or reorder the ten knobs per voice; relabel a knob for a voice (the tooltip does that); add a per-voice knob layout; write a local tooltip in mu-On; put values or units in the tooltip or on the label; add a colour or token for the engine.
+
+## Master key and scale (ruled 2026-11-19)
+
+The master `root` / `scale` ([design-engine.md](design-engine.md), "Master key and scale") is set with the shared `mu_ui::KeyScaleSelector` ([design-ui-family.md section 6.8](../design-ui-family.md#68-key-and-scale-selector-ruled-2026-11-19)) in the **GROOVE box, top row**: caption "Key" and the LCD (`kTonalRootW + kTonalScaleW` = 156, inside the 300 px `kGrooveBoxW` less its screw clear). Swing / Accent keep their place under it; the box is sparse, so the 464 band is not touched. The coder checks the Rumble layout (envelope editor under a `kDropdownH` row) on a screenshot. It is global, not per lane, so it does not change with the selected lane. A Track layer in mu-Tronic does not show it (mu-Tronic's master owns the pair).

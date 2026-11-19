@@ -428,6 +428,48 @@ Today no `drawLinearSlider` exists in `MuLookAndFeel`, so every linear slider fa
 
 ---
 
+## 6.8 Key and scale selector (ruled 2026-11-19)
+
+One shared control for the two tonal settings, **Key** (the root note, C to B) and **Scale** (the family table in `mu-core/Audio/MusicalScales.h`, twelve entries). It replaces mu-Tant's Root / Scale row and mu-Toni's Scale dropdown and Root knob, and is the master key / scale of mu-On and mu-Tronic. Built once in mu-core as `mu_ui::KeyScaleSelector` (`mu-core/UI/Components/KeyScaleSelector.{h,cpp}`; the file home is Ted's call).
+
+**Decision.** One LCD window, the same size in every product, that reads the pair as one phrase (`C Minor`, `F# Dorian`) and opens a small drop-down panel holding a mini keyboard for the key and the scale list. Two settings, one control, one status-bar line each.
+
+**Why.** A single LCD selector is compact (one `kDropdownH` row, and about 60 px less width than mu-Tant's two labelled dropdowns), reads at a glance, and uses only existing family looks (section 11: LCD window, engraved caption, raised box). mu-Toni's Root as one knob of nine hides that a note name is being chosen, and a Scale dropdown apart from it hides that the two belong together.
+
+**Closed state (the LCD).**
+- A `DropdownSelect`-style LCD window (`drawLcdGlass` / `drawLcdFront`, `lcdFont(kLcdTextH)`, `kLcdTextPadX`, the app's `lcdLitColour`), `kDropdownH` high, with the family dropdown's drop-arrow.
+- Width = `kTonalRootW + kTonalScaleW` (156, the two existing tokens summed; they stay in `MuLookAndFeel` and now describe this one control). The coder verifies on screen that the longest value ("A# Pentatonic Major") fits at `kLcdTextH`; if it does not, report it, do not shrink the font locally.
+- Text: the key's note name then the scale name, one space, title case, sharps written with `#` (the family note formatter `mu_fmt::Unit::Note`). No "Key:" or "Scale:" prefix in the box.
+- A caption **"Key"** engraved to its left (`drawEngravedText`, `labelText`, `kEngravedCaptionFont`, width `kDropdownCaptionW`, gap `kSpaceXS`), the pattern of mu-Toni's dropdown captions. The caption is drawn by the host row, not by the component, so a host may omit it where a plate above already names the control.
+- Hover: the LCD brightens as the family dropdown does. Disabled: lettering at the family disabled strength, no popup.
+
+**Open state (the panel).** A popup anchored under the LCD, left edges aligned (`juce::CallOutBox` or a custom popup component; the coder's call, but it must close on a click outside and on Esc, and it floats over the page so no layout moves). It is a raised box (`drawRaisedSubPanelShadow` then `drawRaisedSubPanel`, `kSpaceS` padding, no screws: it is transient) with two parts, top to bottom, `kSpaceXS` apart:
+1. **Key keyboard.** The twelve notes as one piano octave: seven naturals in the lower row, five sharps in the upper row, each centred on the join of its two neighbours. Each cell is `kDropdownH` high; cell width = panel width / 7. Naturals are LCD cells, sharps the same cell in darker glass; the current key is lit in `lcdLitColour` at `Lighting::lampOn` strength, the others unlit. Click sets the key.
+2. **Scale list.** The twelve scales in two columns of six, in table order, each an LCD row `kDropdownH` high, the current one lit as above. Click sets the scale.
+- **Panel width** = two scale columns, each the widest scale name measured at `lcdFont(kLcdTextH)` plus `2 x kLcdTextPadX`, plus `kSpaceXS` between. Measured, not typed in.
+- **Behaviour.** A pick applies at once and the panel **stays open**, so key and scale can both be set in one visit; it closes on a click outside, Esc, or a click on the LCD. Mouse wheel over the closed LCD steps the scale, as a closed `ComboBox` does. No keyboard stepping beyond Esc in version 1.
+
+**Status bar (hard rule, section 6).** The component reports through `mu_ui::reportStatus` (the nearest `StatusSink`): hovering the closed LCD gives `Key and scale` / `C Minor`; a key pick gives `Key` / `D`; a scale pick gives `Scale` / `Dorian`; hovering a key cell or scale row gives the name and value that cell would set. A product that embeds it is in `run-ui-audits.ps1` as for any custom control; no `status-ok:` exemption.
+
+**Binding.** Callback-driven, so no product copies layout code: `setKey(int 0..11)`, `setScale(int index)` (no callback) and `onKeyChanged(int)`, `onScaleChanged(int)`, plus a helper that attaches it to a key id and a scale id in the APVTS (the parameter may be an int or a choice: mu-Toni's `root` is an `AudioParameterInt` 0 to 11, mu-Tant's a choice; the helper reads either). Both ids stay in APVTS, so saved state does not change.
+
+**Tokens.** No new pixel value. Reused: `kDropdownH`, `kDropdownCaptionW`, `kTonalRootW`, `kTonalScaleW`, `kLcdTextH`, `kLcdTextPadX`, `kSpaceXS`, `kSpaceS`, `kEngravedCaptionFont`, `Lighting::lampOn`. `kTonalLabelW` and `kTonalGap` retire when mu-Tant adopts it. If the sharps' darker glass needs a strength it is a new `Lighting` field, not an alpha in drawing code.
+
+**Where it sits per product.**
+
+| Product | Placement | Scope |
+|---|---|---|
+| mu-Tant | left of the band's top row, replacing the Root / Scale labels and dropdowns; row height stays 47 | global, `root` / `scale` |
+| mu-Toni | first control of the Appergater top row, replacing the Scale dropdown and the Root knob | per layer |
+| mu-On | top of the GROOVE box, above Swing / Accent | master, `root` / `scale` |
+| mu-Tronic | the TransportBar beside the tempo, opt-in like `setLoopSection` | master across all slots |
+
+Details in each product's design-ui.md.
+
+**Do not.** Keep a separate Root knob or dropdown beside it; build a local copy per product; stack two dropdowns inside the popup (it is one panel); type a pixel width; omit the status-bar report; reflow a layout to make room (the popup floats).
+
+---
+
 ## 7. Interaction Patterns
 
 These apply to all mu plugins uniformly.
@@ -978,6 +1020,8 @@ P2 (find out whether the images are already sharp; it defines `PixelCache`), the
 ---
 
 ## Design rulings
+
+- 2026-11-19 - Compact shared key / scale control for mu-Tronic (new master), mu-Toni, mu-Tant, mu-On? One LCD selector reading "C Minor" that opens a floating raised panel with a one-octave piano key keyboard over the twelve scales in two columns and stays open for both picks; `mu_ui::KeyScaleSelector` in mu-core; closed width `kTonalRootW + kTonalScaleW`, no new pixel tokens; reports Key and Scale to the status bar. Placement: mu-Tant top-left of its band, mu-Toni first Appergater control, mu-On top of the GROOVE box, mu-Tronic TransportBar. Added section 6.8; product notes in each design-ui.md.
 
 - 2026-11-15 - MIDI mapping editor and learn UI: where, layout, learn display, how a target is chosen? Opens from a "MIDI Mapping..." button in the Settings MIDI group as its own full-page extra screen (`MidiMapOverlay`, the `MidiPresetsOverlay` pattern); list of rows (source + Learn, action, target, delete), Add mapping, Clear all; learn shows "Listening...", ends on message, Esc, Close, hide, destruction or 10 s, and is always cancelled when the screen goes; v1 picks the target from lists (no last-touched hook exists); clip-write and surface actions not offered. Added section 15.
 

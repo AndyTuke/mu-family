@@ -41,3 +41,9 @@ The step under the playhead is marked by a thin white ring round its cell at `Li
 **Status bar and tooltip.** The StatusBar-first rule applies: hovering or dragging a cell reports `Step 3: Accented` (states `Off`, `On`, `Accented`), using the existing `onStatusUpdate` path of the shell; the Steps knob reports `Steps 8` in the standard way. One sparing tooltip on the editor (an icon-less non-obvious control): "Click: Off, On, Accented. Drag to paint. Shift+click goes back." No other tooltips.
 
 **Do not.** Keep `setQuantization(2)` and the height gesture; draw cells in the Appergater code; copy the mu-Tant gate designer; use three hard-coded colours; call the states "Gate"; show the accent bit on an Off cell.
+
+## Appergater Key and Scale (ruled 2026-11-19)
+
+Today the Scale is one of four captioned dropdowns and the Root is the first of nine identical Size-2 knobs in the knob row; nothing says "key" and the two sit apart. Both are replaced by the shared `mu_ui::KeyScaleSelector` ([design-ui-family.md section 6.8](../design-ui-family.md#68-key-and-scale-selector-ruled-2026-11-19)) as the **first control of the top row**: caption "Key" (`kDropdownCaptionW`), LCD width `kTonalRootW + kTonalScaleW` (156, against the 108 of the dropdown it replaces), then Chord, Rate, Trigger, Legato, Snap as now. The top row grows by 48 px and still fits the panel; the Root knob leaves the knob row, so Octave (`roct`) becomes its first knob. It stays **per layer** (each Toni layer is its own arp). Status lines Key / Scale.
+
+**Modulation.** `arp.root` is a modulation target and its knob showed the live arc. The selector shows no arc in version 1; the target and its matrix row are unchanged. Lighting the key cell of the live modulated value is a later option, not required.
