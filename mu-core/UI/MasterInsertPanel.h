@@ -74,6 +74,7 @@ private:
         int   algorithm = 0;
         const std::atomic<float>* gainReduction = nullptr;   // offered by the owner
         const std::atomic<float>* shownGainReduction = nullptr;   // what knob P2 currently reads
+        const std::atomic<float>* shownLevel = nullptr;           // what knob P1 currently reads as a level (the Gate)
         float norm[kParams] = {};
         // Per-algorithm memory of the last actual values, so cycling back restores them.
         float snapshot[kInsertAlgoCount][kParams] = {};

@@ -298,11 +298,18 @@ void KnobWithLabel::clearModBinding() noexcept
 
 void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 {
-    grSource  = gr;
-    grDisplay = 0.0f;
+    grSource     = gr;
+    meterIsLevel = false;
+    grDisplay    = 0.0f;
     if (gr) startTimerHz(mu_ui::kUiRefreshHz);
     else if (!hasModBind) stopTimer();
     repaint();
+}
+
+void KnobWithLabel::setLevelSource(const std::atomic<float>* level)
+{
+    setGRSource(level);
+    meterIsLevel = level != nullptr;
 }
 
 void KnobWithLabel::timerCallback()
@@ -438,7 +445,15 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
 
     // GR arc — orange arc sweeping from the max end (5 o'clock) backward
     // proportional to current gain reduction. 1.0 = 24 dB GR = full arc.
-    if (grDisplay > 0.005f)
+    if (grDisplay > 0.005f && meterIsLevel)
+    {
+        // Level arc: green, from the knob's minimum end up to the current level (a meter, so it grows from zero).
+        juce::Path levelArc;
+        levelArc.addCentredArc(cx, cy, arcR, arcR, 0.0f, startAngle, startAngle + grDisplay * (endAngle - startAngle), true);
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::vuMeterGreen).withAlpha(0.85f));
+        g.strokePath(levelArc, juce::PathStrokeType(sf(2.5f), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+    else if (grDisplay > 0.005f)
     {
         const float grArcStart = endAngle - grDisplay * (endAngle - startAngle);
         juce::Path grArc;

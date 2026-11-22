@@ -178,6 +178,7 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
         k->setAlpha(1.0f);
     }
     insertParam2.setGRSource(nullptr);
+    insertParam1.setGRSource(nullptr);
 
     KnobWithLabel* knobs[mu_ui::kInsertSlotCount] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
     const char* const slotSuffix[mu_ui::kInsertSlotCount] = { "insP1", "insP2", "insP3", "insP4" };
@@ -200,6 +201,9 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
     // Clipper / Compressor / Limiter expose a GR meter on P2.
     if (mu_ui::insertAlgoShowsGainReduction(charId))
         insertParam2.setGRSource(getInsertGR ? getInsertGR() : nullptr);
+    // The Gate shows its input level on the Threshold knob (P1).
+    if (mu_ui::insertAlgoShowsLevel(charId))
+        insertParam1.setLevelSource(getInsertGR ? getInsertGR() : nullptr);
 
     // Vocoder: when Wave (P1) is noise (≥2), P2/P3/P4 don't apply.
     if (charId == 12 || charId == 13)

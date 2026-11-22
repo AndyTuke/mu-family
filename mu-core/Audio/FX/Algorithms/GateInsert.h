@@ -37,7 +37,7 @@ public:
     }
 
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
-                 const VoiceParams& p, float& /*grOut*/) override
+                 const VoiceParams& p, float& grOut) override
     {
         if (nCh <= 0 || ns <= 0) return;
         // Slot 0 = Threshold dB, 1 = Range dB, 2 = Attack ms, 3 = Release ms. A NaN knob falls back to its default.
@@ -55,6 +55,7 @@ public:
         const int   nDet = juce::jmin(nCh, 2);
         auto chans = buf.getArrayOfWritePointers();
 
+        float blockPeak = 0.0f;   // the loudest detected sample of the block, for the Threshold knob's level meter
         // Per sample: detect the level, decide open or closed, move the shared gain toward its target, apply it to every channel.
         for (int i = 0; i < ns; ++i)
         {
@@ -65,6 +66,7 @@ public:
                 if (! std::isfinite(s)) s = 0.0f;   // a NaN or Inf must not latch the detector or the gain
                 if (ch < nDet) d = juce::jmax(d, std::abs(s));
             }
+            blockPeak = juce::jmax(blockPeak, d);
             detector = juce::jmax(d, detector * detRelease);
             if (detector < 1.0e-20f) detector = 0.0f;
 
@@ -83,6 +85,10 @@ public:
                 for (int ch = 0; ch < nCh; ++ch)
                     chans[ch][i] *= gain;
         }
+
+        // Publish the input level for the Threshold knob's ring: dB mapped onto the knob's own -80..0 dB sweep, 0..1.
+        const float levelDb = 20.0f * std::log10(juce::jmax(blockPeak, 1.0e-6f));
+        grOut = juce::jlimit(0.0f, 1.0f, (levelDb + 80.0f) / 80.0f);
     }
 
 private:

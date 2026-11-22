@@ -80,6 +80,13 @@ void MasterInsertPanel::applyDependencies(int slot)
         sl.knobs[1].setGRSource(gr);
         sl.shownGainReduction = gr;
     }
+    // The Gate's input level, on its Threshold knob.
+    const auto* level = insertAlgoShowsLevel(sl.algorithm) ? sl.gainReduction : nullptr;
+    if (level != sl.shownLevel)
+    {
+        sl.knobs[0].setLevelSource(level);
+        sl.shownLevel = level;
+    }
 }
 
 void MasterInsertPanel::setNumSlots(int n)

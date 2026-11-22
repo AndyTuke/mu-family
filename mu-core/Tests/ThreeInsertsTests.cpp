@@ -216,6 +216,22 @@ struct ThreeInsertsTests : juce::UnitTest
             }
         }
 
+        beginTest("Gate: it publishes its input level on the Threshold knob's own -80..0 dB scale (the knob ring's meter)");
+        {
+            mu_audio::GateInsert fx;
+            fx.prepare(kSR, 512);
+            const auto vp = params(Gate, -40.0f, -30.0f, 1.0f, 50.0f);
+            juce::AudioBuffer<float> buf(2, 512);
+            for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i) buf.setSample(ch, i, 0.1f);   // -20 dBFS
+            float level = -1.0f;
+            fx.process(buf, 512, 2, vp, level);
+            expectWithinAbsoluteError(level, 0.75f, 0.01f, "-20 dB is three quarters of the -80..0 sweep");
+
+            buf.clear();
+            fx.process(buf, 512, 2, vp, level);
+            expect(level < 0.01f, "silence reads as the bottom of the sweep");
+        }
+
         beginTest("Gate: Range -80 gives exact zeros after the release");
         {
             mu_audio::GateInsert fx;

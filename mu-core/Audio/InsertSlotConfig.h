@@ -353,6 +353,10 @@ inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
 // The Clipper (5), Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
 inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 5 || algoIndex == 7 || algoIndex == 8; }
 
+// The Gate (23) shows its input level on its Threshold knob (slot 0), as a meter rising from the knob's minimum. The algorithm
+// publishes the level through the same atomic as the gain reduction, already scaled to the Threshold knob's own range.
+inline bool insertAlgoShowsLevel(int algoIndex) noexcept { return algoIndex == 23; }
+
 // First-visit / cold-restore defaults per algorithm. Indexed [algo][slot],
 // stored as ACTUAL (not normalised) values so they read naturally. The init
 // path normalises via actualToNorm() before writing to APVTS. Replaces the
