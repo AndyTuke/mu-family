@@ -200,6 +200,9 @@ public:
         modLabelG               = 0x100000e6,  // cyan-teal
         modLabelH               = 0x100000e7,  // grey
         indicatorLockTint       = 0x100000e8,  // red parameter-lock LED and ghost line
+        indicatorReturnWarm     = 0x100000ea,  // Effect / Delay return strip colour
+        indicatorReturnCool     = 0x100000eb,  // Reverb return strip colour
+        indicatorOutOfScale     = 0x100000ec,  // a note outside the key and scale, in a drop-down
         indicatorAbsoluteTint   = 0x100000e9,  // amber ring of a knob holding an absolute value (not an offset)
     };
 

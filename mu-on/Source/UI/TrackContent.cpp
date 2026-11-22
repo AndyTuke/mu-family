@@ -558,7 +558,7 @@ void TrackContent::refreshNoteItems()
         const int midi = key.baseMidi + octaveShift + n;
         const auto text = mu_audio::midiNoteName(midi) + (n == 0 ? juce::String() : " (" + juce::String(n > 0 ? "+" : "") + juce::String(n) + ")");
         if (mu_audio::midiInScale(midi, key.root, key.scale)) noteSelect.addItem(text, n + 13);
-        else                                                  noteSelect.addItem(text, n + 13, juce::Colour(0xffff6060));   // out of the scale: red
+        else                                                  noteSelect.addItem(text, n + 13, MuLookAndFeel::colour(MuLookAndFeel::indicatorOutOfScale));   // out of the scale: red
     }
     noteSelect.setSelectedId(row.stepNote(step) + 13, false);
 }

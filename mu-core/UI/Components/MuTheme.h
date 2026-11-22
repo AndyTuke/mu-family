@@ -163,6 +163,9 @@ struct MuTheme
         juce::Colour modulationTint    { 0xff89e0ff };  // soft cyan ring around modulated knob
         juce::Colour grTint            { 0xffff6633 };  // orange GR arc on compressor/limiter
         juce::Colour absoluteTint      { 0xffffa31a };  // amber: a knob set to an absolute value instead of an offset (blue and amber stay apart for colour-blind users)
+        juce::Colour returnWarm        { 0xffD85A30 };  // mixer: the Effect and Delay return strips
+        juce::Colour returnCool        { 0xff378ADD };  // mixer: the Reverb return strip
+        juce::Colour outOfScale        { 0xffff6060 };  // a note outside the master key and scale in a note drop-down
         juce::Colour lockTint          { 0xffff3b30 };  // red: a parameter lock's LED (knob centre, step corner) and the ghost line marking the unlocked value
         juce::Colour grMeterBg         { 0xff111111 };  // GRMeter strip background
         juce::Colour grMeterBar        { 0xaa7799cc };  // semi-transparent blue-grey bar
