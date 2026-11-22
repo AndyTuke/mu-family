@@ -60,6 +60,7 @@ set(MU_CORE_TEST_SOURCES
     NewInsertTests.cpp              # chorus, flanger, phaser, pitch delay, tremolo inserts
     FxMergeTests.cpp                # the shared Chorus / Flanger / Phaser: role flags, adapter vs core, hidden insert values, reset
     ThreeInsertsTests.cpp           # auto pan, gate, waveshaper inserts
+    KeyScaleSelectorTests.cpp       # the shared key + scale selector and its APVTS attachment
     FiveInsertsTests.cpp            # comb, freq shift, formant, stutter, lo-fi inserts
     TapeSatTests.cpp                # the Tape Sat insert: even harmonics, highs compress first, head bump, aliasing, level, stability
     StatusRouteTests.cpp            # the status bar hard rule: a layer's content always reports to it
