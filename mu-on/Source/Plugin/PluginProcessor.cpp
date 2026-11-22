@@ -259,6 +259,7 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 
 void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    bool restored = false;
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
         {
@@ -266,7 +267,10 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
             cancelAllStagedSwaps();               // nothing staged before the restore may land on top of it
             applyStateTree(toLayerState(tree));   // host restore — always immediate
             restoreLiveState(tree);               // after the preset: it names the item that is playing
+            restored = true;
         }
+    if (! restored && sizeInBytes > 0)
+        reportHostStateNotRestored("not a mu-On session, or a newer version");
     notifyHostStateRestored();
 }
 

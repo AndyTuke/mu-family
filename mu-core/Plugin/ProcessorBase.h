@@ -673,6 +673,13 @@ public:
             param->setValueNotifyingHost(param->convertTo0to1(level));
     }
 
+    // A host session chunk that did not restore (corrupt, another product's, or newer than this build): say so through onLoadError instead of
+    // opening the project on defaults in silence. An empty chunk is not a failure (a fresh instance has none), so call it only for sizeInBytes > 0.
+    void reportHostStateNotRestored(const juce::String& why)
+    {
+        if (onLoadError) onLoadError("Host state restore failed: " + why);
+    }
+
     // Call at the end of a host state restore (setStateInformation, message thread): the restore changed
     // parameter values behind the host's back, so tell it to re-read them. The CLAP wrapper turns this
     // into a values rescan, which the CLAP spec requires after a state load.

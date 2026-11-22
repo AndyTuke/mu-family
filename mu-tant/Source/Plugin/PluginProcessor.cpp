@@ -180,6 +180,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     // Validate the root tag before applying (mirrors mu-on / mu-toni): a corrupt or
     // foreign chunk that still parses as XML must NOT replace our APVTS root, or the
     // params detach. Only apply a tree tagged as our own state type.
+    bool restored = false;
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
         {
@@ -187,7 +188,10 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
             cancelAllStagedSwaps();                    // nothing staged before the restore may land on top of it
             applyFullPresetTree(toVoiceState(tree));   // host state restore — always immediate
             restoreLiveState(tree);                    // after the preset: it names the item that is playing
+            restored = true;
         }
+    if (! restored && sizeInBytes > 0)
+        reportHostStateNotRestored("not a mu-Tant session, or a newer version");
     notifyHostStateRestored();
 }
 
