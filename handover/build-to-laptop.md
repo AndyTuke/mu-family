@@ -2,18 +2,25 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-007
+Next id: B-008
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
+- Written: 2026-11-22, Andy away, autonomous session. HEAD `95c7f9db`, everything committed and pushed. Build number 1494 (`mu-core/BuildNumber.h`; focused Debug builds only, no increment, no Release, no pluginval). Full Debug sweep (`run-tests.ps1`, no goldens): 0 failures in mu-clid, mu-on, mu-tilate, mu-toni, mu-host, mu-control and the three mu-core suites; 1 failure each in mu-tant and mu-tronic, both the same stale recorded Pattern-stream hash (`4023114231ac4445`), logged as #1828 (Andy: no golden re-records while sounds change). `ui-audit` passes for tant, toni, on, tronic, host. Built and pushed this session: #1827 key/scale selector (all four apps), #1826 step drag, #1825 Gate level ring, #1817 step 6 (Insert/ and Send/ folded into Algorithms/), frozen manifests regenerated (insert range 0..29), release notes for all of it published to the site (run 45048981805, not watched). Nothing was listened to.
 - Written: 2026-11-15, pre-release clearing. Build 1489 (no increment). Release of every product built clean at 1489 and the Release VST3s deployed; pluginval 6 passed, 0 failed (Release, strictness 5); full Debug test sweep 0 failures (goldens not run); static checks pass. Closed #1803, #1804, #1772, #1807. Site work (prices.json, publish-site.yml workflow, Netlify wording) is committed on `site-local` only, merged with main, unpublished. Still for Andy before a release: say go; merge site-local to main and dispatch `publish-site.yml` once; repoint GoDaddy DNS; set the Pages custom domain. Not done: a browser look at the site pages, listening, the mu-Tilate checks B-004/B-005, B-003 decisions.
 - Written: 2026-11-14, end of the architecture and site session. Build number 1489 (`mu-core/BuildNumber.h`; a full Debug of every product at 1489, then focused rebuilds of mu-Clid and mu-Clid MIDI, no increment). Everything is committed and pushed (HEAD `6c743f15`). Closed this session: #1811 (one compiled mu-core library, version family 1.2), #1812 (one shared JUCE library, `mu-juce`), #1805, #1813. Open rows: 4. No Release build and no pluginval run since the library changes; nothing was listened to beyond Andy's own Debug standalone and Bitwig checks (all fine). Next for Andy: repoint `transwarp.me` DNS (GoDaddy) to GitHub Pages; the site preview is at `andytuke.github.io/mu-family`.
 - mu-Tilate: `mu-tilate-tests` 110 results, 0 failures (Debug). New this session and not yet seen or heard by Andy: rows #1759 to #1765 (see B-005). JUCE is now 9.0.5 (`D:\JUCE`, pin bumped, the local MIDI patch dropped); only mu-Tilate and its tests were rebuilt on it. No Release build, no pluginval run.
 - `D:\JUCE-dev` is a scratch clone of JUCE `develop` for upstream work (L-012 is answered below).
 
 ## Open
+
+### B-007 · 2026-11-22 · Look at the key/scale selector, the step drag and the Gate ring; rule on three things only an architect or Andy can
+Rows: #1827, #1826, #1825, #1817 · Commits: `1f6d16d6`, `1c14a271`, `034cf25c`, `5cf552d4` (key/scale); `3e3ab61a` (step drag); `6692a3d4` (Gate ring); `be26dfe3` (FX folder move) · Needs: look | decide | review
+Do: (1) Look at the selector in each Debug Standalone (mu-Tant top row, mu-Toni first Appergater control, mu-On KEY box, mu-Tronic transport bar): open it, pick a key and a scale, check "A# Pentatonic Major" fits the closed LCD at Small / Medium / Large, check mu-Tronic's bar width. I looked at Medium only, and in mu-Tant only with the panel open. (2) mu-On / mu-Tronic Steps: drag an on step sideways (move), Ctrl-drag (copy), Bass Shift-drag; Ctrl and Shift were not tried on screen. (3) Gate insert (23) with audio running: the green ring on Threshold; not seen. (4) Decisions I took for Andy, to confirm or overrule on the rows: slots always follow the master key (mu-Tronic Arp slots are written from the master by a 10 Hz processor timer, their own selector is dimmed); mu-Toni loses the live modulation ring on Root; a step drop on an occupied step overwrites; mu-On keeps the selector in its KEY section, not the top of GROOVE (Sid's 6.8 said GROOVE). Ted could not be called (no such agent in this session), so his rulings on component home, the attach helper, the setLoopSection placement, the Arp follow timer and the level-source hook are still open.
+Report: anything that looks wrong, as a note on the row or a new row; Ted's rulings.
+Not done on this PC: no listening, no Release build, no pluginval, the manuals are not updated for any of this (Frank), the sweep's test builds of every product (mu-Tilate included) compiled after the FX folder move, but no Standalone of mu-Clid or mu-Tilate was rebuilt, goldens untouched.
 
 ### B-006 · 2026-11-14 · Build structure changed, and the site is moving to GitHub Pages: what source writers and the web-steward must know
 Rows: #1811, #1812 (closed), #1803, #1804 · Commits: `634e52d4`, `a64b2f2c`, `2fe5269e`, `8200ae94`, `c3df6178`, `6c743f15` · Needs: review | decide
