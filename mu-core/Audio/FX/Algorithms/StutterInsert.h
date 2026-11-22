@@ -77,7 +77,7 @@ public:
 
         double wantedSec = (double) sizeMs * 0.001;
         if (p.insertSync)
-            wantedSec = (double) mu_ui::insertSyncStepFromNorm(p.insertParam[0]) * mu_ui::insertSixteenthSeconds(tempoBpm);
+            wantedSec = (double) mu_ui::insertSyncStepFromNorm(std::isfinite(p.insertParam[0]) ? p.insertParam[0] : 0.5f) * mu_ui::insertSixteenthSeconds(tempoBpm);
         const int wantedLen = juce::jlimit(juce::jmax(1, (int) std::round(0.001 * sr)), (ringSize - 8) / 2,
                                            (int) std::round(wantedSec * sr));
         if (sliceLen <= 0) sliceLen = wantedLen;   // the first block after a reset starts its clock with the current setting

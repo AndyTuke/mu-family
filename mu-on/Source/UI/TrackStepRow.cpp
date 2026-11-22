@@ -351,6 +351,10 @@ void TrackStepRow::paint(juce::Graphics& g)
 
 void TrackStepRow::mouseDown(const juce::MouseEvent& e)
 {
+    // Every press starts clean (see StepRows::mouseDown).
+    dragStep = dragOrigin = dropStep = -1;
+    dragStartedOn = false;
+    stepDrag = {};
     // A Rumble row is not editable.
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
     const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
@@ -419,6 +423,9 @@ void TrackStepRow::mouseUp(const juce::MouseEvent&)
     }
     dropStep = -1;
     dragOrigin = -1;
+    dragStep = -1;   // the gesture is over
+    dragStartedOn = false;
+    stepDrag = {};
     repaint();
 }
 

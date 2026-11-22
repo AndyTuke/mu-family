@@ -37,10 +37,15 @@ OnlineActivationOutcome OnlineActivation::activate (const juce::File&   contentD
         rec.licenseKey    = licenseKey.trim();
         rec.instanceId    = res.instanceId;
         rec.lastValidated = nowMs();
-        ActivationStore::save (contentDir, activationFilename, rec);
-        o.ok = true;
-        if (o.message.isEmpty())
-            o.message = "Activated.";
+        // The server accepted it, but an activation that cannot be stored would be lost at the next launch (and cost another server slot).
+        if (ActivationStore::save (contentDir, activationFilename, rec))
+        {
+            o.ok = true;
+            if (o.message.isEmpty())
+                o.message = "Activated.";
+        }
+        else
+            o.message = "The licence is valid but could not be stored on this PC (is the content folder writable?). Please try again.";
     }
     else if (! res.networkError && o.message.isEmpty())
     {
@@ -74,7 +79,7 @@ OnlineActivationOutcome OnlineActivation::validateStored (const juce::File&   co
     if (res.ok && res.status == "active")
     {
         rec.lastValidated = nowMs();
-        ActivationStore::save (contentDir, activationFilename, rec);
+        ActivationStore::save (contentDir, activationFilename, rec);   // best effort: the licence is valid now, a failed refresh only shortens the offline grace
         o.ok = true;
     }
     else

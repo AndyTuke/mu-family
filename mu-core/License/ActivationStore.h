@@ -39,7 +39,8 @@ struct ActivationStore
         return rec;
     }
 
-    static void save (const juce::File& contentDir, const juce::String& filename,
+    // True when the record was written (replaceWithText replaces the file whole through a temporary, so a failed write keeps the old one).
+    static bool save (const juce::File& contentDir, const juce::String& filename,
                       const ActivationRecord& rec)
     {
         contentDir.createDirectory();
@@ -47,7 +48,7 @@ struct ActivationStore
         obj->setProperty ("license_key",    rec.licenseKey);
         obj->setProperty ("instance_id",    rec.instanceId);
         obj->setProperty ("last_validated", rec.lastValidated);
-        contentDir.getChildFile (filename).replaceWithText (juce::JSON::toString (juce::var (obj)));
+        return contentDir.getChildFile (filename).replaceWithText (juce::JSON::toString (juce::var (obj)));
     }
 
     static void clear (const juce::File& contentDir, const juce::String& filename)

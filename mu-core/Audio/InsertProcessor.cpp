@@ -167,6 +167,10 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
     {
         for (int ch = 0; ch < nCh; ++ch)
             buf.clear(ch, 0, ns);
-        reset();
+        // Only the algorithm that just ran can hold the bad value; the idle ones were not fed this block, so clearing all thirty
+        // (multi-hundred-KB delay rings) on the audio thread would add a CPU spike to a block that is already bad.
+        if (auto* algo = dispatch[(size_t) idx]) algo->reset();
+        postDriveTone[0].reset();
+        postDriveTone[1].reset();
     }
 }

@@ -76,9 +76,9 @@ inline HostTransport readHostTransport(juce::AudioPlayHead* ph)
         if (auto pos = ph->getPosition())
         {
             result.playing = pos->getIsPlaying();
-            if (auto hostBpm = pos->getBpm())
+            if (auto hostBpm = pos->getBpm(); hostBpm && std::isfinite(*hostBpm))   // a host that sends inf or NaN is treated as sending no tempo
                 result.bpm = *hostBpm;
-            if (auto ppq = pos->getPpqPosition())
+            if (auto ppq = pos->getPpqPosition(); ppq && std::isfinite(*ppq))
             {
                 result.hasPosition = true;
                 result.ppqPosition = *ppq;

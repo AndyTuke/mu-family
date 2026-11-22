@@ -137,6 +137,11 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 
 void StepRows::mouseDown(const juce::MouseEvent& e)
 {
+    // Every press starts clean: a press that returns early below must not leave the last gesture's drag state to be driven by a later drag.
+    dragRow = dragStep = dragOrigin = dropStep = -1;
+    dragStartedOn = false;
+    stepDrag = {};
+
     const int rh = rowHeight();
     if (rh <= 0) return;
     const int row = e.getPosition().y / rh;
@@ -216,7 +221,10 @@ void StepRows::mouseUp(const juce::MouseEvent&)
     const int row = dragRow;
     dropStep = -1;
     dragOrigin = -1;
-    if (row >= 0) repaint(rowArea(row));
+    dragRow = dragStep = -1;   // the gesture is over: a later drag without a fresh press edits nothing
+    dragStartedOn = false;
+    stepDrag = {};
+    if (row >= 0 && row < host.getTrackCount()) repaint(rowArea(row)); else if (row >= 0) repaint();
 }
 
 void StepRows::timerCallback()
