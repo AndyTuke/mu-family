@@ -6,7 +6,7 @@
 #include "../Clock/TransportClock.h"
 #include "../Clock/ClockLock.h"
 #include "../Clock/MidiClockEstimator.h"
-#include "Audio/FX/Insert/EqInsert.h"   // mu-core: shared 3-band EQ insert (per-client strip)
+#include "Audio/FX/Algorithms/EqInsert.h"   // mu-core: shared 3-band EQ insert (per-client strip)
 #include "Audio/InsertProcessor.h"      // mu-core: full insert-FX rack (two master-bus inserts)
 
 #include <algorithm>
