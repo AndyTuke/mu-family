@@ -41,7 +41,7 @@ if ($scope | Where-Object { $_ -match '^(juce-version\.txt|CMakeLists\.txt)$' })
     Run-Check 'check-juce-version.ps1' @()
 }
 # Backlog structure when the backlog is in the commit.
-if ($scope | Where-Object { $_ -eq 'backlog.md' }) {
+if ($scope | Where-Object { $_ -eq 'backlog.md' -or $_ -eq 'backlog-closed.md' }) {
     Run-Check 'check-backlog.ps1' @()
 }
 

@@ -126,8 +126,18 @@ if (-not (Test-Path -LiteralPath $Path)) {
     exit 2
 }
 
-try   { $lines = Get-Content -LiteralPath $Path -Encoding UTF8 }
+try   { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) }
 catch { Write-Host "check-backlog: SETUP ERROR - cannot read $Path : $_"; exit 2 }
+
+# The Closed section may live in backlog-closed.md beside the backlog (split out 2026-11-22: 1700+ closed rows made the file too big to
+# read). When that file exists its lines follow the backlog's, so the passes below see one document; violation line numbers past
+# the backlog's own length are reported against backlog-closed.md.
+$mainLineCount = $lines.Count
+$closedPath    = Join-Path (Split-Path -Parent $Path) 'backlog-closed.md'
+if (Test-Path -LiteralPath $closedPath) {
+    try   { $lines = $lines + @(Get-Content -LiteralPath $closedPath -Encoding UTF8) }
+    catch { Write-Host "check-backlog: SETUP ERROR - cannot read $closedPath : $_"; exit 2 }
+}
 
 # Section heading -> the Status cell every row in it must carry.
 $expectedStatus = [ordered]@{
@@ -139,7 +149,8 @@ $sectionOrder = @('Open', 'On Hold', 'Closed')
 
 $violations = New-Object System.Collections.Generic.List[string]
 function Add-Violation([int]$LineNo, [string]$Message) {
-    $violations.Add(("  [FAIL] {0}:{1} - {2}" -f (Split-Path -Leaf $Path), $LineNo, $Message))
+    if ($LineNo -gt $mainLineCount) { $file = 'backlog-closed.md'; $LineNo -= $mainLineCount } else { $file = Split-Path -Leaf $Path }
+    $violations.Add(("  [FAIL] {0}:{1} - {2}" -f $file, $LineNo, $Message))
 }
 
 # ── Pass 1: walk the file, tracking section context and row facts ────────────────
