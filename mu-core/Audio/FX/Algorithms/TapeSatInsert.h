@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include "Audio/AudioFilters.h"
 #include "Audio/FX/Algorithms/Adaa1Tanh.h"
 #include "Audio/FX/Algorithms/TapeEmphasis.h"
@@ -24,6 +25,8 @@
 class TapeSatInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int blockSize) override
     {
         currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;

@@ -5,7 +5,7 @@
 #include "Audio/FX/Algorithms/GateInsert.h"
 #include "Audio/FX/Algorithms/WaveshaperInsert.h"
 #include "Audio/FX/Algorithms/WaveshaperCurve.h"
-#include "Audio/FX/Insert/OverdriveInsert.h"
+#include "Audio/FX/Algorithms/OverdriveInsert.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <cmath>
 
@@ -22,6 +23,8 @@
 class EqInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int /*blockSize*/) override
     {
         currentSampleRate = sampleRate;

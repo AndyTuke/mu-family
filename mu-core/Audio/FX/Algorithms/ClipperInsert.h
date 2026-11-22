@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include <cmath>
 
 // insertAlgo = 5. Hard-clip at a user-set threshold + post-output gain.
@@ -9,6 +10,8 @@
 class ClipperInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override
     {
         smoothedThresh .reset(sampleRate, 0.015);  smoothedThresh .setCurrentAndTargetValue(1.0f);

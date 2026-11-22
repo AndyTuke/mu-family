@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include "Audio/FX/Algorithms/ModDelayLine.h"
 #include <cmath>
 #include <vector>
@@ -17,6 +18,8 @@
 class PitchDelayInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override
     {
         sr = sampleRate > 0.0 ? sampleRate : 44100.0;

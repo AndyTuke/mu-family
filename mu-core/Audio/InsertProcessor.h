@@ -8,7 +8,7 @@
 
 #include "AudioFilters.h"
 #include "VoiceParams.h"
-#include "Audio/FX/Insert/InsertAlgorithmBase.h"
+#include "Audio/FX/Algorithms/InsertAlgorithmBase.h"
 
 // Standing constraint: no insert algorithm reports latency. The group buses (MixerEngine::BusState) sum
 // channels on parallel paths without delay compensation, so an algorithm that ever adds latency would need

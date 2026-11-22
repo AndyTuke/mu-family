@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Audio/FX/Insert/InsertAlgorithmBase.h"
+#include "Audio/FX/Algorithms/InsertAlgorithmBase.h"
 #include "Audio/FX/Algorithms/FxUse.h"
 #include "Audio/FX/Algorithms/WaveshaperCurve.h"
 #include <juce_dsp/juce_dsp.h>

@@ -4,7 +4,7 @@
 #include "FXAlgorithmDef.h"
 #include "OversampledProcessor.h"
 #include "DelaySlot.h"
-#include "Audio/FX/Send/EffectAlgorithmBase.h"
+#include "Audio/FX/Algorithms/EffectAlgorithmBase.h"
 #include "Audio/FX/Algorithms/FxFactory.h"
 #include "Audio/FX/Algorithms/ChorusFx.h"
 #include "Audio/FX/Algorithms/FlangerFx.h"

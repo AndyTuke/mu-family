@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include "Audio/AudioFilters.h"
 #include "Audio/SoftLimit.h"
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -52,6 +53,8 @@
 class VocoderInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     explicit VocoderInsert(bool stereo = false) : isStereo(stereo) {}
 
     void prepare(double sampleRate, int /*blockSize*/) override

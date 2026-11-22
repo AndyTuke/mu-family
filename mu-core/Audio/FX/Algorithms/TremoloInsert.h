@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include <cmath>
 
 // insertAlgo = 21. Tremolo: the level is multiplied by a low-frequency wave, so the sound pulses.
@@ -14,6 +15,8 @@
 class TremoloInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override
     {
         sr = sampleRate > 0.0 ? sampleRate : 44100.0;

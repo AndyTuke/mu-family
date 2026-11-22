@@ -4,7 +4,7 @@ Status: research only, nothing built. Facts carry a source link; "UNVERIFIED" me
 
 ## 1. What our tape echo models today
 
-Source: [TapeDelayInsert.h](../mu-core/Audio/FX/Insert/TapeDelayInsert.h), insert algorithm 15 ("Tape Delay").
+Source: [TapeDelayInsert.h](../mu-core/Audio/FX/Algorithms/TapeDelayInsert.h), insert algorithm 15 ("Tape Delay").
 
 - **Heads / modes:** none. One delay line, one read point. No repeat-rate modes and no multi-head combinations.
 - **Time:** 20 ms to 1 s (log), glided with a one-pole of about 120 ms, so moving it bends the pitch like a tape-speed change. Read with a 4-point Hermite interpolator.
@@ -84,7 +84,7 @@ Honest summary: ours is a good generic tape echo, not an RE-201 model. Adding a 
 **Parameters:** Decay (RT60 about 0.5 to 4 s), Tone (loop damping), Drip (dispersion amount), Tension (round-trip time), Mix. Five parameters; the insert slot UI currently has four (see below).
 
 **Where it fits:**
-- It is a new `InsertAlgorithmBase` subclass, like `TapeDelayInsert`, in `mu-core/Audio/FX/Insert/SpringReverbInsert.h`. The `FXSlotBase` interface is for the global FX; the insert path here uses `InsertAlgorithmBase`, so the family docs need to be checked for which is wanted. Open question 1.
+- It is a new `InsertAlgorithmBase` subclass, like `TapeDelayInsert`, in `mu-core/Audio/FX/Algorithms/SpringReverbInsert.h`. The `FXSlotBase` interface is for the global FX; the insert path here uses `InsertAlgorithmBase`, so the family docs need to be checked for which is wanted. Open question 1.
 - Fixed-size table, what must change (from the grep): `kNumInsertAlgos` in `InsertProcessor.h` (16 to 17); the `dispatch[]` registration in `InsertProcessor.cpp`; the name list and the display-name/sort table in `AlgorithmNames.h`; the default rows and slot config in `InsertSlotConfig.h`; the algorithm number comment in `InsertAlgorithmBase.h`; and the tests that enumerate algorithms (`InsertDSPSmokeTests.cpp`, `MixerBlockValueTests.cpp`, `StereoParityTests.cpp`). If a parameter count above four is wanted, the slot count in `InsertSlotConfig.h` is a wider change; I did not check how many slots exist. Presets that store the algorithm index need the new index appended at 16 so old presets keep working.
 - Real-time safety: allocate all delay lines in `prepare()`; no allocation or locks in `process()`; add a tiny DC offset or flush denormals (the feedback tails of a long allpass chain are prone to denormals); clamp feedback below 1 so the loop cannot run away; smooth all parameter changes; make the random modulation deterministic (as Tape Delay does with its xorshift generator).
 

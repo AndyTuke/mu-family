@@ -2,8 +2,8 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/FX/Algorithms/Adaa1Tanh.h"
 #include "Audio/FX/Algorithms/TapeEmphasis.h"
-#include "Audio/FX/Insert/OverdriveInsert.h"
-#include "Audio/FX/Insert/TapeSatInsert.h"
+#include "Audio/FX/Algorithms/OverdriveInsert.h"
+#include "Audio/FX/Algorithms/TapeSatInsert.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

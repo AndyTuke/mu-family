@@ -126,7 +126,7 @@ Echo has no algorithm class: the Effect slot's Echo index runs its embedded `Del
 
 ## One algorithm, two roles: Chorus, Flanger, Phaser merge (ruled 2026-11-16, built 2026-11-16, steps 1-5 and 7; step 6 open)
 
-The text below is the ruling as made; where it says "today" or "old" it describes the code before the merge. Built state: `Algorithms/` holds the three `Fx` + `Core` pairs, `FxUse.h`, `FxFactory.h` and `ModDelayLine.h`; `Engines/` holds `SpringReverb.h` and `TapeSpringEcho.h`; the insert-only algorithms still live in `Insert/` and `Send/` still holds `EffectAlgorithmBase.h` until step 6; `Tests/FxMergeTests.cpp` exists.
+The text below is the ruling as made; where it says "today" or "old" it describes the code before the merge. Built state: `Algorithms/` holds the three `Fx` + `Core` pairs, `FxUse.h`, `FxFactory.h` and `ModDelayLine.h`; `Engines/` holds `SpringReverb.h` and `TapeSpringEcho.h`; every algorithm, the insert-only ones and `InsertAlgorithmBase.h` / `EffectAlgorithmBase.h` included, now lives in `Algorithms/` (step 6 done 2026-11-22; `Insert/` and `Send/` are gone); `Tests/FxMergeTests.cpp` exists.
 
 **Why.** Each of the three existed twice (a send class and an insert class) with its own LFO, delay line and smoothing code. Andy's decisions: one folder `FX/Algorithms/`, one class per effect marked insert / send / both, one shared DSP core per effect with thin adapters; the insert has four knobs, so the send parameters that do not fit are fixed in insert mode while the send keeps all of them; the richer send sound wins; no preset migration (saved presets may sound different; the insert APVTS and param ids do not change, so they still load).
 
@@ -145,7 +145,7 @@ mu-core/Audio/FX/
   Engines/      SpringReverb.h  TapeSpringEcho.h   (were at the FX root; engines wrapped by an algorithm)
   Slots/        unchanged (EffectSlot, DelaySlot, ReverbSlot, FXChain, FXSlotBase, FXAlgorithmDef, OversampledProcessor)
 ```
-`Send/` and `Insert/` disappear once step 6 has moved the remaining insert-only algorithms and `EffectAlgorithmBase.h`; until then `Insert/` holds the insert-only algorithms and `Send/` holds `EffectAlgorithmBase.h`. Classes live in namespace `mu_audio` (the area namespace for audio in mu-core; the old global names are left alone). Class `ChorusFx` etc. = the algorithm used by the slots; `ChorusCore` etc. = the DSP, nothing else. Insert-only algorithms keep their `...Insert` names (renamed to `...Fx` only when touched for another reason, never in a bulk rename).
+`Send/` and `Insert/` are gone: step 6 (2026-11-22) moved the insert-only algorithms, `InsertAlgorithmBase.h` and `EffectAlgorithmBase.h` into `Algorithms/`. Classes live in namespace `mu_audio` (the area namespace for audio in mu-core; the old global names are left alone). Class `ChorusFx` etc. = the algorithm used by the slots; `ChorusCore` etc. = the DSP, nothing else. Insert-only algorithms keep their `...Insert` names (renamed to `...Fx` only when touched for another reason, never in a bulk rename).
 
 ### The flag
 `Algorithms/FxUse.h`:
@@ -194,7 +194,7 @@ Port (include and type names only): `AuditMinorsTests.cpp` (`ChorusEffect`/`Phas
 3. **Chorus (done).** Add `ChorusCore.h`, `ChorusFx.h`; add `makeSend` / `makeInsert` helpers (in `FxUse.h`'s neighbour `Algorithms/FxFactory.h`) and use them for slot 0 in `EffectSlot.cpp` and `dispatch[17]` in `InsertProcessor.cpp`; delete `Send/ChorusEffect.h`, `Insert/ChorusInsert.h`; port tests; add the Chorus cases of `FxMergeTests.cpp`.
 4. **Flanger (done).** Same for `FlangerCore.h`, `FlangerFx.h`, slot 1, `dispatch[18]`, delete `FlangerEffect.h`, `FlangerInsert.h`.
 5. **Phaser (done).** Same for slot 2, `dispatch[19]`.
-6. **Move the rest (open).** `git mv` the remaining `Insert/*.h` (including `InsertAlgorithmBase.h`, `NoneInsert.h`) and `Send/EffectAlgorithmBase.h` into `Algorithms/`, add `kUse = FxUse::Insert` to each insert-only class, fix includes (`InsertProcessor.*`, `EffectSlot.h`, tests); `Send/` and `Insert/` are now empty and gone. Mechanical, and may be done later or by itself; steps 1-5 do not depend on it.
+6. **Move the rest (done 2026-11-22).** `git mv` the remaining `Insert/*.h` (including `InsertAlgorithmBase.h`, `NoneInsert.h`) and `Send/EffectAlgorithmBase.h` into `Algorithms/`, add `kUse = FxUse::Insert` to each insert-only class, fix includes (`InsertProcessor.*`, `EffectSlot.h`, tests); `Send/` and `Insert/` are now empty and gone. Mechanical; done as one move plus include rewrite, every insert-only class marked `kUse = FxUse::Insert` and registered through `makeInsert` (Vocoder, which takes a constructor argument, stays a `make_unique`).
 7. **Docs (done).** Updated `docs/design-plugin-family.md` paths if it names `FX/Send` or `FX/Insert`, `tests.md` (new `FxMergeTests`), the manuals only if the insert Chorus/Flanger/Phaser descriptions change (Frank decides; the default-row sounds changed).
 
 Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
@@ -311,7 +311,7 @@ mu-core/Audio/FX/Algorithms/
   WaveshaperCurve.h   (optional) the triode curve as free inline functions, so a test can call the curve alone
 mu-core/Tests/NewInsertTests.cpp (extend), new mu-core/Tests/ThreeInsertsTests.cpp (listed in Tests/CMakeLists.txt)
 ```
-Each includes `Audio/FX/Insert/InsertAlgorithmBase.h` and `Audio/FX/Algorithms/FxUse.h` (as `ChorusFx.h` does). The legacy `Insert/` folder is only touched by the existing step-6 move.
+Each includes `Audio/FX/Algorithms/InsertAlgorithmBase.h` and `Audio/FX/Algorithms/FxUse.h` (as `ChorusFx.h` does). The old `Insert/` folder no longer exists.
 
 ### 3. Numbers and the edits that must agree
 `kInsertAlgoCount` and `InsertProcessor::kNumInsertAlgos` go 22 to 25; two `static_assert`s (InsertProcessor.h, AlgorithmNames.h) and the `kInsertMenu` assert fail the build if any table is missed. Edits:

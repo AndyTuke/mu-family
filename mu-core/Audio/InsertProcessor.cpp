@@ -2,27 +2,27 @@
 #include <cmath>
 #include "Audio/InsertSlotConfig.h"
 
-#include "Audio/FX/Insert/NoneInsert.h"
-#include "Audio/FX/Insert/SoftClipInsert.h"
-#include "Audio/FX/Insert/HardClipInsert.h"
-#include "Audio/FX/Insert/FoldInsert.h"
-#include "Audio/FX/Insert/BitcrusherInsert.h"
-#include "Audio/FX/Insert/ClipperInsert.h"
-#include "Audio/FX/Insert/EqInsert.h"
-#include "Audio/FX/Insert/CompressorLimiterInsert.h"
-#include "Audio/FX/Insert/RingModInsert.h"
-#include "Audio/FX/Insert/TapeSatInsert.h"
-#include "Audio/FX/Insert/KarplusStrongInsert.h"
-#include "Audio/FX/Insert/VocoderInsert.h"
-#include "Audio/FX/Insert/OverdriveInsert.h"
-#include "Audio/FX/Insert/TapeDelayInsert.h"
-#include "Audio/FX/Insert/TapeSpringInsert.h"
+#include "Audio/FX/Algorithms/NoneInsert.h"
+#include "Audio/FX/Algorithms/SoftClipInsert.h"
+#include "Audio/FX/Algorithms/HardClipInsert.h"
+#include "Audio/FX/Algorithms/FoldInsert.h"
+#include "Audio/FX/Algorithms/BitcrusherInsert.h"
+#include "Audio/FX/Algorithms/ClipperInsert.h"
+#include "Audio/FX/Algorithms/EqInsert.h"
+#include "Audio/FX/Algorithms/CompressorLimiterInsert.h"
+#include "Audio/FX/Algorithms/RingModInsert.h"
+#include "Audio/FX/Algorithms/TapeSatInsert.h"
+#include "Audio/FX/Algorithms/KarplusStrongInsert.h"
+#include "Audio/FX/Algorithms/VocoderInsert.h"
+#include "Audio/FX/Algorithms/OverdriveInsert.h"
+#include "Audio/FX/Algorithms/TapeDelayInsert.h"
+#include "Audio/FX/Algorithms/TapeSpringInsert.h"
 #include "Audio/FX/Algorithms/FxFactory.h"
 #include "Audio/FX/Algorithms/ChorusFx.h"
 #include "Audio/FX/Algorithms/FlangerFx.h"
 #include "Audio/FX/Algorithms/PhaserFx.h"
-#include "Audio/FX/Insert/PitchDelayInsert.h"
-#include "Audio/FX/Insert/TremoloInsert.h"
+#include "Audio/FX/Algorithms/PitchDelayInsert.h"
+#include "Audio/FX/Algorithms/TremoloInsert.h"
 #include "Audio/FX/Algorithms/AutoPanInsert.h"
 #include "Audio/FX/Algorithms/GateInsert.h"
 #include "Audio/FX/Algorithms/WaveshaperInsert.h"
@@ -45,37 +45,37 @@ InsertProcessor::InsertProcessor()
         return raw;
     };
 
-    dispatch[0]  = add(std::make_unique<NoneInsert>());
-    dispatch[1]  = add(std::make_unique<SoftClipInsert>());
-    dispatch[2]  = add(std::make_unique<HardClipInsert>());
-    dispatch[3]  = add(std::make_unique<FoldInsert>());
-    dispatch[4]  = add(std::make_unique<BitcrusherInsert>());
-    dispatch[5]  = add(std::make_unique<ClipperInsert>());
-    dispatch[6]  = add(std::make_unique<EqInsert>());
+    dispatch[0]  = add(mu_audio::makeInsert<NoneInsert>());
+    dispatch[1]  = add(mu_audio::makeInsert<SoftClipInsert>());
+    dispatch[2]  = add(mu_audio::makeInsert<HardClipInsert>());
+    dispatch[3]  = add(mu_audio::makeInsert<FoldInsert>());
+    dispatch[4]  = add(mu_audio::makeInsert<BitcrusherInsert>());
+    dispatch[5]  = add(mu_audio::makeInsert<ClipperInsert>());
+    dispatch[6]  = add(mu_audio::makeInsert<EqInsert>());
 
     // Compressor (7) + Limiter (8) share one CompressorLimiterInsert
     // instance. Matches the pre-refactor behaviour where both insertAlgo codes
     // operated on the same `compEnvelope[2]` state — switching between them
     // mid-bar carried the envelope across rather than resetting it, which is
     // audibly less surprising than a fresh envelope at the moment of switch.
-    auto* compLim = add(std::make_unique<CompressorLimiterInsert>());
+    auto* compLim = add(mu_audio::makeInsert<CompressorLimiterInsert>());
     dispatch[7]   = compLim;
     dispatch[8]   = compLim;
 
-    dispatch[9]  = add(std::make_unique<RingModInsert>());
-    dispatch[10] = add(std::make_unique<TapeSatInsert>());
+    dispatch[9]  = add(mu_audio::makeInsert<RingModInsert>());
+    dispatch[10] = add(mu_audio::makeInsert<TapeSatInsert>());
 
-    dispatch[11] = add(std::make_unique<KarplusStrongInsert>());
+    dispatch[11] = add(mu_audio::makeInsert<KarplusStrongInsert>());
     dispatch[12] = add(std::make_unique<VocoderInsert>(false));
     dispatch[13] = add(std::make_unique<VocoderInsert>(true));
-    dispatch[14] = add(std::make_unique<OverdriveInsert>());
-    dispatch[15] = add(std::make_unique<TapeDelayInsert>());
-    dispatch[16] = add(std::make_unique<TapeSpringInsert>());
+    dispatch[14] = add(mu_audio::makeInsert<OverdriveInsert>());
+    dispatch[15] = add(mu_audio::makeInsert<TapeDelayInsert>());
+    dispatch[16] = add(mu_audio::makeInsert<TapeSpringInsert>());
     dispatch[17] = add(mu_audio::makeInsert<mu_audio::ChorusFx>());
     dispatch[18] = add(mu_audio::makeInsert<mu_audio::FlangerFx>());
     dispatch[19] = add(mu_audio::makeInsert<mu_audio::PhaserFx>());
-    dispatch[20] = add(std::make_unique<PitchDelayInsert>());
-    dispatch[21] = add(std::make_unique<TremoloInsert>());
+    dispatch[20] = add(mu_audio::makeInsert<PitchDelayInsert>());
+    dispatch[21] = add(mu_audio::makeInsert<TremoloInsert>());
     dispatch[22] = add(mu_audio::makeInsert<mu_audio::AutoPanInsert>());
     dispatch[23] = add(mu_audio::makeInsert<mu_audio::GateInsert>());
     dispatch[24] = add(mu_audio::makeInsert<mu_audio::WaveshaperInsert>());

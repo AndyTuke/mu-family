@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include <atomic>
 #include <cmath>
 
@@ -10,6 +11,8 @@
 class RingModInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override
     {
         currentSampleRate = sampleRate;

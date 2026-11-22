@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include "Audio/AudioFilters.h"
 #include "Audio/FX/Algorithms/Adaa1Tanh.h"
 #include <cmath>
@@ -14,6 +15,8 @@
 class OverdriveInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override
     {
         currentSampleRate = sampleRate;

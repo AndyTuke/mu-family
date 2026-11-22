@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InsertAlgorithmBase.h"
+#include "FxUse.h"
 #include "Audio/FX/Engines/TapeSpringEcho.h"
 
 #include <cmath>
@@ -17,6 +18,8 @@
 class TapeSpringInsert : public InsertAlgorithmBase
 {
 public:
+    static constexpr mu_audio::FxUse kUse = mu_audio::FxUse::Insert;
+
     void prepare(double sampleRate, int) override { engine.prepare(sampleRate); started = false; }
     void reset() override { engine.reset(); started = false; }
 

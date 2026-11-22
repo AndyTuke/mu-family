@@ -2,8 +2,8 @@
 
 #include "Audio/FX/Algorithms/FlangerCore.h"
 #include "Audio/FX/Algorithms/FxUse.h"
-#include "Audio/FX/Insert/InsertAlgorithmBase.h"
-#include "Audio/FX/Send/EffectAlgorithmBase.h"
+#include "Audio/FX/Algorithms/InsertAlgorithmBase.h"
+#include "Audio/FX/Algorithms/EffectAlgorithmBase.h"
 
 #include <atomic>
 

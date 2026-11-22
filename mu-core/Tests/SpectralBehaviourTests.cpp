@@ -19,12 +19,12 @@
 #include <memory>
 #include <vector>
 
-#include "Audio/FX/Insert/SoftClipInsert.h"
-#include "Audio/FX/Insert/HardClipInsert.h"
-#include "Audio/FX/Insert/FoldInsert.h"
-#include "Audio/FX/Insert/KarplusStrongInsert.h"
-#include "Audio/FX/Insert/CompressorLimiterInsert.h"
-#include "Audio/FX/Insert/VocoderInsert.h"
+#include "Audio/FX/Algorithms/SoftClipInsert.h"
+#include "Audio/FX/Algorithms/HardClipInsert.h"
+#include "Audio/FX/Algorithms/FoldInsert.h"
+#include "Audio/FX/Algorithms/KarplusStrongInsert.h"
+#include "Audio/FX/Algorithms/CompressorLimiterInsert.h"
+#include "Audio/FX/Algorithms/VocoderInsert.h"
 #include "Audio/Filters/Bp12Filter.h"
 #include "Audio/Filters/Notch12Filter.h"
 #include "Audio/Filters/Bp24Filter.h"
