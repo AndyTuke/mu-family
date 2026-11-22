@@ -94,10 +94,37 @@ PluginProcessor::PluginProcessor(const ProcessorIdentity& identity)
     swapTimingParam = apvts.getRawParameterValue(mu_hotswap::kSwapTimingParamId);
     startFxParamSync();      // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();    // restore a saved _default preset (skipped by render mode)
+
+    // A multi-slot host has a master key and scale; its Arp slots follow it. A one-slot host (mu-Host) keeps the layer's own.
+    if (getLimits().layers > 1) startTimerHz(10);
+}
+
+// Message thread. Writes the master root / scale into every Arp slot's own a{N}_root / a{N}_scale when they differ, so an Arp that is
+// added, loaded or automated lands on the master key within a tick. (The Pattern and Track layers read the global rows directly.)
+void PluginProcessor::followMasterKey()
+{
+    const auto* root  = apvts.getRawParameterValue("root");
+    const auto* scale = apvts.getRawParameterValue("scale");
+    if (root == nullptr || scale == nullptr) return;
+    const int masterRoot = juce::roundToInt(root->load()), masterScale = juce::roundToInt(scale->load());
+
+    auto follow = [this](const juce::String& id, int value)
+    {
+        auto* p = apvts.getParameter(id);
+        if (p == nullptr || juce::roundToInt(p->convertFrom0to1(p->getValue())) == value) return;
+        p->setValueNotifyingHost(p->convertTo0to1((float) value));
+    };
+    for (int i = 0; i < getLimits().layers; ++i)
+        if (getLayerTypeId(i) == mu_core::LayerTypeId::Arp)
+        {
+            follow("a" + juce::String(i) + "_root", masterRoot);
+            follow("a" + juce::String(i) + "_scale", masterScale);
+        }
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    stopTimer();
     prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
 }
 

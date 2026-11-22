@@ -38,7 +38,7 @@ struct ProcessorIdentity
     mu_limits::ProcessorLimits limits = kLimits;
 };
 
-class PluginProcessor : public ProcessorBase
+class PluginProcessor : public ProcessorBase, private juce::Timer
 {
 public:
     explicit PluginProcessor(const ProcessorIdentity& identity = ProcessorIdentity());
@@ -133,6 +133,10 @@ public:
     void applyStateTree(const juce::ValueTree& state);
 
 protected:
+    // The master key and scale (the global root / scale row the transport bar shows): every Arp slot follows it (see followMasterKey).
+    void timerCallback() override { followMasterKey(); }
+    void followMasterKey();
+
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);

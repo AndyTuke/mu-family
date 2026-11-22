@@ -44,6 +44,8 @@ public:
     ~ArpContent() override { stopTimer(); }
 
     void setLayer(int idx) override;
+    // A host with a master key (mu-Tronic) sets the layer's own key and scale selector to follow it: shown, dimmed, not editable.
+    void setKeyFollowsMaster(bool follows) { keyScale.setEnabled(! follows); keyScale.setAlpha(follows ? 0.5f : 1.0f); }
 
     // The shown layer's insert effect changed: the editor relabels the modulators' insert destinations.
     std::function<void(int)> onInsertAlgorithmChanged;

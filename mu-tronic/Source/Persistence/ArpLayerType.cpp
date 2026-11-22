@@ -59,7 +59,10 @@ namespace
     {
     public:
         explicit ArpSlotContent(ProcessorBase& p)
-            : ArpSlotHost(p), mu_toni::ArpContent(p, static_cast<ArpSlotHost&>(*this)) {}
+            : ArpSlotHost(p), mu_toni::ArpContent(p, static_cast<ArpSlotHost&>(*this))
+        {
+            setKeyFollowsMaster(p.getLimits().layers > 1);   // mu-Tronic's transport bar owns the key; mu-Host's one slot keeps its own
+        }
     };
 
     std::unique_ptr<LayerContent> createArpContent(ProcessorBase& host, int slot)
