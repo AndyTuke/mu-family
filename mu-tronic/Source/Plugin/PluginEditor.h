@@ -9,6 +9,7 @@
 #include "UI/LayerContent.h"          // mu-core: a layer type's content component
 #include "Plugin/PluginProcessor.h"
 #include "UI/EmptySlotChooser.h"
+#include "UI/Components/KeyScaleSelector.h"   // mu-core: the master key + scale in the transport bar
 #include "UI/TronicSettingsOverlay.h"
 
 namespace mu_tronic
@@ -81,6 +82,9 @@ private:
     std::deque<std::pair<mu_core::LayerTypeId, ModDestProvider>> registryProviders;          // built from a type's published targets, once per type (a deque: the panel holds the pointers)
     LayerContent* shownContent = nullptr;
     juce::String  effectSendName;   // the mixer effect's current name; empty until the mixer reports it
+    // The master key + scale (the global root / scale the Pattern and Track layers read), in the transport bar; none in a one-slot host.
+    mu_ui::KeyScalePane keyScalePane;
+    std::unique_ptr<mu_ui::KeyScaleAttachment> keyScaleAtt;
     std::unique_ptr<juce::FileChooser> importChooser;   // alive while the import file dialog is open
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)

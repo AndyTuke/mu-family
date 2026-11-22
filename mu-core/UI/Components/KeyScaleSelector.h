@@ -55,6 +55,22 @@ private:
     std::unique_ptr<Panel> panel;
 };
 
+// The selector set into a transport pane (TransportBar::setLoopSection): centred at the family dropdown height, with its engraved "Key"
+// caption. A product that has a master key / scale (mu-Tronic) hands this to the bar.
+class KeyScalePane : public juce::Component
+{
+public:
+    KeyScalePane() { addAndMakeVisible(selector); }
+    // Width in Medium pixels the pane needs: caption, gap, the selector and the pane's side padding.
+    static int width() noexcept
+    { return 2 * MuLookAndFeel::kSpaceS + MuLookAndFeel::kDropdownCaptionW + MuLookAndFeel::kSpaceXS + KeyScaleSelector::closedWidth(); }
+    void paint(juce::Graphics&) override;
+    void resized() override;
+    KeyScaleSelector selector;
+private:
+    juce::Rectangle<int> captionR;
+};
+
 // Binds `selector` to the parameters `keyId` and `scaleId` of `apvts` (an int or a choice parameter each: mu-Toni's root is an int
 // 0..11, mu-Tant's a choice). Keeps the selector in step with the parameters and writes user picks back. Destroy it before the selector.
 class KeyScaleAttachment : private juce::AudioProcessorValueTreeState::Listener, private juce::AsyncUpdater

@@ -135,6 +135,13 @@ PluginEditor::PluginEditor(PluginProcessor& p, const EditorOptions& options)
     getTransportBar().onImportProductPreset = [this] { chooseProductPreset(); };
     getTransportBar().refreshPresets();
 
+    // The master key + scale beside the tempo: bound to the global root / scale, which every Pattern and Track layer reads (an Arp keeps its own).
+    if (! singleSlot && proc.apvts.getParameter("root") != nullptr && proc.apvts.getParameter("scale") != nullptr)
+    {
+        keyScaleAtt = std::make_unique<mu_ui::KeyScaleAttachment>(proc.apvts, "root", "scale", keyScalePane.selector);
+        getTransportBar().setLoopSection(&keyScalePane, mu_ui::KeyScalePane::width());
+    }
+
     // The CPU readout: shown in Performance mode too (the one figure a player needs on stage).
     getStatusBar().setCpuMeterVisible(true);
 
@@ -156,6 +163,8 @@ PluginEditor::~PluginEditor()
     proc.onLayerLeaving = nullptr;
     proc.onLayerPresetCommitted = nullptr;
     getTransportBar().onImportProductPreset = nullptr;
+    getTransportBar().setLoopSection(nullptr, 0);   // the pane is this editor's member
+    keyScaleAtt.reset();
 }
 
 void PluginEditor::chooseProductPreset()

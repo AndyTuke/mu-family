@@ -274,6 +274,30 @@ void KeyScaleSelector::mouseWheelMove(const juce::MouseEvent&, const juce::Mouse
     reportStatus(*this, "Scale", mu_audio::kScales[(size_t) scale].name);
 }
 
+// ── KeyScalePane ──────────────────────────────────────────────────────────────────────────────
+
+void KeyScalePane::resized()
+{
+    auto r = getLocalBounds().reduced(s(LF::kSpaceS), 0);
+    const int h = s(LF::kDropdownH);
+    r = r.withSizeKeepingCentre(r.getWidth(), h);
+    captionR = r.removeFromLeft(s(LF::kDropdownCaptionW));
+    r.removeFromLeft(s(LF::kSpaceXS));
+    selector.setBounds(r);
+}
+
+void KeyScalePane::paint(juce::Graphics& g)
+{
+    if (LF::isMetal(*this))
+        LF::drawEngravedText(g, "Key", captionR, juce::Justification::centredLeft, LF::colour(LF::labelText));
+    else
+    {
+        g.setColour(LF::colour(LF::labelText));
+        g.setFont(LF::uiFont(sf(LF::kEngravedCaptionFont)));
+        g.drawText("Key", captionR, juce::Justification::centredLeft);
+    }
+}
+
 // ── KeyScaleAttachment ────────────────────────────────────────────────────────────────────────
 
 int KeyScaleAttachment::readIndex(juce::RangedAudioParameter* p)
