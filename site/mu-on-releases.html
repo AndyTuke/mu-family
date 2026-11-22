@@ -150,6 +150,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>If a DAW project's saved state can't be restored (damaged, or saved by another product or a newer version), you now get a message instead of the project opening silently on default settings. <span class="ref">(1831)</span></li>
             <li>The Gate insert now shows the incoming level as a green meter around its Threshold knob, so you can set the threshold by eye. <span class="ref">(1825)</span></li>
             <li>Tape Sat is rebuilt as a tape-style saturation, with a new Head Bump knob and oversampling.</li>
             <li>The Chorus, Flanger and Phaser inserts now use the same richer versions as the sends. Chorus has three voices. Existing patches that use these inserts will sound different.</li>
@@ -159,6 +160,9 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>A host that sends a broken tempo or position value no longer upsets the sequencers, and a corrupt knob value can no longer break the Auto Pan and Stutter tempo-sync positions. <span class="ref">(1832)</span></li>
+            <li>If an activation is accepted but can't be saved on your PC (for example a read-only folder), you are now told so, instead of being told it is activated and having to activate again at the next start. <span class="ref">(1829)</span></li>
+            <li>A drag started after clicking outside the step cells could still edit or tie the step you last touched; each click now starts a fresh drag. <span class="ref">(1830)</span></li>
             <li>The Rate knob on the slow-rate inserts (Flanger, Phaser, Tremolo, Auto Pan and Chorus) now turns smoothly. Its first notch used to jump to 0.2 Hz; it now steps in 0.01 Hz.</li>
             <li>The About screen now shows the version number (it was blank in mu-On).</li>
           </ul>
