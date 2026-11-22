@@ -9,6 +9,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/KeyScaleSelector.h"   // mu-core: the shared key + scale selector
 #include "UI/Components/StepEditor.h"     // mu-core: the accent pattern cells
 #include "UI/ConfirmDialog.h"             // mu-core: shared confirm / name dialogs
 #include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
@@ -129,8 +130,6 @@ private:
 
     void addToggle(int group, const char* suffix, const juce::String& label);
 
-    static juce::StringArray scaleItems()
-    { juce::StringArray a; for (int i = 0; i < kNumScales; ++i) a.add(kScales[(size_t) i].name); return a; }
     static juce::StringArray chordItems()
     { juce::StringArray a; for (int i = 0; i < kNumChords; ++i) a.add(kChords[(size_t) i].name); return a; }
     juce::StringArray waveItems() const { return host.getWavetableNames(); }
@@ -153,6 +152,11 @@ private:
     juce::Rectangle<int> voiceR, arpR;
     // The three metal panels filling the band: source, voice band, Appergater.
     juce::Rectangle<int> srcR, voicePanelR, arpPanelR;
+
+    // The layer's key + scale in one selector, first control of the Appergater's top row (docs/design-ui-family.md 6.8); rebound per layer.
+    mu_ui::KeyScaleSelector keyScale;
+    std::unique_ptr<mu_ui::KeyScaleAttachment> keyScaleAtt;
+    juce::Rectangle<int> keyCaptionR;
 
     StepEditor accentSteps;                       // the Appergater's step pattern (Off / On / Accented cells)
     int shownAccentLen = -1, shownAccentPat = -1, shownStepMask = -1; // what accentSteps shows (redrawn on change)

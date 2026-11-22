@@ -10,6 +10,7 @@
 #include "UI/TrackStepRow.h"
 #include "UI/LayerContent.h"                // mu-core: the base every layer type's content derives from
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/KeyScaleSelector.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
@@ -92,9 +93,9 @@ private:
     juce::Label    engineCaption { {}, "Engine" }, sourceCaption { {}, "Source" };
     DropdownSelect engineSelect, sourceSelect;
     // The master key and scale (global root / scale, the family tonal row), under the Engine selector.
-    juce::Label    rootCaption { {}, "Root" }, scaleCaption { {}, "Scale" };
-    DropdownSelect rootSelect, scaleSelect;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> rootAtt, scaleAtt;
+    // The master key + scale: the shared selector (docs/design-ui-family.md 6.8) in the KEY section, bound once to the global root / scale.
+    mu_ui::KeyScaleSelector keyScale;
+    std::unique_ptr<mu_ui::KeyScaleAttachment> keyScaleAtt;
     mu_ui::ParamKnobGrid grid;              // the engine's voice knobs (left-justified)
     mu_ui::ParamKnobGrid filterGrid;        // a drum or percussion engine's FILTER section: type, cutoff, resonance, and the envelope's smaller knobs
     StepRows       rows;                              // every track's row (a track the host does not lock)

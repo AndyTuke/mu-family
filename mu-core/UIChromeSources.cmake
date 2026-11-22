@@ -19,6 +19,7 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/Components/StepIndicator.cpp"
     "${_mu_core_dir}/UI/Components/NoteLengthControl.cpp"
     "${_mu_core_dir}/UI/Components/DropdownSelect.cpp"
+    "${_mu_core_dir}/UI/Components/KeyScaleSelector.cpp"
     "${_mu_core_dir}/UI/Components/StepEditor.cpp"
     "${_mu_core_dir}/UI/Components/LFOEditor.cpp"
     "${_mu_core_dir}/UI/Components/LoopWaveform.cpp"

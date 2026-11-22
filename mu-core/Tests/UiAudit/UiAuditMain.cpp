@@ -240,7 +240,9 @@ void Audit::probe(juce::Component& c)
 
 void Audit::sweepCustom(juce::Component& c)
 {
-    for (auto* child : c.getChildren())
+    // A copy: probing a control may add a child to this component (a popup panel floats on the window), which would invalidate the live list.
+    const juce::Array<juce::Component*> children(c.getChildren());
+    for (auto* child : children)
     {
         if (isCustomCandidate(*child, root) && done.insert(child).second) probe(*child);
         sweepCustom(*child);

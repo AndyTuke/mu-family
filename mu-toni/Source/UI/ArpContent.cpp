@@ -88,13 +88,12 @@ void ArpContent::addArpControls()
     using LF = MuLookAndFeel;
 
     // ── Appergater (arpeggiator, boxed) ──────────────────────────────────
-    addCombo (G_ARP, "scale", scaleItems(),       "Scale");
+    addAndMakeVisible(keyScale);   // replaces the Scale dropdown and the Root knob; reports Key / Scale to the status bar itself
     addCombo (G_ARP, "chord", chordItems(),       "Chord");
     addCombo (G_ARP, "rate",  rateItems(),        "Rate");
     addCombo (G_ARP, "trig",  { "Loop", "MIDI" }, "Trigger");
     addToggle(G_ARP, "leg",   "Legato");
     addToggle(G_ARP, "snap",  "Snap");
-    addKnob  (G_ARP, "root",  "Root",      LF::knobEuclidean);
     addKnob  (G_ARP, "roct",  "Octave",    LF::knobEuclidean);
     addKnob  (G_ARP, "inv",   "Inversion", LF::knobEuclidean);
     addKnob  (G_ARP, "octs",  "Octaves",   LF::knobEuclidean);
@@ -221,6 +220,10 @@ void ArpContent::setLayer(int idx)
         t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
             apvts, layerParamId(currentLayer, t.suffix), *t.comp);
 
+    keyScaleAtt.reset();
+    keyScaleAtt = std::make_unique<mu_ui::KeyScaleAttachment>(apvts, layerParamId(currentLayer, "root"),
+                                                              layerParamId(currentLayer, "scale"), keyScale);
+
     bindModulationArcs();
     insertSub.setChannel(currentLayer);
     shownAccentLen = shownAccentPat = shownStepMask = -1;   // redraw the new layer's accent pattern
@@ -267,6 +270,13 @@ void ArpContent::paint(juce::Graphics& g)
 
     // Dropdown captions: engraved into the metal, or plain text in the flat look.
     g.setFont(MuLookAndFeel::uiFont(mu_ui::sf(11.0f)));
+    if (MuLookAndFeel::isMetal(*this))
+        MuLookAndFeel::drawEngravedText(g, "Key", keyCaptionR, juce::Justification::centredLeft, MuLookAndFeel::colour(MuLookAndFeel::labelText));
+    else
+    {
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
+        g.drawText("Key", keyCaptionR, juce::Justification::centredLeft);
+    }
     for (auto& c : combos)
         if (c.caption.isNotEmpty())
         {
@@ -362,11 +372,20 @@ void ArpContent::layoutBox(int group, juce::Rectangle<int> rect)
     for (auto& k : knobs)   if (k.group == group) ++nKnobs;
     if (nCombos + nToggles > 0)
     {
+        const bool hasKey = (group == G_ARP);
         // A lone selector (e.g. the wavetable) stretches to the knob row so its name fits.
         const int comboW = (nCombos == 1 && nToggles == 0)
                          ? juce::jmax(kBoxComboW, nKnobs * (LF::kKnobSize2W + LF::kVoiceGap) - LF::kVoiceGap)
                          : kBoxComboW;
         auto top = inner.removeFromTop(s(LF::kDropdownH));
+        if (hasKey)
+        {
+            // The key + scale selector leads the row, its engraved "Key" caption to its left.
+            keyCaptionR = top.removeFromLeft(s(LF::kDropdownCaptionW));
+            top.removeFromLeft(s(LF::kSpaceXS));
+            keyScale.setBounds(top.removeFromLeft(s(mu_ui::KeyScaleSelector::closedWidth())));
+            top.removeFromLeft(s(kBoxGap + LF::kSpaceL));
+        }
         for (auto& c : combos)
             if (c.group == group)
             {

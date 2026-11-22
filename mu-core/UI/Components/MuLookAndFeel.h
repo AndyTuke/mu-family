@@ -449,10 +449,8 @@ public:
     static constexpr int kDropdownH       = 24;        // family-standard dropdown height
     static constexpr int kGrooveBoxW      = 300;       // fixed width of a two-knob / envelope-editor box, so its layout never jumps
     // The Root / Scale row (mu-Tant's tonal centre): label, root and scale selector widths and the gap between pairs.
-    static constexpr int kTonalLabelW = 44;
     static constexpr int kTonalRootW  = 56;
     static constexpr int kTonalScaleW = 100;
-    static constexpr int kTonalGap    = 12;
     static constexpr int kLcdSegmentW = 56;   // one window of a two-option LCD selector (mu-Clid's Sample | MIDI; a Pattern's Free | Note)
     static constexpr int kAddButtonW      = 110;       // "+ Target" / "+ Assignment" (metal: a normal button, centred)
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7

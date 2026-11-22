@@ -204,7 +204,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     engineSelect.onChange = [this](int id) { engineChosen(id); if (onStatusUpdate) onStatusUpdate("Engine", engineSelect.getText()); };
     sourceSelect.onChange = [this](int id) { sourceChosen(id); if (onStatusUpdate) onStatusUpdate("Rumble Source", sourceSelect.getText()); };
 
-    for (auto* cap : { &engineCaption, &sourceCaption, &rootCaption, &scaleCaption })
+    for (auto* cap : { &engineCaption, &sourceCaption })
     {
         cap->setJustificationType(juce::Justification::centred);
         cap->setInterceptsMouseClicks(false, false);
@@ -214,13 +214,9 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // The master key and scale: global rows bound once (a host without them, none).
     if (host.getTrackParameters().getParameter(kRootParamId) != nullptr)
     {
-        for (int i = 0; i < mu_audio::kNumScales; ++i) scaleSelect.addItem(mu_audio::kScales[(size_t) i].name, i + 1);
-        mu_ui::addChoiceItems(rootSelect, host.getTrackParameters(), kRootParamId);   // items from the parameter's choices
-        rootAtt  = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(host.getTrackParameters(), kRootParamId,  rootSelect.getComboBox());
-        scaleAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(host.getTrackParameters(), kScaleParamId, scaleSelect.getComboBox());
+        keyScaleAtt = std::make_unique<mu_ui::KeyScaleAttachment>(host.getTrackParameters(), kRootParamId, kScaleParamId, keyScale);
     }
-    addChildComponent(rootSelect);
-    addChildComponent(scaleSelect);
+    addChildComponent(keyScale);   // reports Key / Scale to the status bar itself
     addChildComponent(sourceSelect);
     sourceCaption.setVisible(false);
     addAndMakeVisible(grid);
@@ -242,9 +238,6 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     };
     report(swingKnob, "Layer Swing");  report(accentKnob, "Layer Accent");  report(ghostKnob, "Layer Ghost");  report(probKnob, "Layer Probability");  report(levelKnob, "Track Level");
     report(sendEffKnob, "FX Send");   report(sendDlyKnob, "Delay Send");   report(sendRevKnob, "Reverb Send");
-    auto say = [this](const juce::String& name, DropdownSelect& d) { if (onStatusUpdate) onStatusUpdate(name, d.getText()); };
-    rootSelect.getComboBox().onChange  = [this, say] { say("Key Root", rootSelect); };
-    scaleSelect.getComboBox().onChange = [this, say] { say("Key Scale", scaleSelect); };
 
     rows.onRowClicked = [this](int row) { if (onRowClicked) onRowClicked(row); };
     rows.onStatusUpdate = [this](const juce::String& name, const juce::String& value) { if (onStatusUpdate) onStatusUpdate(name, value); };
@@ -712,8 +705,8 @@ void TrackContent::rebuild()
 
     sourceCaption.setVisible(rumble);
     sourceSelect.setVisible(rumble);
-    const bool showKey = ! locked && ! rumble && rootAtt != nullptr;   // the Source takes a Rumble's second cell
-    for (auto* c : { (juce::Component*) &rootCaption, (juce::Component*) &rootSelect, (juce::Component*) &scaleCaption, (juce::Component*) &scaleSelect }) c->setVisible(showKey);
+    const bool showKey = ! locked && ! rumble && keyScaleAtt != nullptr;   // the Source takes a Rumble's second cell
+    keyScale.setVisible(showKey);
     swingKnob.setVisible(! rumble);
     accentKnob.setVisible(! rumble);
     // Ghost steps are for the drum, percussion and Chord engines.
@@ -885,8 +878,8 @@ void TrackContent::resized()
     const int numDrops = (locked ? 0 : 1) + (rumble ? 1 : 0);
     const int engineW  = numDrops > 0 ? 2 * clear + dropW : 0;
     // The master key and scale (global, not per track) have a KEY section of their own, Root over Scale.
-    const bool showKeyBox = ! locked && ! rumble && rootAtt != nullptr;
-    const int keyW     = showKeyBox ? 2 * clear + s(LF::kTonalScaleW) : 0;
+    const bool showKeyBox = ! locked && ! rumble && keyScaleAtt != nullptr;
+    const int keyW     = showKeyBox ? 2 * clear + s(mu_ui::KeyScaleSelector::closedWidth()) : 0;
     engineR    = { 0, 0, w, padY + plateH + boxH + padY };
     const int boxY = padY + plateH;
     int x = padX;
@@ -919,15 +912,8 @@ void TrackContent::resized()
     if (rumble)   place(sourceCaption, sourceSelect, dropY);
     else if (! locked)
     {
-        // Root over Scale in the KEY section, each captioned like the Engine dropdown.
-        const int keyX = keyBoxR.getX() + clear, keyDdW = s(LF::kTonalScaleW);
-        int keyY = keyBoxR.getY() + s(LF::kSpaceS);
-        for (auto* cap : { &rootCaption, &scaleCaption }) cap->setFont(captionFont);
-        rootCaption .setBounds(keyX, keyY, keyDdW, labelH);
-        rootSelect  .setBounds(keyX, keyY + labelH + s(2), keyDdW, s(MuLookAndFeel::kDropdownH));
-        keyY += rowPitch;
-        scaleCaption.setBounds(keyX, keyY, keyDdW, labelH);
-        scaleSelect .setBounds(keyX, keyY + labelH + s(2), keyDdW, s(MuLookAndFeel::kDropdownH));
+        // One key + scale selector in the KEY section.
+        keyScale.setBounds(keyBoxR.getX() + clear, keyBoxR.getY() + s(LF::kSpaceS), s(mu_ui::KeyScaleSelector::closedWidth()), s(LF::kDropdownH));
     }
     grid.setMinSizeIndex(0);
     filterGrid.setMinSizeIndex(0);

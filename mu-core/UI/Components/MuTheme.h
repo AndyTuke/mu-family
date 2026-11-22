@@ -293,6 +293,7 @@ struct MuTheme
 
         // LCD tabs (SegmentControl::DrawStyle::Lcd)
         float lcdGlassDarken     = 0.85f;   // glass: panel colour darkened by this
+        float lcdSharpShade      = 0.45f;   // key / scale selector: alpha of the black shade over a sharp key's glass
         float lcdBacklight       = 0.28f;   // active tab: glass tinted by the lit colour
         float lcdGlow            = 0.35f;   // glow round the lit lettering
         float lcdGhost           = 0.22f;   // unlit lettering, faintly visible through the glass

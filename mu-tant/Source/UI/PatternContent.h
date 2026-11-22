@@ -5,6 +5,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/KeyScaleSelector.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/GatingDesigner.h"
@@ -120,12 +121,9 @@ private:
     NoteModeSetter    noteModeSet;
 
     // ── Tonal centre (shared across voices) ─────────────────────────────────
-    juce::Label    rootLabel;
-    DropdownSelect rootDropdown;
-    juce::Label    scaleLabel;
-    DropdownSelect scaleDropdown;
-    std::unique_ptr<APVTS::ComboBoxAttachment> rootAttachment;
-    std::unique_ptr<APVTS::ComboBoxAttachment> scaleAttachment;
+    juce::Label           keyLabel;          // the engraved "Key" caption left of the selector
+    mu_ui::KeyScaleSelector keyScale;        // key + scale in one LCD (docs/design-ui-family.md 6.8)
+    std::unique_ptr<mu_ui::KeyScaleAttachment> keyScaleAttachment;
 
     // Knob colours follow mu-clid's category logic: oscillator/pitch = purple
     // (knobEuclidean), filter = teal (knobPostPad), levels = amber (knobLevel),

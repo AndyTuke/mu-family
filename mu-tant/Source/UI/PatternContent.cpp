@@ -78,12 +78,6 @@ void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
 }
 namespace
 {
-    void populateScales(DropdownSelect& d)
-    {
-        for (int i = 0; i < (int) kScales.size(); ++i)
-            d.addItem(kScales[(size_t) i].name, i + 1);
-    }
-
     void populateFilterTypes(DropdownSelect& d)
     {
         // Use the family-canonical display order from mu-core — same order as
@@ -117,17 +111,9 @@ void PatternContent::setupTonalCentre()
     auto& apvts = host.getPatternParameters();
 
     // ── Tonal centre (shared — bound once) ──────────────────────────────────
-    addLabel(rootLabel,  "Root");
-    addLabel(scaleLabel, "Scale");
-    mu_ui::addChoiceItems(rootDropdown, apvts, "root");   // items from the parameter's choices
-    populateScales(scaleDropdown);
-    // The status bar names each selector (a pick reports to the editor, see StatusSink.h).
-    rootDropdown.setStatusName("Root");
-    scaleDropdown.setStatusName("Scale");
-    addAndMakeVisible(rootDropdown);
-    addAndMakeVisible(scaleDropdown);
-    rootAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "root",  rootDropdown.getComboBox());
-    scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
+    addLabel(keyLabel, "Key");
+    addAndMakeVisible(keyScale);   // reports Key / Scale to the status bar itself
+    keyScaleAttachment = std::make_unique<mu_ui::KeyScaleAttachment>(apvts, "root", "scale", keyScale);
 }
 
 // The opt-in Note mode selector: added on first use, hidden until then so mu-Tant's row is exactly as before.
@@ -594,12 +580,11 @@ int PatternContent::layoutTonal(const Grid& g)
     using mu_ui::s;
     using LF = MuLookAndFeel;
     const int tonalY = g.inset;
-    const int labelW = s(LF::kTonalLabelW);
+    const int labelW = s(LF::kDropdownCaptionW);
     int x = g.pad;
-    rootLabel    .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
-    rootDropdown .setBounds(x, tonalY, s(LF::kTonalRootW),  g.ddH);  x += s(LF::kTonalRootW)  + s(LF::kTonalGap);
-    scaleLabel   .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
-    scaleDropdown.setBounds(x, tonalY, s(LF::kTonalScaleW), g.ddH);
+    keyLabel.setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(LF::kSpaceXS);
+    keyScale.setBounds(x, tonalY, s(mu_ui::KeyScaleSelector::closedWidth()), g.ddH);
+    x += s(mu_ui::KeyScaleSelector::closedWidth());
 
     // The Note mode selector (when the host opted in): caption then selector, the selector's right edge on the band's.
     if (hasNoteModeControl())
