@@ -47,9 +47,9 @@ Keep the workflow fast: before any check, test, build, review or agent call ask 
 5. **Build when it is worth it** (see "Keep working until a build is worth it"), say in one line why, and report the number read from `mu-core/BuildNumber.h`.
 6. **Follow up.** `test-steward` for tests, `docs-steward` for the manuals, `/notes` for release notes: each once for the batch.
 7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-steward`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
-## Handover between the two PCs (owner rule, 2026-10-30)
+## Handover between the two PCs (owner rule, 2026-11-22: off)
 
-Work is shared between the review-only laptop and the build PC through `origin/main`. The handover files in [handover/](handover/README.md) carry what the backlog cannot: the concrete steps one PC needs the other to do (build, run, listen, look) and the results that come back. **Start a session with `/handover start`** (pull, read the other PC's file, act on results) and **end it with `/handover end`** (write what the other PC must do, commit and push). Each PC writes only its own file; the backlog stays the record of the work and is still changed only through the `backlog-steward`. Procedure: [.claude/commands/handover.md](.claude/commands/handover.md).
+Do not run `/handover start` or `/handover end` and do not write the [handover/](handover/README.md) files unless Andy asks for it in that session. Report results to Andy in chat. The backlog (through the `backlog-steward`) stays the record of the work.
 
 ## Build workflow
 
