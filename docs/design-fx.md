@@ -256,7 +256,7 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 **Mod targets: no new row.** Insert knobs are the generic `insert.p1..p4` rows already in every product's table, labelled per algorithm from `kInsertAlgoSlots` (`mu_mod::populateDropdown`), so Bump becomes a target the moment its label exists. Depth stays a percentage of the knob's range. `check-mod-targets.ps1` and `mu_mod::checks` need no edit.
 
 ### Class shape and files
-- `Insert/TapeSatInsert.h` is rewritten in place (class name, id 10 and dispatch unchanged; insert-only, so it keeps its `...Insert` name and moves to `Algorithms/` with the rest in the merge's last step).
+- `Algorithms/TapeSatInsert.h` (it was `Insert/TapeSatInsert.h` until the 2026-11-22 folder move) is rewritten in place (class name, id 10 and dispatch unchanged; insert-only, so it keeps its `...Insert` name and moves to `Algorithms/` with the rest in the merge's last step).
 - New shared helpers in `mu-core/Audio/FX/Algorithms/` (namespace `mu_audio`):
   - `Adaa1Tanh.h`: `struct Adaa1Tanh { float process(float x) noexcept; void reset() noexcept; }`, the ADAA tanh with its guards, lifted from `OverdriveInsert.h` (a second user, so it moves to a shared header before a second copy exists). `OverdriveInsert` switches to it in the same step (identical maths; bit-identical output is the check).
   - `TapeEmphasis.h`: `struct TapeEmphasis { void prepare(double sr); float pre(float) noexcept; float de(float) noexcept; void reset() noexcept; }`, the first-order shelf pair.
@@ -265,7 +265,7 @@ Order matters: 1, 2, then 3-5 in any order (3 first as the template), 6 last.
 ### Build steps (each builds and runs its tests)
 1. Add `Algorithms/Adaa1Tanh.h`; switch `OverdriveInsert.h` to it; existing Overdrive tests unchanged.
 2. Add `Algorithms/TapeEmphasis.h`.
-3. Rewrite `Insert/TapeSatInsert.h` to the path above (built); `InsertProcessor.cpp` dispatch untouched. Step 3b (amendment): add the 2x polyphase-IIR oversampling around the saturating stage, adjust the latency test entry and the aliasing and droop tests.
+3. Rewrite `TapeSatInsert.h` (then in `Insert/`, now `Algorithms/`) to the path above (built); `InsertProcessor.cpp` dispatch untouched. Step 3b (amendment): add the 2x polyphase-IIR oversampling around the saturating stage, adjust the latency test entry and the aliasing and droop tests.
 4. `InsertSlotConfig.h`: Bump label on row 10 slot 2, defaults row 10, row comment ("Drive / Output / Bump / Tone").
 5. Tests: new `mu-core/Tests/TapeSatTests.cpp`, listed in `mu-core/Tests/CMakeLists.txt`. Product golden renders that use insert 10 are stale on purpose until Andy allows a re-record.
 6. Docs: manual wording (Frank), `tests.md` (Fred), release note.
