@@ -39,6 +39,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void lookAndFeelChanged() override { repaint(); }
 
@@ -89,6 +90,12 @@ public:
     // tie), with the status bar's name and value for what changed.
     static bool dragStepValue(TrackHost& host, int slot, int step, StepDrag& drag, const juce::MouseEvent& e,
                               juce::String& statusName, juce::String& statusValue);
+    // Dragging a step that was on sideways to another step moves it; with Ctrl it copies it (the family's drag-copy, as in mu-Tilate's
+    // timeline). A Bass keeps its plain sideways drag for ties, so it moves with Shift. The drop lands when the button is released;
+    // meanwhile the target cell is outlined. Returns false when this drag is neither (the caller then keeps its tie / edit drag).
+    static bool dropMode(EngineType engine, const juce::ModifierKeys& mods, bool& copy);
+    // Put step `from` on step `to` of `row`: a copy, or a move (the source is cleared). The target is overwritten.
+    static void applyDrop(StepRow& row, int from, int to, bool copy);
     // The cell of page position `step` (0..15), the accent button inside its top-left corner and the delete cross inside its top-right.
     static juce::Rectangle<float> cellRect(juce::Rectangle<int> cells, int step);
     static juce::Rectangle<float> accentButtonRect(juce::Rectangle<float> cell);
@@ -108,6 +115,9 @@ private:
     int selectedStep = -1;
     int dragStep     = -1;     // the step a left-drag has reached (-1: no drag)
     bool dragStartedOn = false;
+    int  dragOrigin = -1;      // the step the press was on (a move or copy comes from it)
+    int  dropStep   = -1;      // the step a move / copy would land on, outlined while the button is down (-1: none)
+    bool dropCopy   = false;
     StepDrag stepDrag;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrackStepRow)

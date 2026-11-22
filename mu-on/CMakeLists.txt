@@ -181,6 +181,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ChordTests.cpp   # Chord voicing, the Chord engine and a step's chord data
     Source/Tests/StepPagingTests.cpp   # step row paging, Length and the page-edge tie the paged Steps grid rests on
     Source/Tests/StepLoopBarsTests.cpp   # a step's loop: Length in bars and the Bars it plays in
+    Source/Tests/StepCopyTests.cpp   # copy / move a whole step (grid drag)
     Source/Tests/StepConditionTests.cpp   # a step's condition: Always, Fill, Pre, NotPre
     Source/Tests/StepLockTests.cpp   # step parameter locks: the set, the row and its saved form, a Track applying and holding a lock
     Source/Tests/LayerClockTests.cpp

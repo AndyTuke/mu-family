@@ -150,6 +150,37 @@ public:
                     c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed); }
     }
 
+    // Put one step back to its defaults (off, no accent, no locks), and end any tie into the step after it.
+    void resetStep(int s) noexcept
+    {
+        if (! valid(s)) return;
+        auto& c = cells[(size_t) s];
+        clearLocks(s);
+        c.on.store(false, std::memory_order_relaxed); c.accent.store(false, std::memory_order_relaxed); c.ghost.store(false, std::memory_order_relaxed); c.open.store(false, std::memory_order_relaxed);
+        c.prob.store(100, std::memory_order_relaxed); c.loopLen.store(1, std::memory_order_relaxed); c.loopBars.store(kAllBars, std::memory_order_relaxed); c.cond.store(kCondAlways, std::memory_order_relaxed);
+        c.level.store(100, std::memory_order_relaxed); c.repeats.store(0, std::memory_order_relaxed); c.repRate.store(step_repeats::kDefaultRate, std::memory_order_relaxed); c.repFade.store(0, std::memory_order_relaxed);
+        c.tie.store(false, std::memory_order_relaxed); c.oct.store(0, std::memory_order_relaxed); c.note.store(0, std::memory_order_relaxed);
+        c.chord.store(kDefaultChord, std::memory_order_relaxed); c.inv.store(0, std::memory_order_relaxed); c.spread.store(0, std::memory_order_relaxed);
+        setTied(s + 1, false);
+    }
+    // Copy every setting of step `from` onto step `to` (the whole step, locks included; the copy is not tied to its neighbour).
+    // A step moved by drag is a copy then resetStep(from). Message thread only, like every edit.
+    void copyStep(int from, int to) noexcept
+    {
+        if (from == to || ! valid(from) || ! valid(to)) return;
+        const auto& a = cells[(size_t) from];
+        auto& b = cells[(size_t) to];
+        const auto rl = std::memory_order_relaxed;
+        b.on.store(a.on.load(rl), rl); b.accent.store(a.accent.load(rl), rl); b.ghost.store(a.ghost.load(rl), rl); b.open.store(a.open.load(rl), rl);
+        b.prob.store(a.prob.load(rl), rl); b.loopLen.store(a.loopLen.load(rl), rl); b.loopBars.store(a.loopBars.load(rl), rl); b.cond.store(a.cond.load(rl), rl);
+        b.level.store(a.level.load(rl), rl); b.repeats.store(a.repeats.load(rl), rl); b.repRate.store(a.repRate.load(rl), rl); b.repFade.store(a.repFade.load(rl), rl);
+        b.tie.store(false, rl); b.oct.store(a.oct.load(rl), rl); b.note.store(a.note.load(rl), rl);
+        b.chord.store(a.chord.load(rl), rl); b.inv.store(a.inv.load(rl), rl); b.spread.store(a.spread.load(rl), rl);
+        b.lockMod.store(a.lockMod.load(rl), rl);
+        b.locks.clear();
+        a.locks.forEach([&](uint16_t key, float v) { b.locks.set(key, v); });
+    }
+
     // The starting groove of an engine, so a new track plays something at once: four-on-the-floor kick
     // (downbeat accented), off-beat bass under it, straight 8th hats, backbeat snare, a sparse tom fill, nothing for Rumble.
     void loadDefaultGroove(EngineType engine) noexcept

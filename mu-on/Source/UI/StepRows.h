@@ -39,6 +39,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
     void lookAndFeelChanged() override { repaint(); }
     void resized() override;
 
@@ -64,6 +65,9 @@ private:
     int selectedStep  = -1;
     int dragRow = -1, dragStep = -1;   // a left-drag across steps (to tie them): the row and the step it has reached
     bool dragStartedOn = false;
+    int  dragOrigin = -1;              // the step the press was on (a move or copy comes from it, within dragRow)
+    int  dropStep   = -1;              // the step a move / copy would land on, outlined while the button is down (-1: none)
+    bool dropCopy   = false;
     TrackStepRow::StepDrag stepDrag;   // a vertical drag on a step edits it (note, octave, accent, Hat open / closed)
     std::array<int, mu_limits::kAbsoluteMaxLayers> playheadSteps;                 // each row's playhead step (-1: none)
     std::array<long long, mu_limits::kAbsoluteMaxLayers> shownPasses;             // each row's pass the dimmed steps were drawn for

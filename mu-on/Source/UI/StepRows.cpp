@@ -119,6 +119,14 @@ void StepRows::paintRow(juce::Graphics& g, int row)
 
     if (isRumble) g.endTransparencyLayer();
 
+    // The cell a move / copy would land on.
+    const int firstStep = pager.page() * StepRow::kNumSteps;
+    if (row == dragRow && dropStep >= firstStep && dropStep < firstStep + StepRow::kNumSteps)
+    {
+        g.setColour(col);
+        g.drawRoundedRectangle(TrackStepRow::cellRect(cellsArea(row), dropStep - firstStep), 3.0f, 2.0f);
+    }
+
     // The selected layer's row is outlined in its colour.
     if (row == selected)
     {
@@ -142,6 +150,8 @@ void StepRows::mouseDown(const juce::MouseEvent& e)
 
     if (s >= host.getTrack(r).row.numSteps()) return;   // past the row's length: nothing to edit
     dragStartedOn = host.getTrack(r).row.isOn(s);
+    dragOrigin = s;
+    dropStep = -1;
     stepDrag = {};
 
     // A click selects the step for the Step panel (creating it if empty); its corner buttons set the accent or delete it.
@@ -173,12 +183,40 @@ void StepRows::mouseDrag(const juce::MouseEvent& e)
             return;
         }
     }
+    // A step that was on moves (or with Ctrl copies) to the cell under the pointer when the button is released.
+    if (dragRow >= 0 && dragStartedOn && std::abs(e.getDistanceFromDragStartX()) >= TrackStepRow::kPitchDragStartPx
+        && TrackStepRow::dropMode(host.getTrackEngine(dragRow), e.mods, dropCopy))
+    {
+        const int before = dropStep;
+        dropStep = cellAt(e.getPosition(), r, s) && r == dragRow && s != dragOrigin && s < host.getTrack(r).row.numSteps() ? s : -1;
+        if (dropStep >= 0 && onStatusUpdate)
+            onStatusUpdate("Step " + juce::String(dragOrigin + 1), juce::String(dropCopy ? "Copy to step " : "Move to step ") + juce::String(dropStep + 1));
+        if (dropStep != before) repaint(rowArea(dragRow));
+        return;
+    }
+    dropStep = -1;
     if (dragRow < 0 || host.getTrackEngine(dragRow) != EngineType::Bass || ! cellAt(e.getPosition(), r, s) || r != dragRow || s == dragStep
         || s >= host.getTrack(r).row.numSteps()) return;
     TrackStepRow::dragTie(host.getTrack(r).row, dragStep, s, dragStartedOn);
     dragStep = s;
     dragStartedOn = true;
     repaint(rowArea(r));
+}
+
+void StepRows::mouseUp(const juce::MouseEvent&)
+{
+    if (dropStep >= 0 && dragOrigin >= 0 && dragRow >= 0)
+    {
+        TrackStepRow::applyDrop(host.getTrack(dragRow).row, dragOrigin, dropStep, dropCopy);
+        selectedStep = dropStep;
+        if (onStepSelected) onStepSelected(dragRow, dropStep);
+        if (onStatusUpdate)
+            onStatusUpdate("Step " + juce::String(dropStep + 1), juce::String(dropCopy ? "Copied from step " : "Moved from step ") + juce::String(dragOrigin + 1));
+    }
+    const int row = dragRow;
+    dropStep = -1;
+    dragOrigin = -1;
+    if (row >= 0) repaint(rowArea(row));
 }
 
 void StepRows::timerCallback()

@@ -246,6 +246,21 @@ bool TrackStepRow::clickStep(StepRow& row, int step, juce::Rectangle<int> cells,
     return true;
 }
 
+bool TrackStepRow::dropMode(EngineType engine, const juce::ModifierKeys& mods, bool& copy)
+{
+    if (mods.isAltDown()) return false;   // Alt edits the accent
+    copy = mods.isCtrlDown();
+    if (copy) return true;
+    return engine == EngineType::Bass ? mods.isShiftDown() : ! mods.isShiftDown();
+}
+
+void TrackStepRow::applyDrop(StepRow& row, int from, int to, bool copy)
+{
+    if (from == to || to >= row.numSteps()) return;
+    row.copyStep(from, to);
+    if (! copy) row.resetStep(from);
+}
+
 void TrackStepRow::dragTie(StepRow& row, int from, int to, bool startedOn)
 {
     if (std::abs(from - to) != 1) return;
@@ -326,6 +341,12 @@ void TrackStepRow::paint(juce::Graphics& g)
     if (isRumble) g.beginTransparencyLayer(0.45f);
     paintCells(g, getLocalBounds(), host.getTrack(slot).row, ! isRumble, colour, playheadStep, true, selectedStep, optionsFor(host, slot, firstStep));
     if (isRumble) g.endTransparencyLayer();
+    // The cell a move / copy would land on.
+    if (dropStep >= firstStep && dropStep < firstStep + StepRow::kNumSteps)
+    {
+        g.setColour(colour);
+        g.drawRoundedRectangle(cellRect(getLocalBounds(), dropStep - firstStep), 3.0f, 2.0f);
+    }
 }
 
 void TrackStepRow::mouseDown(const juce::MouseEvent& e)
@@ -334,6 +355,8 @@ void TrackStepRow::mouseDown(const juce::MouseEvent& e)
     if (host.getTrackEngine(slot) == EngineType::Rumble || ! getLocalBounds().contains(e.getPosition())) return;
     const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
     dragStartedOn = host.getTrack(slot).row.isOn(step);
+    dragOrigin = step;
+    dropStep = -1;
     stepDrag = {};
     const bool selects = clickStep(host.getTrack(slot).row, step, getLocalBounds(), e.getPosition(), e.mods.isPopupMenu(), firstStep);
     dragStep = selects && ! e.mods.isPopupMenu() ? step : -1;
@@ -360,12 +383,42 @@ void TrackStepRow::mouseDrag(const juce::MouseEvent& e)
         repaint();
         return;
     }
-    if (host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
     const int step = stepAt(getLocalBounds(), e.getPosition(), firstStep);
+    // A step that was on moves (or with Ctrl copies) to the cell under the pointer when the button is released.
+    if (dragStartedOn && std::abs(e.getDistanceFromDragStartX()) >= kPitchDragStartPx && dropMode(host.getTrackEngine(slot), e.mods, dropCopy))
+    {
+        dropStep = step != dragOrigin && step < host.getTrack(slot).row.numSteps() ? step : -1;
+        if (dropStep >= 0)
+        {
+            const auto name = "Step " + juce::String(dragOrigin + 1);
+            const auto value = juce::String(dropCopy ? "Copy to step " : "Move to step ") + juce::String(dropStep + 1);
+            if (onStatusUpdate) onStatusUpdate(name, value); else mu_ui::reportStatus(*this, name, value);
+        }
+        repaint();
+        return;
+    }
+    dropStep = -1;
+    if (host.getTrackEngine(slot) != EngineType::Bass) return;   // only a Bass sequence ties notes
     if (step == dragStep || step >= host.getTrack(slot).row.numSteps()) return;
     dragTie(host.getTrack(slot).row, dragStep, step, dragStartedOn);
     dragStep = step;
     dragStartedOn = true;   // the steps are on now: the next pair crossed in this drag toggles its tie the same way
+    repaint();
+}
+
+void TrackStepRow::mouseUp(const juce::MouseEvent&)
+{
+    if (dropStep >= 0 && dragOrigin >= 0)
+    {
+        applyDrop(host.getTrack(slot).row, dragOrigin, dropStep, dropCopy);
+        selectedStep = dropStep;
+        if (onStepSelected) onStepSelected(dropStep);
+        const auto name = "Step " + juce::String(dropStep + 1);
+        const auto value = juce::String(dropCopy ? "Copied from step " : "Moved from step ") + juce::String(dragOrigin + 1);
+        if (onStatusUpdate) onStatusUpdate(name, value); else mu_ui::reportStatus(*this, name, value);
+    }
+    dropStep = -1;
+    dragOrigin = -1;
     repaint();
 }
 
