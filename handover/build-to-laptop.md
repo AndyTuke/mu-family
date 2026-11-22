@@ -2,12 +2,13 @@
 
 Written only by the build PC. The laptop reads it and answers in [laptop-to-build.md](laptop-to-build.md). Protocol: [README.md](README.md).
 
-Next id: B-008
+Next id: B-009
 
 (B-001 resolved and removed: see the Extra entry below.)
 
 ## Status (build PC)
 
+- Addendum 2026-11-22 (later the same session): the backlog is now two files (`backlog.md` = Open + On Hold, 29 KB; `backlog-closed.md` = Closed, 675 KB; `check-backlog.ps1` reads both, CLAUDE.md and Bob's rules updated; `git pull` before any backlog edit as before). A deep audit (four read-only reviewers) logged #1829 to #1833; I fixed #1829, #1830, #1831 and the code half of #1832 and #1833 (commits `fa33157d`, `5523086f`, `4edd2aa6`, `74331008`), all pushed, focused Debug builds and mu-core-tests (993) / mu-on-tests (231) green; none has a sign-off, so all stay Open. Frozen manifests regenerated (`cbc803b5`). Release notes for #1825 to #1827 are on the site (published once).
 - Written: 2026-11-22, Andy away, autonomous session. HEAD `95c7f9db`, everything committed and pushed. Build number 1494 (`mu-core/BuildNumber.h`; focused Debug builds only, no increment, no Release, no pluginval). Full Debug sweep (`run-tests.ps1`, no goldens): 0 failures in mu-clid, mu-on, mu-tilate, mu-toni, mu-host, mu-control and the three mu-core suites; 1 failure each in mu-tant and mu-tronic, both the same stale recorded Pattern-stream hash (`4023114231ac4445`), logged as #1828 (Andy: no golden re-records while sounds change). `ui-audit` passes for tant, toni, on, tronic, host. Built and pushed this session: #1827 key/scale selector (all four apps), #1826 step drag, #1825 Gate level ring, #1817 step 6 (Insert/ and Send/ folded into Algorithms/), frozen manifests regenerated (insert range 0..29), release notes for all of it published to the site (run 45048981805, not watched). Nothing was listened to.
 - Written: 2026-11-15, pre-release clearing. Build 1489 (no increment). Release of every product built clean at 1489 and the Release VST3s deployed; pluginval 6 passed, 0 failed (Release, strictness 5); full Debug test sweep 0 failures (goldens not run); static checks pass. Closed #1803, #1804, #1772, #1807. Site work (prices.json, publish-site.yml workflow, Netlify wording) is committed on `site-local` only, merged with main, unpublished. Still for Andy before a release: say go; merge site-local to main and dispatch `publish-site.yml` once; repoint GoDaddy DNS; set the Pages custom domain. Not done: a browser look at the site pages, listening, the mu-Tilate checks B-004/B-005, B-003 decisions.
 - Written: 2026-11-14, end of the architecture and site session. Build number 1489 (`mu-core/BuildNumber.h`; a full Debug of every product at 1489, then focused rebuilds of mu-Clid and mu-Clid MIDI, no increment). Everything is committed and pushed (HEAD `6c743f15`). Closed this session: #1811 (one compiled mu-core library, version family 1.2), #1812 (one shared JUCE library, `mu-juce`), #1805, #1813. Open rows: 4. No Release build and no pluginval run since the library changes; nothing was listened to beyond Andy's own Debug standalone and Bitwig checks (all fine). Next for Andy: repoint `transwarp.me` DNS (GoDaddy) to GitHub Pages; the site preview is at `andytuke.github.io/mu-family`.
@@ -15,6 +16,12 @@ Next id: B-008
 - `D:\JUCE-dev` is a scratch clone of JUCE `develop` for upstream work (L-012 is answered below).
 
 ## Open
+
+### B-008 · 2026-11-22 · Sign-offs and decisions that the audit and the day's work left for the laptop
+Rows: #1829, #1830, #1831, #1832, #1833, #1827, #1826, #1825 · Needs: review | decide
+Do: (1) Ted (or whoever rules on architecture): confirm the mu-Tronic Arp follow timer and the `setLoopSection` placement (#1827), the level-source hook (#1825), `ProcessorBase::reportHostStateNotRestored` (#1831), and rule on #1832 item b (should the 10 Hz `followMasterKey` write with a change gesture, or without notifying the host). (2) Sid and Fred: sign off #1830 (stale drag state; no UI test exists) and #1826/#1827. (3) Andy: the #1829 wording ("The licence is valid but could not be stored on this PC..."), the JUCE 9.0.6 pin bump (needs `D:\JUCE` updated and a full rebuild, #1833), a one-line note about the empty `mu-tronic/Source/Audio` and `Modulation` folders in `mu-tronic/CLAUDE.md`. (4) Anything the laptop can check by reading: the five trimmed Open rows (#1827, #1817, #1818, #1824, #1825) should still carry every decision and commit hash. The agent files for Ted, Fred, Sid, Bert, Frank and Ernie exist under `.claude/agents/` but only the backlog and web stewards were callable as agent types on this PC this session.
+Report: sign-offs on the rows, rulings in the rows or design docs.
+Not done on this PC: no listening, no Release build, no new unit tests for #1829, #1830, #1831, the mu-Toni MIDI restore path was not checked, the manuals are not updated.
 
 ### B-007 · 2026-11-22 · Look at the key/scale selector, the step drag and the Gate ring; rule on three things only an architect or Andy can
 Rows: #1827, #1826, #1825, #1817 · Commits: `1f6d16d6`, `1c14a271`, `034cf25c`, `5cf552d4` (key/scale); `3e3ab61a` (step drag); `6692a3d4` (Gate ring); `be26dfe3` (FX folder move) · Needs: look | decide | review
