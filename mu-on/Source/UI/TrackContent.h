@@ -90,7 +90,7 @@ private:
     int        gridAlgorithm = -1;          // the FM Perc algorithm the grid's tooltips describe
     juce::uint64 shownLayerSignature = 0;   // the live layers' engines, for the Source list
 
-    juce::Label    engineCaption { {}, "Engine" }, sourceCaption { {}, "Source" };
+    juce::Label    sourceCaption { {}, "Source" };
     DropdownSelect engineSelect, sourceSelect;
     // The master key and scale (global root / scale, the family tonal row), under the Engine selector.
     // The master key + scale: the shared selector (docs/design-ui-family.md 6.8) in the KEY section, bound once to the global root / scale.

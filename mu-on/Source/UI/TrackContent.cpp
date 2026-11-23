@@ -204,12 +204,10 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     engineSelect.onChange = [this](int id) { engineChosen(id); if (onStatusUpdate) onStatusUpdate("Engine", engineSelect.getText()); };
     sourceSelect.onChange = [this](int id) { sourceChosen(id); if (onStatusUpdate) onStatusUpdate("Rumble Source", sourceSelect.getText()); };
 
-    for (auto* cap : { &engineCaption, &sourceCaption })
-    {
-        cap->setJustificationType(juce::Justification::centred);
-        cap->setInterceptsMouseClicks(false, false);
-        addAndMakeVisible(*cap);
-    }
+    // The ENGINE plate names the Engine dropdown, so only the Rumble's second dropdown carries a caption of its own.
+    sourceCaption.setJustificationType(juce::Justification::centred);
+    sourceCaption.setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(sourceCaption);
     addAndMakeVisible(engineSelect);
     // The master key and scale: global rows bound once (a host without them, none).
     if (host.getTrackParameters().getParameter(kRootParamId) != nullptr)
@@ -693,7 +691,6 @@ void TrackContent::rebuild()
     // A host that fixes the track's engine (engineLocked) hides the Engine selector and shows the track's one
     // row of steps; mu-On never locks, so its own look is unchanged.
     locked = host.getTrack(currentLayer).engineLocked;
-    engineCaption.setVisible(! locked);
     engineSelect.setVisible(! locked);
     rows.setVisible(! locked);
     const bool rumble = shownEngine == EngineType::Rumble;
@@ -907,8 +904,11 @@ void TrackContent::resized()
         dropdown.setBounds(engineBoxR.getX() + clear, y + labelH + s(2), dropW, s(MuLookAndFeel::kDropdownH));
     };
     int dropY = engineBoxR.getY() + s(LF::kSpaceS);
-    const int rowPitch = labelH + s(2) + s(MuLookAndFeel::kDropdownH) + 2 * gap;   // a caption over its dropdown, then a gap
-    if (! locked) { place(engineCaption, engineSelect, dropY); dropY += rowPitch; }
+    if (! locked)
+    {
+        engineSelect.setBounds(engineBoxR.getX() + clear, dropY, dropW, s(MuLookAndFeel::kDropdownH));
+        dropY += s(MuLookAndFeel::kDropdownH) + 2 * gap;
+    }
     if (rumble)   place(sourceCaption, sourceSelect, dropY);
     else if (! locked)
     {
