@@ -26,6 +26,9 @@ foreach ($line in $rows) {
 $today = (Get-Date).ToString('yyyy-MM-dd')
 if (-not (Test-Path $csv)) { 'date,product,downloads' | Set-Content $csv -Encoding utf8 }
 $history = @(Import-Csv $csv)
+# A re-run on the same day replaces that day's rows, so the history holds one row per product per day.
+$history = @($history | Where-Object { $_.date -ne $today })
+$history | Export-Csv $csv -Encoding utf8
 foreach ($p in $totals.Keys) { Add-Content $csv "$today,$p,$($totals[$p])" -Encoding utf8 }
 
 # Phase 3: the report - latest totals, and the change since the previous run's date.
@@ -44,3 +47,8 @@ $lines += "| **All** | **$sum** | |"
 $lines += ""; $lines += "Counts include repeat downloads, bots and scanners."
 $lines | Set-Content $md -Encoding utf8
 $lines
+
+# Phase 4: the Excel report (a table and a graph per app, release dates marked); a failure here never loses the CSV.
+$py = (Get-Command python -ErrorAction SilentlyContinue).Source
+if ($py) { & $py (Join-Path $PSScriptRoot 'download-stats-xlsx.py') $OutDir $Repo }
+else     { Write-Warning 'python not found: downloads.xlsx not updated' }
