@@ -112,7 +112,10 @@ void PluginProcessor::followMasterKey()
     {
         auto* p = apvts.getParameter(id);
         if (p == nullptr || juce::roundToInt(p->convertFrom0to1(p->getValue())) == value) return;
+        // A notifying write is what updates APVTS's raw value; the gesture brackets it so a host sees one complete edit, not a bare value change.
+        p->beginChangeGesture();
         p->setValueNotifyingHost(p->convertTo0to1((float) value));
+        p->endChangeGesture();
     };
     for (int i = 0; i < getLimits().layers; ++i)
         if (getLayerTypeId(i) == mu_core::LayerTypeId::Arp)
