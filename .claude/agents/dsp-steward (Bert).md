@@ -1,6 +1,6 @@
 ---
 name: dsp-steward
-description: Reviews every DSP and audio-thread implementation across the mu-family (oscillators, filters, FX, voices, mixer, modulation, sequencer/engine code on the audio path) for efficiency, real-time safety, race conditions, numerical correctness and other errors. Call ONLY when the owner asks for it or a change is genuinely risky (new audio-thread locking, allocation or lock-free structure); NOT a routine per-batch review (owner rule 2026-10-21, docs/workflow-pace.md). Formerly: use proactively once per batch of DSP or processBlock-path changes, and when asked to audit a DSP area. It reports findings with fixes; it does not edit source.
+description: Reviews DSP and audio-thread code for real-time safety, races, efficiency and numerical correctness. Call only when Andy asks or a change is genuinely risky (new locking, allocation or lock-free structure), not as a routine review. Read-only.
 tools: Read, Grep, Glob, Bash, PowerShell
 ---
 

@@ -2,13 +2,13 @@
 
 Architecture Steward, 2026-10-30. Covers backlog rows 1699 (god objects) and 1701 (duplication); the rows hold the audit findings, this document holds the plan. Written on the review-only laptop: nothing here was built or run. Line numbers were read from the tree on 2026-10-30 and will drift; find the code by function name.
 
-Governing rules: [design-plugin-family.md](design-plugin-family.md), [design-naming.md](design-naming.md), [workflow-pace.md](workflow-pace.md), the standing check against [design-future.md](design-future.md). Direction served: one shared `mu-core`, thin products, and a smaller, clearer `ProcessorBase` for mu-Tilate and mu-Tronic to build on ([../mu-tilate/CLAUDE.md](../mu-tilate/CLAUDE.md): shared code goes in `mu-core`).
+Governing rules: [design-plugin-family.md](../../design-plugin-family.md), [design-naming.md](../../design-naming.md), [workflow-pace.md](../../workflow-pace.md), the standing check against [design-future.md](../../design-future.md). Direction served: one shared `mu-core`, thin products, and a smaller, clearer `ProcessorBase` for mu-Tilate and mu-Tronic to build on ([../mu-tilate/CLAUDE.md](../../../mu-tilate/CLAUDE.md): shared code goes in `mu-core`).
 
 ## 0. Ground rules for every phase
 
 - Behaviour-preserving: no parameter ID, saved-data tag, preset format or float operation order changes. A golden or frozen-baseline diff means stop and revert; goldens are never regenerated for a refactor.
-- One phase = one commit = separately buildable. Focused build of the touched product(s) plus the `mu-core` test suite; the daily sweep covers the slow golden suites ([workflow-pace.md](workflow-pace.md) rule 1).
-- Moves first, edits second: a phase that moves code does not also change it (the naming migration rule, [design-naming.md](design-naming.md) section 5).
+- One phase = one commit = separately buildable. Focused build of the touched product(s) plus the `mu-core` test suite; the daily sweep covers the slow golden suites ([workflow-pace.md](../../workflow-pace.md) rule 1).
+- Moves first, edits second: a phase that moves code does not also change it (the naming migration rule, [design-naming.md](../../design-naming.md) section 5).
 - Audio-thread code is marked **[RT]** below. Pace rules say no routine `dsp-steward` call; this plan asks for one (or an explicit waiver by Andy, decision D2) for the **[RT]** phases because they move audio-thread code between functions.
 - New collaborator classes use plain noun names, as `RetireBin` and `LayerSwapper` do; no new role suffix is needed. Files follow the existing `ProcessorBase_<Topic>.cpp` pattern for the split, and `mu-core/Plugin/<Name>.h` for classes.
 - Public surface of `ProcessorBase` is what every product, `ShellBackend` and the UI call. Phases that keep the surface change no product; phases that shrink it touch all of them and are flagged.
@@ -66,14 +66,14 @@ Not on the list but found while reading: `ProcessorBase_Render.cpp` and `Layer` 
 
 ## 3. Recommended sequence for the next two weeks of build-PC time
 
-Assumes Andy schedules mu-Tilate's first steps (D1: the product is "Design only, nothing scheduled" in [../mu-tilate/CLAUDE.md](../mu-tilate/CLAUDE.md), so its steps need his explicit go). The laptop writes the small unbuilt items in advance; the build PC time is for building, testing and the audio-thread work. One full sweep per day.
+Assumes Andy schedules mu-Tilate's first steps (D1: the product is "Design only, nothing scheduled" in [../mu-tilate/CLAUDE.md](../../../mu-tilate/CLAUDE.md), so its steps need his explicit go). The laptop writes the small unbuilt items in advance; the build PC time is for building, testing and the audio-thread work. One full sweep per day.
 
 | Block | Build-PC work | Laptop prep (unbuilt, handed over) |
 |---|---|---|
 | Day 1 | Verify the laptop batch: 1701 items 1, 3, 4, 5 and 1699 phase A (focused builds, then the full sweep). Fix forward. | Write items 1, 3, 4, 5 and phase A on the laptop beforehand. Hand over via `/handover`. |
 | Days 2-4 | **mu-Tilate step 1: lift mu-Clid's sample-library mechanism into `mu-core`** (SampleLibrary, SamplePreview, the `SampleSlotHost` seam, SampleBrowser with the extra-info column hook, embedded-sample encode/decode and path safety), mu-Clid refactored onto it with no copy left behind. About 330 lines move; protected by `SamplePreviewTests`, `EmbeddedSampleTests`, `ProcessorSeamTests`, mu-Clid goldens. This also shrinks mu-Clid `PluginProcessor.h` (phase I for free). Do it in three commits: library and preview, browser, embedded-sample code. | Laptop drafts the file moves and CMake entries; `test-steward` adds tests for the lifted code. |
 | Day 5 | 1699 phases B and C (`FxParamSync`, `ProgramChangeRouter`, `ActivationWorker`); 1701 item 2 only if the sweep is clean (needs the `dsp-steward` call). | Phases B and C written on the laptop. |
-| Days 6-8 | **mu-Tilate Stretch prototype**: Signalsmith Stretch in `ThirdParty/`, a throwaway offline harness in `mu-core/Tests` measuring CPU, memory and latency against the targets in [mu-tilate/design.md](mu-tilate/design.md) ruling 5; then `dsp-steward` review before adoption (Andy's own rule). No refactor work on these days: Stretch needs undivided build/measure time. | Laptop reads the library, writes the review brief. |
+| Days 6-8 | **mu-Tilate Stretch prototype**: Signalsmith Stretch in `ThirdParty/`, a throwaway offline harness in `mu-core/Tests` measuring CPU, memory and latency against the targets in [mu-tilate/design.md](../../mu-tilate/design.md) ruling 5; then `dsp-steward` review before adoption (Andy's own rule). No refactor work on these days: Stretch needs undivided build/measure time. | Laptop reads the library, writes the review brief. |
 | Days 9-10 | 1701 item 8 (pure state machine first, then `StepRows`, then `TrackStepRow`) with 1699 phase J, aligned with row 1681 so mu-Tronic gets the mirror in the same pass. | Pure class and clamp tests written on the laptop in week 1. |
 
 Deferred out of the two weeks: phases D, E (until a Phrase layer needs clips and presets, then do them first), F, G, H, and items 6 and 7. Phases G and H and item 2 need the `dsp-steward`; if Andy does not want to spend that review (D2), drop them rather than do them unreviewed.
@@ -95,4 +95,4 @@ All six DECIDED (Andy, 2026-10-30): he accepted every recommendation below. Prog
 
 ## 5. Docs this plan touches when done
 
-On completion of a phase, mark it here and update [design-plugin-family.md](design-plugin-family.md) (the `ProcessorBase` file list and the new collaborators) in the same turn; no change to [design-naming.md](design-naming.md) is needed beyond adding the new class names if a "Service" role is ever wanted. Delete this document when every phase is done or dropped; the git log is the history.
+On completion of a phase, mark it here and update [design-plugin-family.md](../../design-plugin-family.md) (the `ProcessorBase` file list and the new collaborators) in the same turn; no change to [design-naming.md](../../design-naming.md) is needed beyond adding the new class names if a "Service" role is ever wanted. Delete this document when every phase is done or dropped; the git log is the history.

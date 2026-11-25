@@ -86,6 +86,6 @@ Per the family consistency rule: per-layer preset = `.muPattern` (camelCase noun
 - Slot engines (`voices[slot]`) and the wavetable bank plus `bankLock` stay processor-owned and are bound by the Pattern through `PatternHost` (`UI/PatternHost.h`). Do not move the engine into the Pattern: the oscillator phase is slot-owned and pinned by a golden.
 - Note mode is an app setting pushed to every Pattern; the final-mix gate is the shell's (decision A3). Do not save it in a preset.
 - `Persistence/PatternParams.{h,cpp}` holds the parameter table; `Audio/TantScales.h` was `Scales.h`; `Sequencer/Pattern.{h,cpp}` and `HeldNoteStack.h` are the layer.
-- `setRegrowCutsInPlaceTails(false)` is a temporary opt-out that keeps the old stale-tail behaviour until the retire-regrow golden update; delete it afterwards.
+- `setRegrowCutsInPlaceTails(false)` is a temporary opt-out that keeps the old stale-tail behaviour until it is removed; delete it when no caller needs it.
 - `swapLoopBeats` and `SwapBoundary.h` stay in `Plugin/` (host policy).
 - `v{N}_` parameter ids and order, and the preset bytes, are saved data: append only.

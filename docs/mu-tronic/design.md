@@ -7,9 +7,9 @@ pushed. Only the short "still open" list in section 9 needs Andy; everything els
 
 **Settled by Andy, 2026-10-15 (the shape of the product):** a fifth product; **Standalone only** (no VST3, no CLAP); **freeware** (no licence key, no
 Support prompt); name mu-Tronic, plugin code `MTrn`; three buses with two inserts each; every mu-On engine is its own layer type; scenes; mu-link
-left as it is; the product refactors of mu-Clid and mu-Tant wait until after their next releases (historical). **Superseded later the same day:** Andy re-prioritised, so all four extractions come before any mu-Tronic product work; see [extraction-plan.md](extraction-plan.md), which replaces the ordering in section 6.
+left as it is; the product refactors of mu-Clid and mu-Tant wait until after their next releases (historical). **Superseded later the same day:** Andy re-prioritised, so all four extractions come before any mu-Tronic product work; see [extraction-plan.md](../archive/extraction-plan.md), which replaces the ordering in section 6.
 
-**Decisions of 2026-10-15 (later), recorded in [extraction-plan.md](extraction-plan.md) section 7:** the first mu-Tronic release waits until **all four engines** are
+**Decisions of 2026-10-15 (later), recorded in [extraction-plan.md](../archive/extraction-plan.md) section 7:** the first mu-Tronic release waits until **all four engines** are
 ready (Andy: "No, all four engines for launch. There's no rush, so we get each one ready"), so the earlier "useful after E3" point is an internal checkpoint only and the
 "ship before T5/T7" option is removed (decision 5 and still-open item 1 below are closed that way); Rumble may read any layer type (still-open item 3 closed); mu-Tant Note
 mode keeps its final-mix gate as a mu-Tant shell function (live product bit-identical); noise is seeded per layer slot. **Decided (A14, Andy, 2026-10-15: "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."):**
@@ -127,7 +127,7 @@ Andy: every mu-On voice engine can be added as a mu-Tronic layer. So the registr
 
 Stage 8 of design-plugin-family waited for exactly this decision. Ruling: **dispatch stays virtual on `Layer`; a registry only creates and describes.**
 This section is the specification of record for E1. Subsections 2.1.2 to 2.1.5 are the four design fixes C1 to C4 of the real-time review
-([extraction-plan.md 2.1a](extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18), written 2026-10-15 as stage E0d); C5 to C18
+([extraction-plan.md 2.1a](../archive/extraction-plan.md#21a-contract-requirements-from-the-real-time-review-c1-to-c18), written 2026-10-15 as stage E0d); C5 to C18
 stay in that table and bind this section too. **Status: specified 2026-10-15; `dsp-steward` round 1 (2026-10-15): C1 and C3 Pass with notes, C2 and
 C4 Not yet (R1 to R7), structure kept; this revision folds in R1 to R7, the binding notes N1 to N7, the accepted amendments and the open-point rulings (2.1.6).
 Round 2 (2026-10-15): C1 and C2 Pass with notes, C3 Pass, C4 Not yet (F1, folded in with the R5 rule line and the round-2 binding notes on the packed word,
@@ -883,7 +883,7 @@ never fill).
 
 #### 2.1.6 Open points: the `dsp-steward`'s rulings (round 1, 2026-10-15)
 
-None of the twelve blocks E1. The pins (P) and measurements (M) named here are listed in [extraction-plan.md](extraction-plan.md) step E0.6.
+None of the twelve blocks E1. The pins (P) and measurements (M) named here are listed in [extraction-plan.md](../archive/extraction-plan.md) step E0.6.
 
 1. **Jump tolerance:** not needed before E1. E1 codes `tol = 1/256 + |beatsPerSecond_now - beatsPerSecond_last| * lastBlockSeconds` (2.1.5); M1 measures
    block-to-block host position deltas under fast tempo automation (Bitwig, Reaper) and under MIDI clock with the sync-offset ramp before the first consumer (T1).
@@ -945,7 +945,7 @@ type reaches only `RetireTail.h` (design-naming §3). (b) `BlockTransport::beatW
 - **`check-layer-boundary.ps1` rules 7 and 8:** (7) no `numLayers.store` outside `ProcessorCore.h` (`Tests/` exempt), so every count store goes through
   `storeLayerCount`; (8) no `Plugin/` include from `mu-core` `Audio/`, `Modulation/`, `Persistence/` or `Sequencer/`.
 
-**What each product converts when it adopts the contract** (stage rows in [extraction-plan.md](extraction-plan.md) section 2):
+**What each product converts when it adopts the contract** (stage rows in [extraction-plan.md](../archive/extraction-plan.md) section 2):
 
 - **Every live-count store goes through `storeLayerCount`.** The four product constructors store `numLayers` directly today (mu-Clid
   `PluginProcessor.cpp`, mu-Tant `PluginProcessor.cpp`, mu-Toni `PluginProcessor.cpp`, mu-On `PluginProcessor.cpp`), and so do mu-Clid's
@@ -1644,7 +1644,7 @@ ownership: M mechanical, S supervised (audio thread or lock), O needs Andy.
 | **T9** | O | Release stages: installer, manual, site page (listed as freeware), no licence work. **Launch only when all four engines are ready** (Andy, 2026-10-15); the earlier "ship before T5 and T7" option is removed. | | |
 
 **Real order (rewritten 2026-10-19, extraction closed at E6; supersedes the earlier "T4 and T6 now, T5 and T7 after the releases" plan).** The stages above are the
-design's units. What was run is [extraction-plan.md](extraction-plan.md)'s order, and the T-numbers map onto it as below. T4 to T7 are numbered by glue size, not run order.
+design's units. What was run is [extraction-plan.md](../archive/extraction-plan.md)'s order, and the T-numbers map onto it as below. T4 to T7 are numbered by glue size, not run order.
 
 | Run order | Extraction stage | Design stages it delivered |
 |---|---|---|
@@ -1782,7 +1782,7 @@ Not "absorb" because that would copy mu-link's server, IPC and registry into a p
 
 1. **Closed (Andy, 2026-10-15): no early release.** mu-Tronic launches only when all four engines (all nine types) are ready.
 2. **Closed (A14, Andy, 2026-10-15): static libraries, no runtime engine loading.** "Go with the recommendation. Updates will be suite wide so mu-tronic will rebuild if the engine of an app does."
-   Licence follows the install via a per-app manifest (supporter flag, checkout URL, content dir); mu-Tronic has no key code. Analysis: [extraction-plan.md](extraction-plan.md) sections 8 and 9.
+   Licence follows the install via a per-app manifest (supporter flag, checkout URL, content dir); mu-Tronic has no key code. Analysis: [extraction-plan.md](../archive/extraction-plan.md) sections 8 and 9.
    Remaining small point, for T1 and the `ux-steward` (not Andy yet): does mu-Tronic show a generic Support prompt for an installed-but-unlicensed engine in use, or none.
 3. **Closed (Andy, 2026-10-15): Rumble reads any layer type.**
 4. **Launchpad scenes.** How a scene is fired on the pad (a modifier, a spare button, a column). Not needed until T8a; `ux-steward` proposes.

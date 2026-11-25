@@ -611,7 +611,7 @@ able to hold a layer of any of the four existing types, on the shared mixer, FX 
 (T0 to T9) and the short list still open are in [mu-tronic/design.md](mu-tronic/design.md). **Andy's answers, 2026-10-15:** a fifth product; **Standalone only** (no
 VST3 or CLAP, so no host parameter-list constraint); **freeware** (no licence key, no Support prompt); name mu-Tronic, code `MTrn`; **3 buses with 2 inserts
 each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer type; scenes; mu-link left as it is; all four extractions (mu-Toni, mu-On, mu-Tant, mu-Clid) come before any mu-Tronic product work
-(re-prioritised by Andy later the same day; plan: [mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md)). The structural rulings that bind other work:
+(re-prioritised by Andy later the same day; plan: [mu-tronic/extraction-plan.md](archive/extraction-plan.md)). The structural rulings that bind other work:
 
 - **Layer = voice.** The code and docs keep *layer*; *voice* stays the polyphonic voice inside an engine. A layer is engine + sequencer + modulation + insert + parameters +
   presets / clips + UI content; the mixer strip and the transport are not part of it.
@@ -637,9 +637,9 @@ each**; every mu-On engine (Kick, Bass, Hat, Snare, Rumble) is its own layer typ
 - **Static libraries, licence follows the install (Andy, 2026-10-15):** the layer libraries are compiled into mu-Tronic; engines are **not** loaded at runtime from the installed
   apps and need not update independently (releases are suite-wide; mu-Tronic is rebuilt and released whenever an app's engine changes). Each app writes a small manifest
   (supporter flag, checkout URL, content dir) at install and at every launch; mu-Tronic carries no key code. Three E1 constraints keep a module ABI possible at no cost:
-  `RenderContext` mirrors a C struct, layer state is text, `render` makes no host callback. Analysis: [mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md) sections 8 and 9.
+  `RenderContext` mirrors a C struct, layer state is text, `render` makes no host callback. Analysis: [mu-tronic/extraction-plan.md](archive/extraction-plan.md) sections 8 and 9.
 - **mu-link:** coexists, no freeze, revisit later (Andy: "leave it as is for now"); mu-Tronic is a mu-link client; no clock / MIDI-out code is duplicated.
-- **Timing:** all four extractions are scheduled before mu-Tronic product work, in the order Toni, On, Tant, Clid, behind a golden-render / compat / equivalence safety net ([mu-tronic/extraction-plan.md](mu-tronic/extraction-plan.md)).
+- **Timing:** all four extractions are scheduled before mu-Tronic product work, in the order Toni, On, Tant, Clid, behind a golden-render / compat / equivalence safety net ([mu-tronic/extraction-plan.md](archive/extraction-plan.md)).
 
 ### Shared layer sidebar and layer panel (ruled 2026-10-12, #1505 / #1506)
 

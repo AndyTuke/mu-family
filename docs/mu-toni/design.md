@@ -78,7 +78,7 @@ and the product is the library `mu-toni-layer` plus the app ([mu-tronic/design.m
 | Note articulation | None (continuous drone; gate chops volume) | Per-step: **Gate Length** (%-of-step) → note-off → Release; **Legato** voice param ties 100%-gate notes |
 | MIDI note input | **None** — PC-only, no played notes | **Consumes played notes** — root selectable by MIDI note + a Loop / MIDI-triggered run mode (PC→preset unchanged). See [design-sequencer.md](design-sequencer.md) §"MIDI control". |
 | Pitch glide | None (drone; no note-to-note movement) | **Portamento** (ms) slew, **heard only on legato (100%-gate) notes** — 303-style slides driven by modulating Gate Length. Pitch-path addition, no shared-engine change. |
-| Licensing | Pay What You Want; key + activation removes the Support prompt | Same model (see "Licensing / distribution") |
+| Licensing | Free download, fixed £20 licence; key + activation removes the licence reminder | Same model (see "Licensing / distribution") |
 | Product identity | Evolving drone | Note-triggered arpeggiator / mono synth |
 
 Everything not in this table is identical to mu-tant.
@@ -181,7 +181,7 @@ skewed-triangle scan** (deterministic, identical every loop); **articulation =
 Legato voice param + Gate Length** (glide only on tied notes, ms glide);
 **bipolar Inversion**; all chords ship (grouped); **diatonic-snap toggle**;
 **Rate = note values** (+dotted/triplet); **1–8 slots, default 1**; **Loop-mode
-default, sounds on play**; **Pay What You Want** (key removes the Support prompt, nothing limited); per-slot `.muArp`.
+default, sounds on play**; **free download with a fixed £20 licence** (key removes the licence reminder, nothing limited); per-slot `.muArp`.
 Fine-tuning only remains — see [design-sequencer.md](design-sequencer.md)
 §"Open questions".
 

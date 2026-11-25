@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-toni/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Toni** is a JUCE/C++ **generative arpeggiator mono-synth** by Transwarp Development Project, and a pay-what-you-want product. Each voice is an independent monophonic arp: a note pool is derived from a **Scale × Chord × inversion × octave-span** (with optional diatonic snap), then scanned by a deterministic **skewed-triangle walk** (Direction −100 = down-arp, +100 = up-arp, 0 = up-down; the shorter sweep skips notes evenly to keep Rate timing uniform). The same parameters always produce the same sequence — the note is a pure function of the live parameter set, which is what makes every arp control a modulation destination.
+**μ-Toni** is a JUCE/C++ **generative arpeggiator mono-synth** by Transwarp Development Project, and a free-with-licence-reminder product (one-off £20 licence). Each voice is an independent monophonic arp: a note pool is derived from a **Scale × Chord × inversion × octave-span** (with optional diatonic snap), then scanned by a deterministic **skewed-triangle walk** (Direction −100 = down-arp, +100 = up-arp, 0 = up-down; the shorter sweep skips notes evenly to keep Rate timing uniform). The same parameters always produce the same sequence — the note is a pure function of the live parameter set, which is what makes every arp control a modulation destination.
 
 The note drives a **note-triggered voice** ([Source/Audio/ToniVoice.h](Source/Audio/ToniVoice.h)): 2 oscillators + noise → mu-core `MultiModeFilter` → Amp / Filter / Pitch `juce::ADSR`, with portamento and legato, then the shared per-voice `InsertProcessor` post-VCA. Builds Standalone + VST3 + CLAP in the root build.
 

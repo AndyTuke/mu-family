@@ -2008,11 +2008,11 @@ for that rhythm.
 
 **15.6 Copy Protection**
 
-- Current model (owner decision 2026-10-11): the apps are free and fully
-  functional, pay what you like (suggested £20) through Lemon Squeezy. A key
-  (online activation or a signed offline licence file) only marks a
-  supporter; unlicensed copies show a polite once-per-session support prompt.
-  Source is GPLv3. The text below is the original market analysis.
+- Current model (owner decision 2026-10-11): the apps are free to
+  download with every feature working, and a one-off £20 licence (bought through
+  Lemon Squeezy) removes the licence reminder that shows on every load. A key
+  (online activation or a signed offline licence file) is the only difference.
+  Pay-what-you-want was dropped 2026-11-17. Source is GPLv3. The text below is the original market analysis.
 
 - Serial key validation via Polar (free tier available, no hardware
   dongle) --- superseded by Lemon Squeezy

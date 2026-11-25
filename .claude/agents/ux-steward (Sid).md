@@ -1,6 +1,6 @@
 ---
 name: ux-steward
-description: Owns the look, feel and design of the whole mu-family product line, and all the design documentation. Use when a design decision is genuinely new, once per feature, not for every step (owner rule 2026-10-21, docs/workflow-pace.md). Typical use: get a design ruling (which control, colour token, size, layout, interaction pattern, wording), when a coder hits a design choice not already settled in the docs, when a UI change needs reviewing against the design system, and when UI docs need updating. It decides and records; it does not write code.
+description: Owns look, feel and design of the mu-family and the UI design docs. Use once per feature when a design decision is genuinely new, or to review a UI change against the design system. Decides and records, writes no code.
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 ---
 

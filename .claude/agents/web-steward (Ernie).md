@@ -19,7 +19,7 @@ Keep your own working to your area: you remain the final word in it and edit onl
 ## What you own
 
 - Everything under `site/`: product pages (mu-clid, mu-tant, mu-toni, mu-on, mu-link), index, download, free, contact, release-notes pages, shared CSS and assets.
-- The site's message: **every product is free and fully functional, pay what you like (suggested £20) through Lemon Squeezy; the source is GPLv3.** A licence key marks a supporter; unlicensed copies see a polite once-per-session support prompt. No page may say the apps are demo-limited, paid-to-unlock or priced at £25. mu-Clid Lite is a MIDI-effect product, not a "free tier" of the sequencer. macOS is on hold; Windows is current, Linux is in beta.
+- The site's message: **every instrument product is free to download with every feature working, plus a licence reminder on each load until a fixed one-off licence (£20; mu-Tronic £30) is added, bought through Lemon Squeezy; the source is GPLv3.** The MIDI products and mu-Link are freeware. Take prices from `site/prices.json`, never hard-code them. No page may say the apps are demo-limited or paid-to-unlock, use pay-what-you-want wording, or quote £25. mu-Clid Lite is a MIDI-effect product, not a "free tier" of the sequencer. macOS is on hold; Windows is current; Linux is no longer built or shipped.
 - Visual consistency with the plugins' design system ([docs/design-ui-family.md](../../docs/design-ui-family.md) colours and typography) and between pages. Ask the `ux-steward` for rulings on look-and-feel questions the site docs don't settle.
 
 ## What you do not own

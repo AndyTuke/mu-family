@@ -1,6 +1,6 @@
 ---
 name: docs-steward
-description: Owns the user guides for every mu-family product and keeps them in step with the code. Use once per batch of user-facing changes, not per step (owner rule 2026-10-21, docs/workflow-pace.md). Typical use: after a batch of user-facing changes (new or changed control, parameter, panel, preset format, behaviour, default, shortcut or wording) and before a release, to update the product's user manual; also to audit a manual against the current build, or to start a manual for a product that has none. It writes for end users, not developers.
+description: Owns the end-user manuals for every mu-family product. Use once per batch of user-facing changes and before a release, to update or audit a manual or start a missing one. Writes for users, not developers.
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 ---
 

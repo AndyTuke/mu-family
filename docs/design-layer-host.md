@@ -4,7 +4,7 @@ Status: **analysis only, nothing decided, nothing built.** Written from a read-o
 
 ## The idea
 
-Each product is a sequencer + sound engine (a **Layer type**) plugged into the shared mixer, FX rack and modulation. The proposal: one generic **layer host** that loads a layer type through the registry, so every product (mu-Clid, mu-Tant, mu-Toni, mu-On, mu-Tilate) becomes a thin wrapper target (name, licence, layer type, layer count, branding) around the same host code, and mu-Tronic is the same host with 16 slots and every type registered. Modulation is part of the snap-in. This is the concrete form of the one-framework / one-instance direction in [design-future.md](design-future.md) and the end point of backlog #1699 and #1701 ([refactor-plan-2026-10.md](refactor-plan-2026-10.md)).
+Each product is a sequencer + sound engine (a **Layer type**) plugged into the shared mixer, FX rack and modulation. The proposal: one generic **layer host** that loads a layer type through the registry, so every product (mu-Clid, mu-Tant, mu-Toni, mu-On, mu-Tilate) becomes a thin wrapper target (name, licence, layer type, layer count, branding) around the same host code, and mu-Tronic is the same host with 16 slots and every type registered. Modulation is part of the snap-in. This is the concrete form of the one-framework / one-instance direction in [design-future.md](design-future.md) and the end point of backlog #1699 and #1701 ([refactor-plan-2026-10.md](archive/refactor-plan-2026-10.md)).
 
 ## Verdict
 
