@@ -80,6 +80,8 @@ struct Track : Layer
     // The type is the engine the track's parameter names (mu_core::LayerTypeId::Kick .. Chord).
     int  typeId() const override;
     bool stripMods(float (&out)[4]) const noexcept override { return stripMod.read(out); }
+    // The Compressor / Limiter meter and the Gate's input level, for the shared insert panel.
+    const std::atomic<float>* insertGainReduction() const override { return &insert.grReduction; }
     // A Rumble renders after every other track (it reads its source's block); everything else first.
     int  renderPriority() const override { return engineSetting() == EngineType::Rumble ? 1 : 0; }
     // Message thread, not processing: the engine's and the track's buffers for this rate and block size. The

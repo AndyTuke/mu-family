@@ -143,6 +143,7 @@ PhraseContent::PhraseContent(ProcessorBase& base, PhraseHost& h)
     layerAmpSection.place(knobOf(ppi::ampR), 1, 3);
 
     insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+    insertSub.getInsertGR = [this]() -> const std::atomic<float>* { return host.getPhrase(currentLayer).insertGainReduction(); };
     insertSub.onInsertAlgorithmChanged = [this](int algo)
     {
         slicePanel.setLayerInsertAlgorithm(algo);

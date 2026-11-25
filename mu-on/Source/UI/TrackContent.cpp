@@ -406,6 +406,7 @@ TrackContent::TrackContent(ProcessorBase& base, TrackHost& trackHost)
     // The insert knobs show their live modulation arc like every other modulated knob: the track's matrix says which of the
     // four are assigned, the audio thread publishes each one's value (its row in the shown engine's target table).
     insertSub.isPlaying = [this] { return host.isTrackTransportPlaying(); };
+    insertSub.getInsertGR = [this]() -> const std::atomic<float>* { return host.getTrack(currentLayer).insertGainReduction(); };
     insertSub.isSlotModulated = [this](int slot) -> bool
     {
         static const char* const destId[4] = { "insert.p1", "insert.p2", "insert.p3", "insert.p4" };
