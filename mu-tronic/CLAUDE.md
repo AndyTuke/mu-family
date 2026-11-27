@@ -32,3 +32,5 @@ Static layer libraries compiled into the binary, registered in [Source/Persisten
 ## Mirror rule with mu-On (Andy 2026-10-29)
 
 mu-Tronic's Track layers and mu-On's sequencer show the same step rows (`StepRows` / `TrackStepRow` / `StepPager` in `mu-on-layer`). Every sequencer change (step model, length and paging, shading, step panel, boxes and widths) must be made so it works in both products: put it in the shared layer code, and check the mu-Tronic Steps box as well as mu-On's before calling it done. Never fix one product only.
+
+Note: `Source/Audio` and `Source/Modulation` are empty (`.gitkeep`) on purpose: mu-Tronic hosts layers from the other products, so its audio and modulation live in `mu-core` and the `mu-<product>-layer` libraries. The family rule keeps all eight folders.
