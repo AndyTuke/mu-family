@@ -223,13 +223,33 @@ struct ThreeInsertsTests : juce::UnitTest
             const auto vp = params(Gate, -40.0f, -30.0f, 1.0f, 50.0f);
             juce::AudioBuffer<float> buf(2, 512);
             for (int ch = 0; ch < 2; ++ch) for (int i = 0; i < 512; ++i) buf.setSample(ch, i, 0.1f);   // -20 dBFS
-            float level = -1.0f;
-            fx.process(buf, 512, 2, vp, level);
+            float packed = -1.0f, level = -1.0f, gr = -1.0f;
+            fx.process(buf, 512, 2, vp, packed);
+            mu_ui::unpackLevelAndGR(packed, level, gr);
             expectWithinAbsoluteError(level, 0.75f, 0.01f, "-20 dB is three quarters of the -80..0 sweep");
+            expect(gr < 0.01f, "an open gate shows no gain reduction");
 
             buf.clear();
-            fx.process(buf, 512, 2, vp, level);
+            fx.process(buf, 512, 2, vp, packed);
+            mu_ui::unpackLevelAndGR(packed, level, gr);
             expect(level < 0.01f, "silence reads as the bottom of the sweep");
+
+            // Well past the hold and release, the closed gate cuts by its Range (-30 dB = 30/80 of the sweep).
+            for (int b = 0; b < 40; ++b) fx.process(buf, 512, 2, vp, packed);
+            mu_ui::unpackLevelAndGR(packed, level, gr);
+            expectWithinAbsoluteError(gr, 30.0f / 80.0f, 0.01f, "the closed gate's gain reduction is its Range");
+        }
+
+        beginTest("Gate meter packing: two 0..1 values survive one float exactly to 12 bits");
+        {
+            for (float a : { 0.0f, 0.25f, 0.5f, 1.0f })
+                for (float b : { 0.0f, 0.375f, 0.9f, 1.0f })
+                {
+                    float x = -1.0f, y = -1.0f;
+                    mu_ui::unpackLevelAndGR(mu_ui::packLevelAndGR(a, b), x, y);
+                    expectWithinAbsoluteError(x, a, 1.0f / 4095.0f);
+                    expectWithinAbsoluteError(y, b, 1.0f / 4095.0f);
+                }
         }
 
         beginTest("Gate: Range -80 gives exact zeros after the release");

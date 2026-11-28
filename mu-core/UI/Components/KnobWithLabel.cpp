@@ -1,4 +1,5 @@
 #include "KnobWithLabel.h"
+#include "Audio/InsertSlotConfig.h"
 
 KnobWithLabel::KnobWithLabel(const juce::String& label,
                              MuLookAndFeel::ColourIds categoryColour)
@@ -299,8 +300,9 @@ void KnobWithLabel::clearModBinding() noexcept
 void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 {
     grSource     = gr;
-    meterIsLevel = false;
-    grDisplay    = 0.0f;
+    meterIsLevel   = false;
+    grDisplay      = 0.0f;
+    levelGRDisplay = 0.0f;
     if (gr) startTimerHz(mu_ui::kUiRefreshHz);
     else if (!hasModBind) stopTimer();
     repaint();
@@ -347,15 +349,22 @@ void KnobWithLabel::timerCallback()
         else             setModulatedActual(live);
     }
 
-    const float incoming = grSource ? grSource->load() : 0.0f;
-    const float prev     = grDisplay;
-    grDisplay = (incoming > grDisplay)
-              ? incoming
-              : kGRRelease * grDisplay + (1.0f - kGRRelease) * incoming;
-    grDisplay = juce::jlimit(0.0f, 1.0f, grDisplay);
-    const bool wasVisible = prev      > 0.005f;
-    const bool nowVisible = grDisplay > 0.005f;
-    if (wasVisible != nowVisible || std::abs(grDisplay - prev) > 0.001f)
+    // A level source carries the level and the gain reduction packed together; a GR source is the gain reduction alone.
+    float incoming = grSource ? grSource->load() : 0.0f;
+    float incomingGR = 0.0f;
+    if (meterIsLevel) mu_ui::unpackLevelAndGR(incoming, incoming, incomingGR);
+
+    // Instant rise, smoothed fall, for each meter.
+    const auto follow = [](float shown, float in)
+    {
+        return juce::jlimit(0.0f, 1.0f, in > shown ? in : kGRRelease * shown + (1.0f - kGRRelease) * in);
+    };
+    const float prev   = grDisplay;
+    const float prevGR = levelGRDisplay;
+    grDisplay      = follow(grDisplay, incoming);
+    levelGRDisplay = follow(levelGRDisplay, incomingGR);
+    const auto changed = [](float a, float b) { return (a > 0.005f) != (b > 0.005f) || std::abs(a - b) > 0.001f; };
+    if (changed(prev, grDisplay) || changed(prevGR, levelGRDisplay))
         repaint();
 }
 
@@ -370,7 +379,8 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
                                isSteppedControl() || overrideMode == OverrideMode::absolute);   // an Absolute knob always shows its actual value
 
     // Modulation indicator ring and GR arc overlay.
-    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && ! lockLed && std::isnan(lockGhostNorm)) return;
+    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f && levelGRDisplay <= 0.005f
+        && ! lockLed && std::isnan(lockGhostNorm)) return;
 
     using mu_ui::sf;
 
@@ -445,13 +455,28 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
 
     // GR arc — orange arc sweeping from the max end (5 o'clock) backward
     // proportional to current gain reduction. 1.0 = 24 dB GR = full arc.
-    if (grDisplay > 0.005f && meterIsLevel)
+    if (meterIsLevel)
     {
-        // Level arc: green, from the knob's minimum end up to the current level (a meter, so it grows from zero).
-        juce::Path levelArc;
-        levelArc.addCentredArc(cx, cy, arcR, arcR, 0.0f, startAngle, startAngle + grDisplay * (endAngle - startAngle), true);
-        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::vuMeterGreen).withAlpha(0.85f));
-        g.strokePath(levelArc, juce::PathStrokeType(sf(2.5f), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        // Two thin rings: the level (green, outer) grows from the minimum end, the gain reduction (orange, inner) falls from
+        // the maximum end, so the two read like the Compressor's meter and never hide each other.
+        const float w = sf(1.5f);
+        const auto stroke = juce::PathStrokeType(w, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        if (grDisplay > 0.005f)
+        {
+            const float r = arcR + w * 0.75f;
+            juce::Path levelArc;
+            levelArc.addCentredArc(cx, cy, r, r, 0.0f, startAngle, startAngle + grDisplay * (endAngle - startAngle), true);
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::vuMeterGreen).withAlpha(0.85f));
+            g.strokePath(levelArc, stroke);
+        }
+        if (levelGRDisplay > 0.005f)
+        {
+            const float r = arcR - w * 0.75f;
+            juce::Path grArc;
+            grArc.addCentredArc(cx, cy, r, r, 0.0f, endAngle - levelGRDisplay * (endAngle - startAngle), endAngle, true);
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::indicatorGRTint).withAlpha(0.85f));
+            g.strokePath(grArc, stroke);
+        }
     }
     else if (grDisplay > 0.005f)
     {

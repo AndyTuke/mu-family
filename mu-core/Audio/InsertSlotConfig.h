@@ -353,9 +353,25 @@ inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
 // The Clipper (5), Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
 inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 5 || algoIndex == 7 || algoIndex == 8; }
 
-// The Gate (23) shows its input level on its Threshold knob (slot 0), as a meter rising from the knob's minimum. The algorithm
-// publishes the level through the same atomic as the gain reduction, already scaled to the Threshold knob's own range.
+// The Gate (23) shows its input level and its gain reduction on its Threshold knob (slot 0): two thin rings, the level rising
+// from the knob's minimum and the gain reduction falling from its maximum. Both go through the insert's one meter atomic,
+// packed by packLevelAndGR, each already scaled 0..1 to the Threshold knob's -80..0 dB sweep.
 inline bool insertAlgoShowsLevel(int algoIndex) noexcept { return algoIndex == 23; }
+
+// Two 0..1 meter values in one float: each quantised to 12 bits and packed as level * 4096 + gr, an integer below 2^24 that a
+// float holds exactly, so one atomic store keeps the pair consistent.
+inline float packLevelAndGR(float level, float gr) noexcept
+{
+    const auto q = [](float v) { return (int) std::lround(juce::jlimit(0.0f, 1.0f, std::isfinite(v) ? v : 0.0f) * 4095.0f); };
+    return (float) (q(level) * 4096 + q(gr));
+}
+
+inline void unpackLevelAndGR(float packed, float& level, float& gr) noexcept
+{
+    const int v = juce::jlimit(0, 4096 * 4096 - 1, std::isfinite(packed) ? (int) std::lround(packed) : 0);
+    level = (float) (v / 4096) / 4095.0f;
+    gr    = (float) (v % 4096) / 4095.0f;
+}
 
 // First-visit / cold-restore defaults per algorithm. Indexed [algo][slot],
 // stored as ACTUAL (not normalised) values so they read naturally. The init

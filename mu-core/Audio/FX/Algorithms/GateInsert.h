@@ -56,6 +56,7 @@ public:
         auto chans = buf.getArrayOfWritePointers();
 
         float blockPeak = 0.0f;   // the loudest detected sample of the block, for the Threshold knob's level meter
+        float minGain   = 1.0f;   // the deepest cut of the block, for its gain-reduction meter
         // Per sample: detect the level, decide open or closed, move the shared gain toward its target, apply it to every channel.
         for (int i = 0; i < ns; ++i)
         {
@@ -82,13 +83,18 @@ public:
             if (std::abs(gain - target) < 1.0e-7f) gain = target;   // lands exactly on the target (Range -80 gives exact zeros)
 
             if (cuts)
+            {
+                minGain = juce::jmin(minGain, gain);
                 for (int ch = 0; ch < nCh; ++ch)
                     chans[ch][i] *= gain;
+            }
         }
 
-        // Publish the input level for the Threshold knob's ring: dB mapped onto the knob's own -80..0 dB sweep, 0..1.
+        // Publish both meters for the Threshold knob's rings, each on the knob's own -80..0 dB sweep (0..1): the input level,
+        // and the gain reduction (80 dB of cut = the full sweep), packed into the one meter value.
         const float levelDb = 20.0f * std::log10(juce::jmax(blockPeak, 1.0e-6f));
-        grOut = juce::jlimit(0.0f, 1.0f, (levelDb + 80.0f) / 80.0f);
+        const float grDb    = -20.0f * std::log10(juce::jmax(minGain, 1.0e-4f));
+        grOut = mu_ui::packLevelAndGR((levelDb + 80.0f) / 80.0f, grDb / 80.0f);
     }
 
 private:

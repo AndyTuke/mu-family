@@ -75,9 +75,9 @@ public:
     // knob polls at 30 Hz and draws an orange arc showing gain reduction (0..1,
     // where 1 ≡ 24 dB). Pass nullptr to disable.
     void setGRSource(const std::atomic<float>* gr);
-    // Level meter overlay (the Gate's input level): the same audio-thread atomic, 0..1 along THIS knob's own sweep (0 = the knob's
-    // minimum, 1 = its maximum), drawn as a green arc rising from the minimum end, where the GR arc falls from the maximum end.
-    // Pass nullptr to disable.
+    // Level + GR meter overlay (the Gate): the audio-thread atomic holds both values packed by mu_ui::packLevelAndGR, each 0..1
+    // along THIS knob's own sweep. Drawn as two thin rings: the level in green rising from the minimum end, the gain reduction
+    // in orange falling from the maximum end. Pass nullptr to disable.
     void setLevelSource(const std::atomic<float>* level);
 
     // Parameter-lock marks (a step's lock shown on the knob): `locked` lights a small red LED in the knob's centre, and
@@ -135,6 +135,7 @@ private:
     const std::atomic<float>* grSource  = nullptr;
     bool                       meterIsLevel = false;   // grSource is a level (drawn up from the minimum), not a gain reduction
     float                      grDisplay = 0.0f;
+    float                      levelGRDisplay = 0.0f;  // a level source's gain reduction (the Gate's inner ring)
     static constexpr float     kGRRelease = 0.85f;
     static constexpr float     kModRepaintStep = 0.002f;   // ≈0.5° of the sweep — smallest visible ring move
 
