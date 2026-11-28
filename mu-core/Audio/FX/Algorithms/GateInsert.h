@@ -9,8 +9,8 @@ namespace mu_audio
 // insertAlgo = 23. Gate: a downward noise gate that cuts the sound below a level, no look-ahead (so no latency).
 //   - Threshold -80..0 dB: the level above which the gate opens.
 //   - Range     -80..0 dB: how far a closed gate cuts; 0 leaves the signal untouched, -80 shuts it fully (gain exactly 0).
-//   - Attack    0.1..50 ms: time constant of the gain rise when the gate opens.
-//   - Release   5..2000 ms: time constant of the gain fall once the gate closes.
+//   - Attack    0.1..50 ms: time of the gain rise when the gate opens (two smoothing stages, so it eases in and out).
+//   - Release   5..2000 ms: time of the gain fall once the gate closes (same two stages).
 // The detector is the louder of the two channels through a peak follower (instant rise, 5 ms fall). The gate opens above the
 // threshold and closes 4 dB below it (hysteresis, so a level hovering at the threshold does not chatter) after a 20 ms hold; both
 // values are fixed. One gain serves both channels, so the stereo image does not shift.
@@ -32,6 +32,7 @@ public:
         // Starts open, so the first note is not clipped; it closes by itself if the signal stays below the threshold.
         detector = 0.0f;
         gain = 1.0f;
+        gainStage = 1.0f;
         open = true;
         hold = holdSamples;
     }
@@ -50,8 +51,8 @@ public:
         const float closeThr = openThr * std::pow(10.0f, -kHysteresisDb / 20.0f);
         const bool  cuts     = rangeDb < -0.05f;                       // Range 0: the gate does nothing, the signal stays bit-exact
         const float floorGain = rangeDb <= -79.9f ? 0.0f : std::pow(10.0f, rangeDb / 20.0f);
-        const float attCoef = 1.0f - std::exp(-1.0f / juce::jmax(1.0f, attMs * 0.001f * (float) sr));
-        const float relCoef = 1.0f - std::exp(-1.0f / juce::jmax(1.0f, relMs * 0.001f * (float) sr));
+        const float attCoef = 1.0f - std::exp(-1.0f / juce::jmax(1.0f, 0.5f * attMs * 0.001f * (float) sr));   // half time per stage
+        const float relCoef = 1.0f - std::exp(-1.0f / juce::jmax(1.0f, 0.5f * relMs * 0.001f * (float) sr));
         const int   nDet = juce::jmin(nCh, 2);
         auto chans = buf.getArrayOfWritePointers();
 
@@ -78,9 +79,14 @@ public:
                 else          open = false;
             }
 
+            // Two cascaded one-pole smoothers, each at half the knob's time: the gain eases in and out of every move instead of
+            // starting at full speed, which would click. The pair reaches 63 % in about 1.07x the knob time.
             const float target = open ? 1.0f : floorGain;
-            gain += (target - gain) * (target > gain ? attCoef : relCoef);
-            if (std::abs(gain - target) < 1.0e-7f) gain = target;   // lands exactly on the target (Range -80 gives exact zeros)
+            const float coef = target > gain ? attCoef : relCoef;
+            gainStage += (target - gainStage) * coef;
+            gain      += (gainStage - gain) * coef;
+            if (std::abs(gainStage - target) < 1.0e-7f) gainStage = target;
+            if (std::abs(gain - target) < 1.0e-7f && gainStage == target) gain = target;   // lands exactly (Range -80 gives exact zeros)
 
             if (cuts)
             {
@@ -106,7 +112,8 @@ private:
     int    holdSamples = 882;
     float  detRelease = 0.0f;
     float  detector = 0.0f;
-    float  gain = 1.0f;
+    float  gain = 1.0f;        // the applied gain (second smoothing stage)
+    float  gainStage = 1.0f;   // the first smoothing stage
     bool   open = true;
     int    hold = 0;
 };
