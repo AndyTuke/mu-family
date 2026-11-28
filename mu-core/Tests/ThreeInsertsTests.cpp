@@ -210,9 +210,10 @@ struct ThreeInsertsTests : juce::UnitTest
                 fx.prepare(kSR, 512);
                 const auto x = sine(n, 1000.0, kSR, 0.001f);
                 const auto y = render(fx, params(Gate, -40.0f, 0.0f, 1.0f, 50.0f), x);
+                const size_t la = (size_t) fx.lookAheadSamples();
                 float worst = 0.0f;
-                for (size_t i = 0; i < x.size(); ++i) worst = std::max(worst, std::abs(y[i] - x[i]));
-                expect(worst == 0.0f, "Range 0 leaves the signal bit-exact");
+                for (size_t i = 0; i + la < x.size(); ++i) worst = std::max(worst, std::abs(y[i + la] - x[i]));
+                expect(worst == 0.0f, "Range 0 leaves the signal bit-exact (only delayed by the look-ahead)");
             }
         }
 
@@ -235,7 +236,7 @@ struct ThreeInsertsTests : juce::UnitTest
             expect(level < 0.01f, "silence reads as the bottom of the sweep");
 
             // Well past the hold and release, the closed gate cuts by its Range (-30 dB = 30/80 of the sweep).
-            for (int b = 0; b < 40; ++b) fx.process(buf, 512, 2, vp, packed);
+            for (int b = 0; b < 40; ++b) { buf.clear(); fx.process(buf, 512, 2, vp, packed); }
             mu_ui::unpackLevelAndGR(packed, level, gr);
             expectWithinAbsoluteError(gr, 30.0f / 80.0f, 0.01f, "the closed gate's gain reduction is its Range");
         }
@@ -304,7 +305,7 @@ struct ThreeInsertsTests : juce::UnitTest
             const auto x = concat(constant(48000, 0.001f), constant(24000, 0.5f));
             const auto y = render(fx, params(Gate, -40.0f, -80.0f, 5.0f, 100.0f), x);
             int fall = -1;
-            for (int i = 0; i < 48000 && fall < 0; ++i)
+            for (int i = fx.lookAheadSamples(); i < 48000 && fall < 0; ++i)   // the output starts after the look-ahead
                 if (y[(size_t) i] <= 0.001f * std::exp(-1.0f)) fall = i;
             const double releaseMs = (fall - (int) std::lround(0.020 * kSR) - 1) * 1000.0 / kSR;
             expect(std::abs(releaseMs - 100.0) < 20.0, "release time constant " + juce::String(releaseMs, 1) + " ms");
@@ -313,6 +314,19 @@ struct ThreeInsertsTests : juce::UnitTest
                 if (y[(size_t) (48000 + i)] >= 0.5f * (1.0f - std::exp(-1.0f))) rise = i;
             const double attackMs = rise * 1000.0 / kSR;
             expect(std::abs(attackMs - 5.0) < 1.0, "attack time constant " + juce::String(attackMs, 2) + " ms");
+        }
+
+        beginTest("Gate: a hit that arrives while the gate is releasing plays at full level from its first sample (look-ahead)");
+        {
+            mu_audio::GateInsert fx;
+            fx.prepare(kSR, 512);
+            // A loud burst, a quiet gap long enough to close and half-release, then a second loud burst.
+            const auto x = concat(concat(sine(9600, 1000.0, kSR, 0.5f), constant(9600, 0.0f)), sine(9600, 1000.0, kSR, 0.5f));
+            const auto y = render(fx, params(Gate, -40.0f, -60.0f, 1.0f, 150.0f), x);
+            const int la = fx.lookAheadSamples();
+            const int hit = 19200;
+            const float early = peakOf(y, hit + la + 24, 24) / peakOf(x, hit + 24, 24);   // the hit's second half-millisecond
+            expect(early > 0.85f, "the hit started at " + juce::String(early, 3) + " of its level");
         }
 
         beginTest("Gate: one gain serves both channels (a quiet right channel is cut like the left)");

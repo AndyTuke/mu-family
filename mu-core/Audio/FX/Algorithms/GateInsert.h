@@ -3,10 +3,14 @@
 #include "Audio/FX/Algorithms/InsertAlgorithmBase.h"
 #include "Audio/FX/Algorithms/FxUse.h"
 #include <cmath>
+#include <vector>
 
 namespace mu_audio
 {
-// insertAlgo = 23. Gate: a downward noise gate that cuts the sound below a level, no look-ahead (so no latency).
+// insertAlgo = 23. Gate: a downward noise gate that cuts the sound below a level. The detector listens 2 ms ahead of the
+// output (a fixed look-ahead delay, not reported to the host), so a hit that arrives while the gate is closed or still
+// releasing finds the gain already open; without it the hit's first millisecond passes quietly and the fast gain rise under
+// the loud sound clicks.
 //   - Threshold -80..0 dB: the level above which the gate opens.
 //   - Range     -80..0 dB: how far a closed gate cuts; 0 leaves the signal untouched, -80 shuts it fully (gain exactly 0).
 //   - Attack    0.1..50 ms: time of the gain rise when the gate opens (two smoothing stages, so it eases in and out).
@@ -24,11 +28,18 @@ public:
         sr = sampleRate > 0.0 ? sampleRate : 44100.0;
         holdSamples = juce::jmax(1, (int) std::lround(kHoldSeconds * sr));
         detRelease  = std::exp(-1.0f / juce::jmax(1.0f, (float) (kDetectorReleaseSeconds * sr)));
+        lookAhead   = juce::jmax(1, (int) std::lround(kLookAheadSeconds * sr));
+        for (auto& d : delay) d.assign((size_t) lookAhead, 0.0f);   // allocation here, never in process()
         reset();
     }
 
+    // The fixed look-ahead delay in samples at the prepared rate (the output lags the input by this much).
+    int lookAheadSamples() const noexcept { return lookAhead; }
+
     void reset() override
     {
+        for (auto& d : delay) std::fill(d.begin(), d.end(), 0.0f);
+        delayPos = 0;
         // Starts open, so the first note is not clipped; it closes by itself if the signal stays below the threshold.
         detector = 0.0f;
         gain = 1.0f;
@@ -55,6 +66,7 @@ public:
         const float relCoef = 1.0f - std::exp(-1.0f / juce::jmax(1.0f, 0.5f * relMs * 0.001f * (float) sr));
         const int   nDet = juce::jmin(nCh, 2);
         auto chans = buf.getArrayOfWritePointers();
+        if (delay[0].size() != (size_t) lookAhead) return;   // not prepared
 
         float blockPeak = 0.0f;   // the loudest detected sample of the block, for the Threshold knob's level meter
         float minGain   = 1.0f;   // the deepest cut of the block, for its gain-reduction meter
@@ -88,12 +100,22 @@ public:
             if (std::abs(gainStage - target) < 1.0e-7f) gainStage = target;
             if (std::abs(gain - target) < 1.0e-7f && gainStage == target) gain = target;   // lands exactly (Range -80 gives exact zeros)
 
-            if (cuts)
+            // The output is the input from lookAhead samples ago, so the gain decided now meets the sound it was decided for
+            // slightly early. Always delayed (even at Range 0), so the timing never jumps when Range moves.
+            if (cuts) minGain = juce::jmin(minGain, gain);
+            const float g = cuts ? gain : 1.0f;
+            for (int ch = 0; ch < nCh; ++ch)
             {
-                minGain = juce::jmin(minGain, gain);
-                for (int ch = 0; ch < nCh; ++ch)
-                    chans[ch][i] *= gain;
+                float& s = chans[ch][i];
+                if (ch < 2)
+                {
+                    const float late = delay[(size_t) ch][(size_t) delayPos];
+                    delay[(size_t) ch][(size_t) delayPos] = s;
+                    s = late;
+                }
+                if (cuts) s *= g;   // a third channel and on (none in practice) is gated without the delay
             }
+            if (++delayPos >= lookAhead) delayPos = 0;
         }
 
         // Publish both meters for the Threshold knob's rings, each on the knob's own -80..0 dB sweep (0..1): the input level,
@@ -107,6 +129,14 @@ private:
     static constexpr double kHoldSeconds            = 0.020;
     static constexpr double kDetectorReleaseSeconds = 0.005;
     static constexpr float  kHysteresisDb           = 4.0f;
+
+public:
+    static constexpr double kLookAheadSeconds       = 0.002;   // covers the default 1 ms Attack (the two stages reach ~93 % in 2 ms)
+
+private:
+    int    lookAhead = 96;
+    int    delayPos  = 0;
+    std::vector<float> delay[2];
 
     double sr = 44100.0;
     int    holdSamples = 882;

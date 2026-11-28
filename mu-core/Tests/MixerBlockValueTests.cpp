@@ -1146,7 +1146,10 @@ struct InsertLatencyTests : juce::UnitTest
                 const bool tape = algo == 10;
                 const bool lofi = algo == 29;     // Lo-Fi: Wobble is a short modulated delay (at most 2.5 ms; 0 at Wobble 0, checked in its own test)
                 const bool shaper = algo == 24;   // the Waveshaper: the same half-band, so a step starts within 4 samples
-                if (crusher)
+                const bool gate = algo == 23;     // the Gate: a fixed 2 ms look-ahead, so its gain is open when a hit arrives
+                if (gate)
+                    expect(onset <= (int) std::ceil(0.002 * kRate), "Gate delays a step by " + juce::String(onset) + " samples");
+                else if (crusher)
                     expect(onset >= 0 && onset <= 64, "Bitcrusher cold-start hold is bounded (" + juce::String(onset) + ")");
                 else if (lofi)
                     expect(onset <= (int) std::ceil(0.0025 * kRate), "Lo-Fi delays a step by " + juce::String(onset) + " samples");
